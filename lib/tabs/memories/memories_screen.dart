@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../models/scrapbook_entry.dart';
 import '../../services/scrapbook_service.dart';
+import 'watch_tab.dart';
 
 class MemoriesScreen extends StatefulWidget {
   const MemoriesScreen({super.key});
@@ -45,7 +46,7 @@ class _MemoriesScreenState extends State<MemoriesScreen>
                 color: Colors.transparent,
                 child: TabBar(
                   controller: _tabController,
-                  dividerColor: cs.outlineVariant,
+                  dividerColor: Colors.transparent,
                   indicatorColor: cs.primary,
                   indicatorWeight: 2,
                   isScrollable: true,
@@ -72,13 +73,7 @@ class _MemoriesScreenState extends State<MemoriesScreen>
                       'Track your relationship streaks, milestones, and meaningful moments together.',
                   cs: cs,
                 ),
-                _ComingSoonTab(
-                  icon: Icons.movie_outlined,
-                  title: 'Watch Together',
-                  subtitle:
-                      'A shared list of movies and shows, with reflective prompts after you watch.',
-                  cs: cs,
-                ),
+                const WatchTab(),
                 const _ScrapbookTab(),
               ],
             ),
@@ -1243,14 +1238,7 @@ class _GalleryScrapbookView extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFFBF4),
                         borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: cs.outlineVariant),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 24,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
+                        border: Border.all(color: cs.primary),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
