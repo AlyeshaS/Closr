@@ -46,7 +46,7 @@ class _MemoriesScreenState extends State<MemoriesScreen>
                 color: Colors.transparent,
                 child: TabBar(
                   controller: _tabController,
-                  dividerColor: Colors.transparent,
+                  dividerColor: cs.outlineVariant,
                   indicatorColor: cs.primary,
                   indicatorWeight: 2,
                   isScrollable: true,

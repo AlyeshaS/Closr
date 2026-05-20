@@ -20,6 +20,7 @@ class _WatchTabState extends State<WatchTab> {
   late Future<String?> _partnerUidFuture;
 
   _WatchFeedFilter _filter = _WatchFeedFilter.all;
+  _TopView _topView = _TopView.suggestions;
   String? _selectedGenre;
   double _minRating = 0;
   double _maxRuntime = 240;
@@ -29,6 +30,105 @@ class _WatchTabState extends State<WatchTab> {
     super.initState();
     _recommendationsFuture = _repository.fetchRecommendations();
     _partnerUidFuture = _repository.fetchPartnerUid();
+  }
+
+  String _activeFilterLabel(_WatchFeedFilter filter, String? genre) {
+    final filterLabel = switch (filter) {
+      _WatchFeedFilter.all => 'All media',
+      _WatchFeedFilter.bothYes => 'Both yes',
+      _WatchFeedFilter.oneYes => 'One yes',
+      _WatchFeedFilter.anyNo => 'Any no',
+      _WatchFeedFilter.favorites => 'Favorites',
+      _WatchFeedFilter.watched => 'Watched',
+      _WatchFeedFilter.unwatched => 'Unwatched',
+      _WatchFeedFilter.movies => 'Movies only',
+      _WatchFeedFilter.tv => 'TV shows only',
+    };
+
+    if (genre == null) {
+      return filterLabel;
+    }
+
+    return '$filterLabel · $genre';
+  }
+
+  Future<void> _openFilterSheet({
+    required ColorScheme cs,
+    required _WatchFeedFilter filter,
+    required String? selectedGenre,
+    required List<String> genres,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: cs.outlineVariant,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Filter watch picks',
+                        style: Theme.of(sheetContext).textTheme.titleLarge,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _filter = _WatchFeedFilter.all;
+                          _selectedGenre = null;
+                          _minRating = 0;
+                          _maxRuntime = 240;
+                        });
+                        Navigator.of(sheetContext).pop();
+                      },
+                      child: const Text('Reset'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _FilterPanel(
+                  cs: cs,
+                  filter: filter,
+                  selectedGenre: selectedGenre,
+                  genres: genres,
+                  minRating: _minRating,
+                  maxRuntime: _maxRuntime,
+                  onFilterChanged: (value) => setState(() => _filter = value),
+                  onGenreChanged: (value) =>
+                      setState(() => _selectedGenre = value),
+                  onRatingChanged: (value) =>
+                      setState(() => _minRating = value),
+                  onRuntimeChanged: (value) =>
+                      setState(() => _maxRuntime = value),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<String> _collectGenres(
@@ -452,46 +552,66 @@ class _WatchTabState extends State<WatchTab> {
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
                       sliver: SliverToBoxAdapter(
-                        child: _WatchHeroCard(
-                          cs: cs,
-                          title: 'Watch',
-                          subtitle:
-                              'A soft shared watchlist for movie nights and series binges.',
-                          headline: _headlineForFilter(),
-                          count: filteredItems.length,
-                          partnerLinked: partnerUid != null,
-                        ),
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                      sliver: SliverToBoxAdapter(
-                        child: _FilterPanel(
-                          cs: cs,
-                          filter: _filter,
-                          selectedGenre: selectedGenre,
-                          genres: genres,
-                          minRating: _minRating,
-                          maxRuntime: _maxRuntime,
-                          onFilterChanged: (filter) =>
-                              setState(() => _filter = filter),
-                          onGenreChanged: (genre) =>
-                              setState(() => _selectedGenre = genre),
-                          onRatingChanged: (value) =>
-                              setState(() => _minRating = value),
-                          onRuntimeChanged: (value) =>
-                              setState(() => _maxRuntime = value),
-                        ),
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                      sliver: SliverToBoxAdapter(
-                        child: _MatchHistoryPanel(
-                          cs: cs,
-                          currentUserId: user.uid,
-                          partnerUid: partnerUid,
-                          records: records,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _TopViewDropdown(
+                                  value: _topView,
+                                  cs: cs,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _topView = value;
+                                      if (value == _TopView.suggestions) {
+                                        _filter = _WatchFeedFilter.all;
+                                      } else if (value == _TopView.matched) {
+                                        _filter = _WatchFeedFilter.bothYes;
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 110,
+                                child: FilledButton.tonal(
+                                  onPressed: () => _openFilterSheet(
+                                    cs: cs,
+                                    filter: _filter,
+                                    selectedGenre: selectedGenre,
+                                    genres: genres,
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.tune_rounded,
+                                        size: 18,
+                                        color: cs.onSurface,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Filter',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(color: cs.onSurface),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -503,70 +623,130 @@ class _WatchTabState extends State<WatchTab> {
                           child: CircularProgressIndicator(color: cs.primary),
                         ),
                       )
-                    else if (filteredItems.isEmpty)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyWatchState(
-                          cs: cs,
-                          title: 'No matches for this filter yet.',
-                          subtitle:
-                              'Try widening the rating, runtime, or genre filters.',
-                        ),
-                      )
-                    else
+                    else ...[
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                        sliver: SliverGrid(
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 420,
-                                mainAxisExtent: 560,
-                                crossAxisSpacing: 14,
-                                mainAxisSpacing: 14,
-                              ),
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            final item = filteredItems[index];
-                            final record = _recordFor(item, records);
-                            final score = _displayScore(
-                              item,
-                              record,
-                              user.uid,
-                              partnerUid,
-                            );
-                            return _RecommendationCard(
-                              cs: cs,
-                              item: item,
-                              score: score,
-                              record: record,
-                              currentUserId: user.uid,
-                              partnerUid: partnerUid,
-                              onOpenDetails: () => _openDetails(item),
-                              onYes: () => _toggleAction(
-                                item: item,
-                                liked: !(record?.isLikedBy(user.uid) ?? false),
-                              ),
-                              onNo: () => _toggleAction(
-                                item: item,
-                                disliked:
-                                    !(record?.isDislikedBy(user.uid) ?? false),
-                              ),
-                              onFavorite: () => _toggleAction(
-                                item: item,
-                                favorited:
-                                    !(record?.isFavoritedBy(user.uid) ?? false),
-                              ),
-                              onWatched: () => _toggleAction(
-                                item: item,
-                                watched:
-                                    !(record?.isWatchedBy(user.uid) ?? false),
-                              ),
-                            );
-                          }, childCount: filteredItems.length),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                        sliver: SliverToBoxAdapter(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            child: _topView == _TopView.history
+                                ? _PersonalHistoryPanel(
+                                    key: const ValueKey('history'),
+                                    cs: cs,
+                                    currentUserId: user.uid,
+                                    records: records,
+                                  )
+                                : const SizedBox.shrink(key: ValueKey('empty')),
+                          ),
                         ),
                       ),
+
+                      if (_topView == _TopView.matched)
+                        if (filteredItems.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _MatchedTimelineState(
+                              cs: cs,
+                              icon: Icons.favorite_border_rounded,
+                              title: 'No shared matches yet',
+                              subtitle:
+                                  'Once you both like the same picks, they will show up here as a shared timeline.',
+                              milestones: const [
+                                'Pick a few recommendations together',
+                                'Save items you both say yes to',
+                                'Watch the matched timeline grow',
+                              ],
+                            ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                            sliver: SliverToBoxAdapter(
+                              child: _MatchedTimelineFeed(
+                                cs: cs,
+                                entries: filteredItems
+                                    .map(
+                                      (item) => _MatchedTimelineEntry(
+                                        item: item,
+                                        record: _recordFor(item, records),
+                                        score: _displayScore(
+                                          item,
+                                          _recordFor(item, records),
+                                          user.uid,
+                                          partnerUid,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                currentUserId: user.uid,
+                                partnerUid: partnerUid,
+                              ),
+                            ),
+                          )
+                      // FIX 3: Do not render the card grid when in history view
+                      else if (_topView == _TopView.history ||
+                          filteredItems.isEmpty)
+                        const SliverToBoxAdapter(child: SizedBox.shrink())
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 420,
+                                  mainAxisExtent: 560,
+                                  crossAxisSpacing: 14,
+                                  mainAxisSpacing: 14,
+                                ),
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final item = filteredItems[index];
+                              final record = _recordFor(item, records);
+                              final score = _displayScore(
+                                item,
+                                record,
+                                user.uid,
+                                partnerUid,
+                              );
+                              return _RecommendationCard(
+                                cs: cs,
+                                item: item,
+                                score: score,
+                                record: record,
+                                currentUserId: user.uid,
+                                partnerUid: partnerUid,
+                                onOpenDetails: () => _openDetails(item),
+                                onYes: () => _toggleAction(
+                                  item: item,
+                                  liked:
+                                      !(record?.isLikedBy(user.uid) ?? false),
+                                ),
+                                onNo: () => _toggleAction(
+                                  item: item,
+                                  disliked:
+                                      !(record?.isDislikedBy(user.uid) ??
+                                          false),
+                                ),
+                                onFavorite: () => _toggleAction(
+                                  item: item,
+                                  favorited:
+                                      !(record?.isFavoritedBy(user.uid) ??
+                                          false),
+                                ),
+                                onWatched: () => _toggleAction(
+                                  item: item,
+                                  watched:
+                                      !(record?.isWatchedBy(user.uid) ?? false),
+                                ),
+                              );
+                            }, childCount: filteredItems.length),
+                          ),
+                        ),
+                    ],
                   ],
                 );
               },
@@ -591,6 +771,8 @@ enum _WatchFeedFilter {
 }
 
 enum _WatchMediaType { movie, tv }
+
+enum _TopView { suggestions, matched, history }
 
 class _WatchItem {
   final int tmdbId;
@@ -1274,7 +1456,7 @@ class _WatchRepository {
         mediaType: _WatchMediaType.movie,
         title: 'Interstellar',
         overview:
-            'A team of explorers travel through a wormhole in space in an attempt to ensure humanity’s survival.',
+            'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
         posterPath: '/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
         backdropPath: '/rAiYTfKGqDCRIIqo664sY9XZIvQ.jpg',
         rating: 8.7,
@@ -1348,16 +1530,20 @@ class _WatchHeroCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String headline;
+  final String filterLabel;
   final int count;
   final bool partnerLinked;
+  final VoidCallback onFilterTap;
 
   const _WatchHeroCard({
     required this.cs,
     required this.title,
     required this.subtitle,
     required this.headline,
+    required this.filterLabel,
     required this.count,
     required this.partnerLinked,
+    required this.onFilterTap,
   });
 
   @override
@@ -1410,6 +1596,12 @@ class _WatchHeroCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                onPressed: onFilterTap,
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Filter'),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1424,6 +1616,14 @@ class _WatchHeroCard extends StatelessWidget {
               ),
               _HeroMetric(label: 'Focus', value: headline),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Showing $filterLabel',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -1617,11 +1817,50 @@ class _MatchHistoryPanel extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
+            _MatchedTimelineState(
+              cs: cs,
+              icon: Icons.link_rounded,
+              title: 'No partner connected',
+              subtitle:
+                  'Connect a partner to unlock the shared match timeline.',
+              milestones: const [
+                'Link your partner account',
+                'Vote on a few movies or shows together',
+                'See your shared story appear here',
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (records.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: cs.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
-              'Connect a partner to see shared yes/no history, disagreements, and mutual favorites.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              'Match history',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _MatchedTimelineState(
+              cs: cs,
+              icon: Icons.favorite_border_rounded,
+              title: 'No shared history yet',
+              subtitle:
+                  'Start voting together and this area will fill with moments.',
+              milestones: const [
+                'Swipe through a few recommendations',
+                'Mark what you both like or skip',
+                'See mutual taste and disagreements build up',
+              ],
             ),
           ],
         ),
@@ -1694,24 +1933,411 @@ class _MatchHistoryPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          if (records.isEmpty)
-            Text(
-              'Once you start voting, your shared watch history will appear here.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-            )
-          else ...[
-            _HistorySection(title: 'What you both liked', items: bothLiked),
-            const SizedBox(height: 12),
-            _HistorySection(
-              title: 'What you both disliked',
-              items: bothDisliked,
+          _HistorySection(title: 'What you both liked', items: bothLiked),
+          const SizedBox(height: 12),
+          _HistorySection(title: 'What you both disliked', items: bothDisliked),
+          const SizedBox(height: 12),
+          _HistorySection(title: 'Where you disagreed', items: disagreements),
+        ],
+      ),
+    );
+  }
+}
+
+class _MatchedTimelineFeed extends StatelessWidget {
+  final ColorScheme cs;
+  final List<_MatchedTimelineEntry> entries;
+  final String currentUserId;
+  final String? partnerUid;
+
+  const _MatchedTimelineFeed({
+    required this.cs,
+    required this.entries,
+    required this.currentUserId,
+    required this.partnerUid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(999),
             ),
-            const SizedBox(height: 12),
-            _HistorySection(title: 'Where you disagreed', items: disagreements),
+            child: Text(
+              'Matched timeline',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: cs.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text('Your shared yeses', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            'A timeline view of the picks you both liked.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 18),
+          for (var index = 0; index < entries.length; index++) ...[
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: index == entries.length - 1 ? 0 : 12,
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: index.isEven
+                                  ? cs.primary
+                                  : cs.primaryContainer,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: cs.primary, width: 1.5),
+                            ),
+                          ),
+                          if (index != entries.length - 1)
+                            Expanded(
+                              child: Container(
+                                width: 1.5,
+                                color: cs.primary.withValues(alpha: 0.2),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          final entry = entries[index];
+                          final item = entry.item;
+                          final record = entry.record;
+                          final score = entry.score;
+                          final dark = theme.brightness == Brightness.dark;
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: index.isEven
+                                  ? cs.primaryContainer
+                                  : dark
+                                  ? const Color(0xFF231519)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _MatchedPosterThumb(
+                                  posterUrl: item.posterUrl,
+                                  cs: cs,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${item.mediaLabel} · ${item.releaseYear} · ${item.runtimeLabel}',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: cs.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        item.matchReason,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyMedium,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: [
+                                          _TimelineChip(
+                                            label:
+                                                '${score.toStringAsFixed(0)}% match',
+                                            filled: true,
+                                          ),
+                                          for (final genre in item.genres.take(
+                                            3,
+                                          ))
+                                            _TimelineChip(label: genre),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _MatchedTimelineEntry {
+  final _WatchItem item;
+  final _WatchRecord? record;
+  final double score;
+
+  const _MatchedTimelineEntry({
+    required this.item,
+    required this.record,
+    required this.score,
+  });
+}
+
+class _MatchedPosterThumb extends StatelessWidget {
+  final String posterUrl;
+  final ColorScheme cs;
+
+  const _MatchedPosterThumb({required this.posterUrl, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 72,
+        height: 96,
+        color: cs.surfaceContainerHighest,
+        child: posterUrl.isEmpty
+            ? Icon(Icons.image_outlined, color: cs.onSurfaceVariant)
+            : Image.network(
+                posterUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    Icon(Icons.image_outlined, color: cs.onSurfaceVariant),
+              ),
+      ),
+    );
+  }
+}
+
+class _TimelineChip extends StatelessWidget {
+  final String label;
+  final bool filled;
+
+  const _TimelineChip({required this.label, this.filled = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: filled ? cs.primary : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: filled ? cs.primary : cs.outlineVariant),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: filled ? cs.onPrimary : cs.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonalHistoryPanel extends StatelessWidget {
+  final ColorScheme cs;
+  final String currentUserId;
+  final List<_WatchRecord> records;
+
+  const _PersonalHistoryPanel({
+    Key? key,
+    required this.cs,
+    required this.currentUserId,
+    required this.records,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (records.isEmpty)
+            _HistoryEmptyState(
+              cs: cs,
+              icon: Icons.local_fire_department_outlined,
+              title: 'Start building your taste profile',
+              subtitle:
+                  'Your personal milestones will appear here as you vote.',
+              milestones: const [
+                'Like a few picks you want to revisit',
+                'Dislike the ones you want to skip',
+                'Save favorites and build a pattern',
+              ],
+            )
+          else
+            const SizedBox.shrink(),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopViewDropdown extends StatefulWidget {
+  final _TopView value;
+  final ValueChanged<_TopView> onChanged;
+  final ColorScheme cs;
+
+  const _TopViewDropdown({
+    required this.value,
+    required this.onChanged,
+    required this.cs,
+  });
+
+  @override
+  State<_TopViewDropdown> createState() => _TopViewDropdownState();
+}
+
+class _TopViewDropdownState extends State<_TopViewDropdown> {
+  Future<void> _showMenu() async {
+    final RenderBox box = context.findRenderObject() as RenderBox;
+    final offset = box.localToGlobal(Offset.zero);
+    final size = MediaQuery.of(context).size;
+    final left = offset.dx;
+    final top = offset.dy + box.size.height;
+    final right = size.width - offset.dx - box.size.width;
+    final bottom = size.height - top;
+
+    final selected = await showMenu<_TopView>(
+      context: context,
+      position: RelativeRect.fromLTRB(left, top, right, bottom),
+      // FIX 2: Remove the border from the popup menu by providing a clean shape
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide.none,
+      ),
+      elevation: 4,
+      items: [
+        PopupMenuItem(
+          value: _TopView.suggestions,
+          child: Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: widget.cs.onSurface),
+              const SizedBox(width: 8),
+              const Text('Suggestions'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          // FIX 1: Use outline heart icon instead of filled heart
+          value: _TopView.matched,
+          child: Row(
+            children: [
+              Icon(Icons.favorite_border_rounded, color: widget.cs.onSurface),
+              const SizedBox(width: 8),
+              const Text('Matched'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: _TopView.history,
+          child: Row(
+            children: [
+              Icon(Icons.history, color: widget.cs.onSurface),
+              const SizedBox(width: 8),
+              const Text('History'),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (selected != null) widget.onChanged(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = widget.cs;
+    final label = switch (widget.value) {
+      _TopView.suggestions => 'Suggestions',
+      _TopView.matched => 'Matched',
+      _TopView.history => 'History',
+    };
+    final icon = switch (widget.value) {
+      _TopView.suggestions => Icons.lightbulb_outline,
+      // FIX 1: Also use outline heart in the button itself when Matched is selected
+      _TopView.matched => Icons.favorite_border_rounded,
+      _TopView.history => Icons.history,
+    };
+
+    return GestureDetector(
+      onTap: _showMenu,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.primary,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: cs.onPrimary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: cs.onPrimary),
+              ),
+            ),
+            Icon(Icons.keyboard_arrow_down, color: cs.onPrimary),
+          ],
+        ),
       ),
     );
   }
@@ -1733,7 +2359,7 @@ class _HistorySection extends StatelessWidget {
         const SizedBox(height: 6),
         if (items.isEmpty)
           Text(
-            'Nothing yet.',
+            'Nothing yet. Keep voting to populate this section.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
@@ -2188,7 +2814,6 @@ class _EmptyWatchState extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surface,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: cs.outlineVariant),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2211,6 +2836,267 @@ class _EmptyWatchState extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MatchedTimelineState extends StatelessWidget {
+  final ColorScheme cs;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<String> milestones;
+
+  const _MatchedTimelineState({
+    required this.cs,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.milestones,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Icon(icon, color: cs.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          for (var index = 0; index < milestones.length; index++) ...[
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: index == milestones.length - 1 ? 0 : 12,
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: index.isEven
+                                  ? cs.primary
+                                  : cs.primaryContainer,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: cs.primary, width: 1.5),
+                            ),
+                          ),
+                          if (index != milestones.length - 1)
+                            Expanded(
+                              child: Container(
+                                width: 1.5,
+                                color: cs.primary.withValues(alpha: 0.2),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: index.isEven
+                                ? cs.primaryContainer
+                                : theme.brightness == Brightness.dark
+                                ? const Color(0xFF231519)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: index.isEven
+                                  ? cs.primary.withValues(alpha: 0.3)
+                                  : cs.outlineVariant,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                index.isEven ? Icons.favorite_rounded : icon,
+                                color: cs.primary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  milestones[index],
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryEmptyState extends StatelessWidget {
+  final ColorScheme cs;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<String> milestones;
+
+  const _HistoryEmptyState({
+    required this.cs,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.milestones,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(22),
+        // outer border removed per design
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  shape: BoxShape.circle,
+                  // inner circle border removed per design
+                ),
+                child: Icon(icon, color: cs.primary, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          ...List.generate(milestones.length, (index) {
+            final isLast = index == milestones.length - 1;
+            return Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: cs.onPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                      if (!isLast)
+                        Container(
+                          width: 2,
+                          height: 24,
+                          color: cs.outlineVariant,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        milestones[index],
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
