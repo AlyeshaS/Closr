@@ -775,11 +775,36 @@ class _WatchTabState extends State<WatchTab> {
                                     sliver: SliverToBoxAdapter(
                                       child: _MatchedTimelineFeed(
                                         cs: cs,
+                                        currentUserId: user.uid,
+                                        partnerUid: partnerUid,
+                                        onMarkWatchedTogether: (record) =>
+                                            _repository.markWatchedTogether(
+                                              record: record,
+                                            ),
+                                        onOpenDetails: (record) => _openDetails(
+                                          _WatchItem(
+                                            tmdbId: record.tmdbId,
+                                            mediaType: record.mediaType == 'tv'
+                                                ? _WatchMediaType.tv
+                                                : _WatchMediaType.movie,
+                                            title: record.title,
+                                            overview: '',
+                                            posterPath: record.posterPath,
+                                            backdropPath: record.backdropPath,
+                                            rating: 0,
+                                            runtimeMinutes: 0,
+                                            releaseDate: null,
+                                            seasons: null,
+                                            genres: record.matchedGenres,
+                                            matchPercentage:
+                                                record.coupleMatchScore,
+                                            matchReason: '',
+                                          ),
+                                        ),
                                         entries: matchedRecords
                                             .map(
                                               (record) => _MatchedTimelineEntry(
                                                 record: record,
-                                                score: record.coupleMatchScore,
                                               ),
                                             )
                                             .toList(),
@@ -821,7 +846,7 @@ class _WatchTabState extends State<WatchTab> {
                                         return Center(
                                           child: ConstrainedBox(
                                             constraints: const BoxConstraints(
-                                              maxWidth: 420,
+                                              maxWidth: 360,
                                             ),
                                             child: _RecommendationCard(
                                               cs: cs,
@@ -1412,6 +1437,128 @@ class _WatchRepository {
         await partnerMatchRef.delete();
       }
     }
+  }
+
+  Future<void> markWatchedTogether({required _WatchRecord record}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final partnerUid = await fetchPartnerUid();
+    if (partnerUid == null) {
+      return;
+    }
+
+    final now = Timestamp.now();
+    final docId = record.id;
+    final currentItemRef = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('watchItems')
+        .doc(docId);
+    final partnerItemRef = _db
+        .collection('users')
+        .doc(partnerUid)
+        .collection('watchItems')
+        .doc(docId);
+    final currentMatchRef = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('watchMatches')
+        .doc(docId);
+    final partnerMatchRef = _db
+        .collection('users')
+        .doc(partnerUid)
+        .collection('watchMatches')
+        .doc(docId);
+
+    final currentItemSnap = await currentItemRef.get();
+    final currentItemData = currentItemSnap.data() ?? <String, dynamic>{};
+    final partnerItemSnap = await partnerItemRef.get();
+    final partnerItemData = partnerItemSnap.data() ?? <String, dynamic>{};
+
+    final currentWatchedBy =
+        Set<String>.from(
+            List<String>.from(
+              (currentItemData['watchedBy'] as List?) ?? const [],
+            ),
+          )
+          ..add(user.uid)
+          ..add(partnerUid);
+    final partnerWatchedBy =
+        Set<String>.from(
+            List<String>.from(
+              (partnerItemData['watchedBy'] as List?) ?? const [],
+            ),
+          )
+          ..add(user.uid)
+          ..add(partnerUid);
+
+    final currentPayload = <String, Object?>{
+      'tmdbId': record.tmdbId,
+      'mediaType': record.mediaType,
+      'title': record.title,
+      'posterPath': record.posterPath,
+      'backdropPath': record.backdropPath,
+      'likedBy': List<String>.from(
+        (currentItemData['likedBy'] as List?) ?? const [],
+      ),
+      'dislikedBy': List<String>.from(
+        (currentItemData['dislikedBy'] as List?) ?? const [],
+      ),
+      'favoritedBy': List<String>.from(
+        (currentItemData['favoritedBy'] as List?) ?? const [],
+      ),
+      'watchedBy': currentWatchedBy.toList(),
+      'coupleMatchScore':
+          (currentItemData['coupleMatchScore'] as num?)?.toDouble() ??
+          record.coupleMatchScore,
+      'matchedGenres': List<String>.from(
+        (currentItemData['matchedGenres'] as List?) ?? record.matchedGenres,
+      ),
+      'createdAt': currentItemData['createdAt'] ?? now,
+      'updatedAt': now,
+    };
+
+    final partnerPayload = <String, Object?>{
+      'tmdbId': record.tmdbId,
+      'mediaType': record.mediaType,
+      'title': record.title,
+      'posterPath': record.posterPath,
+      'backdropPath': record.backdropPath,
+      'likedBy': List<String>.from(
+        (partnerItemData['likedBy'] as List?) ?? const [],
+      ),
+      'dislikedBy': List<String>.from(
+        (partnerItemData['dislikedBy'] as List?) ?? const [],
+      ),
+      'favoritedBy': List<String>.from(
+        (partnerItemData['favoritedBy'] as List?) ?? const [],
+      ),
+      'watchedBy': partnerWatchedBy.toList(),
+      'coupleMatchScore':
+          (partnerItemData['coupleMatchScore'] as num?)?.toDouble() ??
+          record.coupleMatchScore,
+      'matchedGenres': List<String>.from(
+        (partnerItemData['matchedGenres'] as List?) ?? record.matchedGenres,
+      ),
+      'createdAt': partnerItemData['createdAt'] ?? now,
+      'updatedAt': now,
+    };
+
+    await currentItemRef.set(currentPayload, SetOptions(merge: true));
+    await partnerItemRef.set(partnerPayload, SetOptions(merge: true));
+
+    final watchedTogetherPayload = <String, Object?>{
+      ...currentPayload,
+      'participants': [user.uid, partnerUid],
+      'watchedTogetherAt': now,
+      'watchedBy': [user.uid, partnerUid],
+    };
+
+    await currentMatchRef.set(watchedTogetherPayload, SetOptions(merge: true));
+    await partnerMatchRef.set(watchedTogetherPayload, SetOptions(merge: true));
   }
 
   Future<List<_WatchSeed>> _fetchSeeds(_WatchMediaType type) async {
@@ -2199,183 +2346,291 @@ class _MatchHistoryPanel extends StatelessWidget {
 
 class _MatchedTimelineFeed extends StatelessWidget {
   final ColorScheme cs;
+  final String currentUserId;
+  final String? partnerUid;
+  final Future<void> Function(_WatchRecord record) onMarkWatchedTogether;
+  final Future<void> Function(_WatchRecord record) onOpenDetails;
   final List<_MatchedTimelineEntry> entries;
 
-  const _MatchedTimelineFeed({required this.cs, required this.entries});
+  const _MatchedTimelineFeed({
+    required this.cs,
+    required this.currentUserId,
+    required this.partnerUid,
+    required this.onMarkWatchedTogether,
+    required this.onOpenDetails,
+    required this.entries,
+  });
+
+  String _dateLabel(DateTime date) {
+    return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final watchedCount = entries.where((entry) {
+      final record = entry.record;
+      return partnerUid != null &&
+          record.watchedBy.contains(currentUserId) &&
+          record.watchedBy.contains(partnerUid);
+    }).length;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(999),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                cs.primaryContainer.withValues(alpha: 0.75),
+                cs.secondaryContainer.withValues(alpha: 0.45),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: Text(
-              'Matched timeline',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.w700,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: cs.primary.withValues(alpha: 0.16),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 14),
-          Text('Your shared yeses', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 6),
-          Text(
-            'A timeline view of the picks you both liked.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 18),
-          for (var index = 0; index < entries.length; index++) ...[
-            Padding(
-              padding: EdgeInsets.only(
-                bottom: index == entries.length - 1 ? 0 : 12,
-              ),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: index.isEven
-                                  ? cs.primary
-                                  : cs.primaryContainer,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: cs.primary, width: 1.5),
-                            ),
-                          ),
-                          if (index != entries.length - 1)
-                            Expanded(
-                              child: Container(
-                                width: 1.5,
-                                color: cs.primary.withValues(alpha: 0.2),
-                              ),
-                            ),
-                        ],
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: 0.82),
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Builder(
-                        builder: (context) {
-                          final entry = entries[index];
-                          final record = entry.record;
-                          final score = entry.score;
-                          final dark = theme.brightness == Brightness.dark;
-                          final mediaLabel = record.mediaType == 'tv'
-                              ? 'TV show'
-                              : 'Movie';
-                          final posterUrl = record.posterPath.isEmpty
-                              ? ''
-                              : 'https://image.tmdb.org/t/p/w500${record.posterPath}';
+                    child: Icon(
+                      Icons.favorite_border_rounded,
+                      color: cs.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your matched list',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Movies and shows you both said yes to.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _HistoryBadge(
+                      label: 'Matches',
+                      value: entries.length.toString(),
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _HistoryBadge(
+                      label: 'Watched',
+                      value: watchedCount.toString(),
+                      color: cs.secondary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _HistoryBadge(
+                      label: 'Latest',
+                      value: entries.isEmpty
+                          ? '--'
+                          : _dateLabel(entries.first.record.updatedAt),
+                      color: cs.tertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        for (final entry in entries) ...[
+          () {
+            final record = entry.record;
+            final watchedTogether =
+                partnerUid != null &&
+                record.watchedBy.contains(currentUserId) &&
+                record.watchedBy.contains(partnerUid);
 
-                          return Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: index.isEven
-                                  ? cs.primaryContainer
-                                  : dark
-                                  ? const Color(0xFF231519)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Row(
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () => onOpenDetails(record),
+                  child: Container(
+                    // compact height, but still leaves room for the poster and action row
+                    height: 212,
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.7),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cs.primary.withValues(alpha: 0.10),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.horizontal(
+                            left: Radius.circular(24),
+                          ),
+                          child: SizedBox(
+                            // keep poster at a 2:3 aspect ratio; reduced width for smaller cards
+                            width: 132,
+                            height: double.infinity,
+                            child: record.posterPath.isEmpty
+                                ? _PosterFallback(cs: cs)
+                                : Image.network(
+                                    'https://image.tmdb.org/t/p/w500${record.posterPath}',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _PosterFallback(cs: cs),
+                                  ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _MatchedPosterThumb(
-                                  posterUrl: posterUrl,
-                                  cs: cs,
+                                Row(
+                                  children: [
+                                    _TimelineChip(
+                                      label: record.mediaType == 'tv'
+                                          ? 'TV show'
+                                          : 'Movie',
+                                      filled: true,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _TimelineChip(label: 'Shared yes'),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
+                                const SizedBox(height: 8),
+                                // make the middle content flexible so the action button can sit
+                                // at the bottom without causing overflow
+                                Flexible(
+                                  fit: FlexFit.loose,
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
                                         record.title,
-                                        style: theme.textTheme.titleMedium
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
                                             ?.copyWith(
-                                              fontWeight: FontWeight.w600,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 6),
                                       Text(
-                                        '$mediaLabel · Shared yes',
-                                        style: theme.textTheme.bodySmall
+                                        'Matched ${_dateLabel(record.updatedAt)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
                                             ?.copyWith(
                                               color: cs.onSurfaceVariant,
                                             ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Mutual like recorded on ${record.updatedAt.year.toString().padLeft(4, '0')}-${record.updatedAt.month.toString().padLeft(2, '0')}-${record.updatedAt.day.toString().padLeft(2, '0')}',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodyMedium,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 6,
-                                        children: [
-                                          _TimelineChip(
-                                            label:
-                                                '${score.toStringAsFixed(0)}% match',
-                                            filled: true,
-                                          ),
-                                          for (final genre
-                                              in record.matchedGenres.take(3))
-                                            _TimelineChip(label: genre),
-                                        ],
-                                      ),
+                                      if (record.matchedGenres.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: record.matchedGenres
+                                              .take(2)
+                                              .map(
+                                                (genre) =>
+                                                    _TimelineChip(label: genre),
+                                              )
+                                              .toList(),
+                                        ),
+                                      ],
                                     ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.tonalIcon(
+                                    onPressed:
+                                        partnerUid == null || watchedTogether
+                                        ? null
+                                        : () => onMarkWatchedTogether(record),
+                                    icon: Icon(
+                                      watchedTogether
+                                          ? Icons.check_circle_outline_rounded
+                                          : Icons.play_circle_outline_rounded,
+                                    ),
+                                    label: Text(
+                                      watchedTogether
+                                          ? 'Watched together'
+                                          : 'Mark watched',
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            );
+          }(),
         ],
-      ),
+      ],
     );
   }
 }
 
 class _MatchedTimelineEntry {
   final _WatchRecord record;
-  final double score;
 
-  const _MatchedTimelineEntry({required this.record, required this.score});
+  const _MatchedTimelineEntry({required this.record});
 }
 
 class _MatchedPosterThumb extends StatelessWidget {
@@ -2389,8 +2644,9 @@ class _MatchedPosterThumb extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
+        // poster thumb should mirror the 2:3 poster aspect ratio (smaller)
         width: 72,
-        height: 96,
+        height: 108,
         color: cs.surfaceContainerHighest,
         child: posterUrl.isEmpty
             ? Icon(Icons.image_outlined, color: cs.onSurfaceVariant)
@@ -2448,7 +2704,7 @@ class _PersonalHistoryPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2713,189 +2969,180 @@ class _RecommendationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: cs.outlineVariant),
             boxShadow: [
+              // Subtle directional depth
               BoxShadow(
-                color: cs.primary.withValues(alpha: 0.22),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
+                color: cs.primary.withValues(alpha: 0.10),
+                blurRadius: 18,
+                spreadRadius: 1,
+                offset: const Offset(0, 6),
+              ),
+              // Soft even halo around the card
+              BoxShadow(
+                color: cs.primary.withValues(alpha: 0.06),
+                blurRadius: 28,
+                spreadRadius: 2,
+                offset: Offset.zero,
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                child: AspectRatio(
-                  aspectRatio: 16 / 10,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (item.backdropUrl.isNotEmpty)
-                        Image.network(
-                          item.backdropUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _BackdropFallback(cs: cs),
-                        )
-                      else
-                        _BackdropFallback(cs: cs),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.black.withValues(alpha: 0.12),
-                              Colors.black.withValues(alpha: 0.6),
-                            ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        top: 16,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _Pill(
-                                  label: item.mediaLabel,
-                                  background: cs.surface.withValues(
-                                    alpha: 0.86,
-                                  ),
-                                  foreground: cs.onSurface,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 16,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: SizedBox(
-                                width: 84,
-                                height: 124,
-                                child: item.posterUrl.isNotEmpty
-                                    ? Image.network(
-                                        item.posterUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
-                                            _PosterFallback(cs: cs),
-                                      )
-                                    : _PosterFallback(cs: cs),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item.mediaType == _WatchMediaType.tv
-                                        ? '${item.releaseYear} • ${item.seasonsLabel ?? 'Seasons unavailable'}'
-                                        : '${item.releaseYear} • ${item.runtimeLabel}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(color: Colors.white70),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+          child: AspectRatio(
+            aspectRatio: 0.65,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: item.posterUrl.isNotEmpty
+                        ? Image.network(
+                            item.posterUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _PosterFallback(cs: cs),
+                          )
+                        : _PosterFallback(cs: cs),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.genreLabel,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant,
+
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          Colors.black.withValues(alpha: 0.25),
+                          Colors.black.withValues(alpha: 0.92),
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      item.overview,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: _Pill(
+                    label: item.mediaLabel,
+                    background: cs.surface.withValues(alpha: 0.88),
+                    foreground: cs.onSurface,
+                  ),
+                ),
+
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    const SizedBox(height: 12),
-                    Row(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
                       children: [
-                        Expanded(
-                          child: _ActionChip(
-                            label: 'Interested',
-                            icon: Icons.thumb_up_alt_rounded,
-                            selected: isLiked,
-                            onTap: onYes,
-                          ),
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Colors.amber,
+                          size: 16,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _ActionChip(
-                            label: 'Pass',
-                            icon: Icons.thumb_down_alt_rounded,
-                            selected: isDisliked,
-                            onTap: onNo,
+                        const SizedBox(width: 4),
+                        Text(
+                          item.rating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: onOpenDetails,
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('Open details'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Data and images via TMDb.',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  bottom: 18,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(
+                        item.mediaType == _WatchMediaType.tv
+                            ? '${item.releaseYear} • ${item.seasonsLabel ?? 'TV Show'}'
+                            : '${item.releaseYear} • ${item.runtimeLabel}',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Text(
+                        item.genreLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Text(
+                        item.overview,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          height: 1.4,
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ActionChip(
+                              label: 'Pass',
+                              icon: Icons.close_rounded,
+                              selected: isDisliked,
+                              onTap: onNo,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ActionChip(
+                              label: 'Interested',
+                              icon: Icons.favorite_rounded,
+                              selected: isLiked,
+                              onTap: onYes,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
