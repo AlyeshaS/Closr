@@ -19,15 +19,22 @@ class AuthService {
     final user = userCredential.user;
     if (user != null) {
       final normalizedPartnerEmail = partnerEmail?.trim().toLowerCase() ?? '';
-      // Add user to Firestore with partnerEmail
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      final payload = <String, Object?>{
         'uid': user.uid,
         'email': user.email,
         'emailLower': user.email?.trim().toLowerCase(),
         'displayName': user.displayName,
-        'partnerEmail': normalizedPartnerEmail,
-        'partnerEmailLower': normalizedPartnerEmail,
-      }, SetOptions(merge: true));
+      };
+
+      if (normalizedPartnerEmail.isNotEmpty) {
+        payload['partnerEmail'] = normalizedPartnerEmail;
+        payload['partnerEmailLower'] = normalizedPartnerEmail;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set(payload, SetOptions(merge: true));
     }
     return user;
   }

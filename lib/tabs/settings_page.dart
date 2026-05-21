@@ -118,7 +118,12 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _companionEmoji = (data['companionEmoji'] as String?) ?? '🦊';
       _companionName = (data['companionName'] as String?) ?? 'Ember';
-      _partnerEmail = (data['partnerEmail'] as String?) ?? '';
+      _partnerEmail =
+          ((data['partnerEmailLower'] as String?) ??
+                  (data['partnerEmail'] as String?) ??
+                  '')
+              .trim()
+              .toLowerCase();
       final annivStr = data['anniversaryDate'] as String?;
       if (annivStr != null && annivStr.isNotEmpty) {
         _anniversaryDate = DateTime.tryParse(annivStr);
@@ -708,10 +713,16 @@ class _SettingsPageState extends State<SettingsPage> {
             rows: [
               _SettingsRowData(
                 icon: Icons.favorite_outline_rounded,
-                label: 'Partner',
+                label: 'Partner email',
                 onTap: _showAddPartnerDialog,
                 trailing: _partnerEmail.isEmpty
-                    ? const _TrailingArrow()
+                    ? Text(
+                        'Not set',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      )
                     : Text(
                         _partnerEmail,
                         style: TextStyle(fontSize: 13, color: cs.primary),
