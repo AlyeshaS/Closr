@@ -35,7 +35,12 @@ class ScrapbookService {
       return null;
     }
 
-    final partnerEmail = (userData['partnerEmail'] as String?) ?? '';
+    final partnerEmail =
+        ((userData['partnerEmailLower'] as String?) ??
+                (userData['partnerEmail'] as String?) ??
+                '')
+            .trim()
+            .toLowerCase();
     if (partnerEmail.isEmpty) {
       print('🔗 Partner lookup: no partnerEmail in user profile');
       return null;
@@ -44,15 +49,41 @@ class ScrapbookService {
     print('🔗 Looking for partner with email: $partnerEmail');
     final partnerQuery = await _db
         .collection('users')
+        .where('emailLower', isEqualTo: partnerEmail)
+        .get();
+
+    if (partnerQuery.docs.isNotEmpty) {
+      final partnerId = partnerQuery.docs.first.id;
+      print('✅ Partner lookup: found partner $partnerId');
+      return partnerId;
+    }
+
+    final fallbackQuery = await _db
+        .collection('users')
         .where('email', isEqualTo: partnerEmail)
         .get();
 
-    if (partnerQuery.docs.isEmpty) {
+    if (fallbackQuery.docs.isEmpty) {
+      final allUsers = await _db.collection('users').limit(250).get();
+      for (final doc in allUsers.docs) {
+        final data = doc.data();
+        final email =
+            ((data['emailLower'] as String?) ??
+                    (data['email'] as String?) ??
+                    '')
+                .trim()
+                .toLowerCase();
+        if (email == partnerEmail) {
+          final partnerId = doc.id;
+          print('✅ Partner lookup: found partner $partnerId');
+          return partnerId;
+        }
+      }
       print('❌ Partner lookup: no user found with email $partnerEmail');
       return null;
     }
 
-    final partnerId = partnerQuery.docs.first.id;
+    final partnerId = fallbackQuery.docs.first.id;
     print('✅ Partner lookup: found partner $partnerId');
     return partnerId;
   }

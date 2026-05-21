@@ -22,16 +22,36 @@ class LoveLetterService {
     if (user == null) return null;
     final userDoc = await _db.collection('users').doc(user.uid).get();
     final userData = userDoc.data();
-    if (userData == null ||
-        userData['partnerEmail'] == null ||
-        userData['partnerEmail'] == '')
-      return null;
+    final partnerEmail =
+        ((userData?['partnerEmailLower'] as String?) ??
+                (userData?['partnerEmail'] as String?) ??
+                '')
+            .trim()
+            .toLowerCase();
+    if (partnerEmail.isEmpty) return null;
     final partnerQuery = await _db
         .collection('users')
-        .where('email', isEqualTo: userData['partnerEmail'])
+        .where('emailLower', isEqualTo: partnerEmail)
         .get();
-    if (partnerQuery.docs.isEmpty) return null;
-    return partnerQuery.docs.first.id;
+    if (partnerQuery.docs.isNotEmpty) return partnerQuery.docs.first.id;
+    final fallbackQuery = await _db
+        .collection('users')
+        .where('email', isEqualTo: partnerEmail)
+        .get();
+    if (fallbackQuery.docs.isNotEmpty) return fallbackQuery.docs.first.id;
+
+    final allUsers = await _db.collection('users').limit(250).get();
+    for (final doc in allUsers.docs) {
+      final data = doc.data();
+      final email =
+          ((data['emailLower'] as String?) ?? (data['email'] as String?) ?? '')
+              .trim()
+              .toLowerCase();
+      if (email == partnerEmail) {
+        return doc.id;
+      }
+    }
+    return null;
   }
 
   Future<void> sendLetter(String text) async {

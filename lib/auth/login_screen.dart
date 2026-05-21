@@ -44,7 +44,7 @@ class LoginScreen extends StatelessWidget {
                       actions: [
                         TextButton(
                           onPressed: () {
-                            partnerEmail = controller.text.trim();
+                            partnerEmail = controller.text.trim().toLowerCase();
                             Navigator.of(context).pop();
                           },
                           child: const Text('Continue'),
@@ -59,6 +59,7 @@ class LoginScreen extends StatelessWidget {
                       .doc(user.uid)
                       .set({
                         'partnerEmail': partnerEmail!.toLowerCase(),
+                        'partnerEmailLower': partnerEmail!.toLowerCase(),
                       }, SetOptions(merge: true));
                 }
               }

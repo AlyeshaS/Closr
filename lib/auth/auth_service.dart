@@ -18,12 +18,15 @@ class AuthService {
     final userCredential = await _auth.signInWithCredential(credential);
     final user = userCredential.user;
     if (user != null) {
+      final normalizedPartnerEmail = partnerEmail?.trim().toLowerCase() ?? '';
       // Add user to Firestore with partnerEmail
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'email': user.email,
+        'emailLower': user.email?.trim().toLowerCase(),
         'displayName': user.displayName,
-        'partnerEmail': partnerEmail ?? '',
+        'partnerEmail': normalizedPartnerEmail,
+        'partnerEmailLower': normalizedPartnerEmail,
       }, SetOptions(merge: true));
     }
     return user;

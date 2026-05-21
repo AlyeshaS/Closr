@@ -236,13 +236,16 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           FilledButton(
             onPressed: () async {
-              final email = controller.text.trim();
+              final email = controller.text.trim().toLowerCase();
               final user = FirebaseAuth.instance.currentUser;
               if (user != null) {
                 await FirebaseFirestore.instance
                     .collection('users')
                     .doc(user.uid)
-                    .set({'partnerEmail': email}, SetOptions(merge: true));
+                    .set({
+                      'partnerEmail': email,
+                      'partnerEmailLower': email,
+                    }, SetOptions(merge: true));
                 setState(() => _partnerEmail = email);
               }
               if (dialogContext.mounted) Navigator.pop(dialogContext);

@@ -149,7 +149,9 @@ class WelcomeScreen extends StatelessWidget {
                               ).colorScheme.primary,
                             ),
                             onPressed: () {
-                              partnerEmail = controller.text.trim();
+                              partnerEmail = controller.text
+                                  .trim()
+                                  .toLowerCase();
                               Navigator.of(context).pop();
                             },
                             child: const Text('Continue'),

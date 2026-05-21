@@ -17,7 +17,6 @@ class _WatchTabState extends State<WatchTab> {
   final _repository = _WatchRepository();
 
   late Future<List<_WatchItem>> _recommendationsFuture;
-  late Future<String?> _partnerUidFuture;
 
   _WatchFeedFilter _filter = _WatchFeedFilter.all;
   _TopView _topView = _TopView.suggestions;
@@ -30,7 +29,6 @@ class _WatchTabState extends State<WatchTab> {
   void initState() {
     super.initState();
     _recommendationsFuture = _repository.fetchRecommendations();
-    _partnerUidFuture = _repository.fetchPartnerUid();
   }
 
   String _activeFilterLabel(_WatchFeedFilter filter, String? genre) {
@@ -165,6 +163,23 @@ class _WatchTabState extends State<WatchTab> {
       }
     }
     return null;
+  }
+
+  List<_WatchRecord> _matchedRecordsFor(
+    List<_WatchRecord> records,
+    String currentUserId,
+    String? partnerUid,
+  ) {
+    final matches = records.where((record) {
+      final currentLiked = record.isLikedBy(currentUserId);
+      final partnerLiked = partnerUid != null
+          ? record.isLikedBy(partnerUid)
+          : record.likedBy.length >= 2;
+      return currentLiked && partnerLiked;
+    }).toList();
+
+    matches.sort((a, b) => b.coupleMatchScore.compareTo(a.coupleMatchScore));
+    return matches;
   }
 
   bool _matchesFilter(
@@ -560,223 +575,260 @@ class _WatchTabState extends State<WatchTab> {
         final recommendations =
             recommendationsSnapshot.data ?? const <_WatchItem>[];
 
-        return FutureBuilder<String?>(
-          future: _partnerUidFuture,
-          builder: (context, partnerSnapshot) {
-            final partnerUid = partnerSnapshot.data;
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .snapshots(),
+          builder: (context, userSnapshot) {
+            final userData = userSnapshot.data?.data();
+            final partnerEmail =
+                ((userData?['partnerEmailLower'] as String?) ??
+                        (userData?['partnerEmail'] as String?) ??
+                        '')
+                    .trim()
+                    .toLowerCase();
 
-            return StreamBuilder<List<_WatchRecord>>(
-              stream: _repository.streamWatchRecords(),
-              builder: (context, recordsSnapshot) {
-                final records = recordsSnapshot.data ?? const <_WatchRecord>[];
-                final genres = _collectGenres(recommendations, records);
-                final selectedGenre = genres.contains(_selectedGenre)
-                    ? _selectedGenre
-                    : null;
-                final filteredItems = recommendations.where((item) {
-                  final record = _recordFor(item, records);
-                  if (selectedGenre != null &&
-                      !item.genres.contains(selectedGenre)) {
-                    return false;
-                  }
-                  return _matchesFilter(item, record, user.uid, partnerUid);
-                }).toList();
+            return FutureBuilder<String?>(
+              future: _repository.resolvePartnerUid(partnerEmail),
+              builder: (context, partnerSnapshot) {
+                final partnerUid = partnerSnapshot.data;
 
-                return CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
-                      sliver: SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _TopViewDropdown(
-                                  value: _topView,
+                return StreamBuilder<List<_WatchRecord>>(
+                  stream: _repository.streamWatchRecords(),
+                  builder: (context, recordsSnapshot) {
+                    final records =
+                        recordsSnapshot.data ?? const <_WatchRecord>[];
+                    final matchedRecords = _matchedRecordsFor(
+                      records,
+                      user.uid,
+                      partnerUid,
+                    );
+                    final recommendationsLoading =
+                        recommendationsSnapshot.connectionState ==
+                        ConnectionState.waiting;
+                    final genres = _collectGenres(recommendations, records);
+                    final selectedGenre = genres.contains(_selectedGenre)
+                        ? _selectedGenre
+                        : null;
+                    final filteredItems = recommendations.where((item) {
+                      final record = _recordFor(item, records);
+                      if (selectedGenre != null &&
+                          !item.genres.contains(selectedGenre)) {
+                        return false;
+                      }
+                      return _matchesFilter(item, record, user.uid, partnerUid);
+                    }).toList();
+
+                    return CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                          sliver: SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _TopViewDropdown(
+                                      value: _topView,
+                                      cs: cs,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _topView = value;
+                                          _currentRecommendationIndex = 0;
+                                          if (value == _TopView.suggestions) {
+                                            _filter = _WatchFeedFilter.all;
+                                          } else if (value ==
+                                              _TopView.matched) {
+                                            _filter = _WatchFeedFilter.bothYes;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 110,
+                                    child: FilledButton.tonal(
+                                      onPressed: () => _openFilterSheet(
+                                        cs: cs,
+                                        filter: _filter,
+                                        selectedGenre: selectedGenre,
+                                        genres: genres,
+                                      ),
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.tune_rounded,
+                                            size: 18,
+                                            color: cs.onSurface,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Filter',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(color: cs.onSurface),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (recommendationsLoading &&
+                            _topView == _TopView.suggestions)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: cs.primary,
+                              ),
+                            ),
+                          )
+                        else ...[
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                            sliver: SliverToBoxAdapter(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeIn,
+                                child: _topView == _TopView.history
+                                    ? _PersonalHistoryPanel(
+                                        key: const ValueKey('history'),
+                                        cs: cs,
+                                        currentUserId: user.uid,
+                                        records: records,
+                                      )
+                                    : const SizedBox.shrink(
+                                        key: ValueKey('empty'),
+                                      ),
+                              ),
+                            ),
+                          ),
+
+                          if (_topView == _TopView.matched)
+                            if (matchedRecords.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: _MatchedTimelineState(
                                   cs: cs,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _topView = value;
-                                      _currentRecommendationIndex = 0;
-                                      if (value == _TopView.suggestions) {
-                                        _filter = _WatchFeedFilter.all;
-                                      } else if (value == _TopView.matched) {
-                                        _filter = _WatchFeedFilter.bothYes;
-                                      }
-                                    });
+                                  icon: Icons.favorite_border_rounded,
+                                  title: 'No shared matches yet',
+                                  subtitle:
+                                      'Once you both like the same picks, they will show up here as a shared timeline.',
+                                  milestones: const [
+                                    'Pick a few recommendations together',
+                                    'Save items you both say yes to',
+                                    'Watch the matched timeline grow',
+                                  ],
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  0,
+                                  20,
+                                  32,
+                                ),
+                                sliver: SliverToBoxAdapter(
+                                  child: _MatchedTimelineFeed(
+                                    cs: cs,
+                                    entries: matchedRecords
+                                        .map(
+                                          (record) => _MatchedTimelineEntry(
+                                            record: record,
+                                            score: record.coupleMatchScore,
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                              )
+                          else if (_topView == _TopView.history ||
+                              filteredItems.isEmpty)
+                            const SliverToBoxAdapter(child: SizedBox.shrink())
+                          else
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  0,
+                                  20,
+                                  14,
+                                ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final activeIndex =
+                                        _currentRecommendationIndex %
+                                        filteredItems.length;
+                                    final item = filteredItems[activeIndex];
+                                    final record = _recordFor(item, records);
+                                    final score = _displayScore(
+                                      item,
+                                      record,
+                                      user.uid,
+                                      partnerUid,
+                                    );
+
+                                    return Center(
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 420,
+                                        ),
+                                        child: _RecommendationCard(
+                                          cs: cs,
+                                          item: item,
+                                          score: score,
+                                          record: record,
+                                          currentUserId: user.uid,
+                                          partnerUid: partnerUid,
+                                          onOpenDetails: () =>
+                                              _openDetails(item),
+                                          onYes: () => _voteAndAdvance(
+                                            item: item,
+                                            liked: true,
+                                            currentListCount:
+                                                filteredItems.length,
+                                          ),
+                                          onNo: () => _voteAndAdvance(
+                                            item: item,
+                                            disliked: true,
+                                            currentListCount:
+                                                filteredItems.length,
+                                          ),
+                                        ),
+                                      ),
+                                    );
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 110,
-                                child: FilledButton.tonal(
-                                  onPressed: () => _openFilterSheet(
-                                    cs: cs,
-                                    filter: _filter,
-                                    selectedGenre: selectedGenre,
-                                    genres: genres,
-                                  ),
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.tune_rounded,
-                                        size: 18,
-                                        color: cs.onSurface,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Filter',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(color: cs.onSurface),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (recommendationsSnapshot.connectionState ==
-                        ConnectionState.waiting)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(
-                          child: CircularProgressIndicator(color: cs.primary),
-                        ),
-                      )
-                    else ...[
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                        sliver: SliverToBoxAdapter(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            switchInCurve: Curves.easeOut,
-                            switchOutCurve: Curves.easeIn,
-                            child: _topView == _TopView.history
-                                ? _PersonalHistoryPanel(
-                                    key: const ValueKey('history'),
-                                    cs: cs,
-                                    currentUserId: user.uid,
-                                    records: records,
-                                  )
-                                : const SizedBox.shrink(key: ValueKey('empty')),
-                          ),
-                        ),
-                      ),
-
-                      if (_topView == _TopView.matched)
-                        if (filteredItems.isEmpty)
-                          SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: _MatchedTimelineState(
-                              cs: cs,
-                              icon: Icons.favorite_border_rounded,
-                              title: 'No shared matches yet',
-                              subtitle:
-                                  'Once you both like the same picks, they will show up here as a shared timeline.',
-                              milestones: const [
-                                'Pick a few recommendations together',
-                                'Save items you both say yes to',
-                                'Watch the matched timeline grow',
-                              ],
                             ),
-                          )
-                        else
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                            sliver: SliverToBoxAdapter(
-                              child: _MatchedTimelineFeed(
-                                cs: cs,
-                                entries: filteredItems
-                                    .map(
-                                      (item) => _MatchedTimelineEntry(
-                                        item: item,
-                                        record: _recordFor(item, records),
-                                        score: _displayScore(
-                                          item,
-                                          _recordFor(item, records),
-                                          user.uid,
-                                          partnerUid,
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                currentUserId: user.uid,
-                                partnerUid: partnerUid,
-                              ),
-                            ),
-                          )
-                      // FIX 3: Do not render the card grid when in history view
-                      else if (_topView == _TopView.history ||
-                          filteredItems.isEmpty)
-                        const SliverToBoxAdapter(child: SizedBox.shrink())
-                      else
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                            child: Builder(
-                              builder: (context) {
-                                final activeIndex =
-                                    _currentRecommendationIndex %
-                                    filteredItems.length;
-                                final item = filteredItems[activeIndex];
-                                final record = _recordFor(item, records);
-                                final score = _displayScore(
-                                  item,
-                                  record,
-                                  user.uid,
-                                  partnerUid,
-                                );
-
-                                return Center(
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 420,
-                                    ),
-                                    child: _RecommendationCard(
-                                      cs: cs,
-                                      item: item,
-                                      score: score,
-                                      record: record,
-                                      currentUserId: user.uid,
-                                      partnerUid: partnerUid,
-                                      onOpenDetails: () => _openDetails(item),
-                                      onYes: () => _voteAndAdvance(
-                                        item: item,
-                                        liked: true,
-                                        currentListCount: filteredItems.length,
-                                      ),
-                                      onNo: () => _voteAndAdvance(
-                                        item: item,
-                                        disliked: true,
-                                        currentListCount: filteredItems.length,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                    ],
-                  ],
+                        ],
+                      ],
+                    );
+                  },
                 );
               },
             );
@@ -970,6 +1022,47 @@ class _WatchRepository {
 
   String get _apiKey => dotenv.env['TMDB_API_KEY'] ?? '';
 
+  Future<String?> resolvePartnerUid(String partnerEmail) async {
+    final normalizedEmail = partnerEmail.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return null;
+    }
+
+    final partnerQuery = await _db
+        .collection('users')
+        .where('emailLower', isEqualTo: normalizedEmail)
+        .limit(1)
+        .get();
+
+    if (partnerQuery.docs.isNotEmpty) {
+      return partnerQuery.docs.first.id;
+    }
+
+    final fallbackQuery = await _db
+        .collection('users')
+        .where('email', isEqualTo: normalizedEmail)
+        .limit(1)
+        .get();
+
+    if (fallbackQuery.docs.isNotEmpty) {
+      return fallbackQuery.docs.first.id;
+    }
+
+    final allUsers = await _db.collection('users').limit(250).get();
+    for (final doc in allUsers.docs) {
+      final data = doc.data();
+      final email =
+          ((data['emailLower'] as String?) ?? (data['email'] as String?) ?? '')
+              .trim()
+              .toLowerCase();
+      if (email == normalizedEmail) {
+        return doc.id;
+      }
+    }
+
+    return null;
+  }
+
   Stream<List<_WatchRecord>> streamWatchRecords() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -997,22 +1090,50 @@ class _WatchRepository {
       return null;
     }
 
-    final partnerEmail = (userData['partnerEmail'] as String?) ?? '';
+    final partnerEmail =
+        ((userData['partnerEmailLower'] as String?) ??
+                (userData['partnerEmail'] as String?) ??
+                '')
+            .trim()
+            .toLowerCase();
     if (partnerEmail.isEmpty) {
       return null;
     }
 
     final partnerQuery = await _db
         .collection('users')
+        .where('emailLower', isEqualTo: partnerEmail)
+        .limit(1)
+        .get();
+
+    if (partnerQuery.docs.isNotEmpty) {
+      return partnerQuery.docs.first.id;
+    }
+
+    final fallbackQuery = await _db
+        .collection('users')
         .where('email', isEqualTo: partnerEmail)
         .limit(1)
         .get();
 
-    if (partnerQuery.docs.isEmpty) {
+    if (fallbackQuery.docs.isEmpty) {
+      final allUsers = await _db.collection('users').limit(250).get();
+      for (final doc in allUsers.docs) {
+        final data = doc.data();
+        final email =
+            ((data['emailLower'] as String?) ??
+                    (data['email'] as String?) ??
+                    '')
+                .trim()
+                .toLowerCase();
+        if (email == partnerEmail) {
+          return doc.id;
+        }
+      }
       return null;
     }
 
-    return partnerQuery.docs.first.id;
+    return fallbackQuery.docs.first.id;
   }
 
   Future<List<_WatchItem>> fetchRecommendations() async {
@@ -1065,6 +1186,7 @@ class _WatchRepository {
 
       final providerNames = _extractProviders(providers);
       final seasons = (details['number_of_seasons'] as num?)?.toInt();
+
       return _WatchDetails(
         item: item.copyWith(
           overview: ((details['overview'] as String?) ?? item.overview).trim(),
@@ -2001,15 +2123,8 @@ class _MatchHistoryPanel extends StatelessWidget {
 class _MatchedTimelineFeed extends StatelessWidget {
   final ColorScheme cs;
   final List<_MatchedTimelineEntry> entries;
-  final String currentUserId;
-  final String? partnerUid;
 
-  const _MatchedTimelineFeed({
-    required this.cs,
-    required this.entries,
-    required this.currentUserId,
-    required this.partnerUid,
-  });
+  const _MatchedTimelineFeed({required this.cs, required this.entries});
 
   @override
   Widget build(BuildContext context) {
@@ -2089,10 +2204,15 @@ class _MatchedTimelineFeed extends StatelessWidget {
                       child: Builder(
                         builder: (context) {
                           final entry = entries[index];
-                          final item = entry.item;
                           final record = entry.record;
                           final score = entry.score;
                           final dark = theme.brightness == Brightness.dark;
+                          final mediaLabel = record.mediaType == 'tv'
+                              ? 'TV show'
+                              : 'Movie';
+                          final posterUrl = record.posterPath.isEmpty
+                              ? ''
+                              : 'https://image.tmdb.org/t/p/w500${record.posterPath}';
 
                           return Container(
                             padding: const EdgeInsets.all(16),
@@ -2108,7 +2228,7 @@ class _MatchedTimelineFeed extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _MatchedPosterThumb(
-                                  posterUrl: item.posterUrl,
+                                  posterUrl: posterUrl,
                                   cs: cs,
                                 ),
                                 const SizedBox(width: 12),
@@ -2118,7 +2238,7 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        item.title,
+                                        record.title,
                                         style: theme.textTheme.titleMedium
                                             ?.copyWith(
                                               fontWeight: FontWeight.w600,
@@ -2126,7 +2246,7 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${item.mediaLabel} · ${item.releaseYear} · ${item.runtimeLabel}',
+                                        '$mediaLabel · Shared yes',
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                               color: cs.onSurfaceVariant,
@@ -2134,7 +2254,7 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        item.matchReason,
+                                        'Mutual like recorded on ${record.updatedAt.year.toString().padLeft(4, '0')}-${record.updatedAt.month.toString().padLeft(2, '0')}-${record.updatedAt.day.toString().padLeft(2, '0')}',
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.bodyMedium,
@@ -2149,9 +2269,8 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                                 '${score.toStringAsFixed(0)}% match',
                                             filled: true,
                                           ),
-                                          for (final genre in item.genres.take(
-                                            3,
-                                          ))
+                                          for (final genre
+                                              in record.matchedGenres.take(3))
                                             _TimelineChip(label: genre),
                                         ],
                                       ),
@@ -2176,15 +2295,10 @@ class _MatchedTimelineFeed extends StatelessWidget {
 }
 
 class _MatchedTimelineEntry {
-  final _WatchItem item;
-  final _WatchRecord? record;
+  final _WatchRecord record;
   final double score;
 
-  const _MatchedTimelineEntry({
-    required this.item,
-    required this.record,
-    required this.score,
-  });
+  const _MatchedTimelineEntry({required this.record, required this.score});
 }
 
 class _MatchedPosterThumb extends StatelessWidget {
@@ -2275,10 +2389,60 @@ class _PersonalHistoryPanel extends StatelessWidget {
               ],
             )
           else
-            const SizedBox.shrink(),
+            Column(
+              children: records
+                  .map(
+                    (record) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          _MatchedPosterThumb(
+                            posterUrl: record.posterPath.isEmpty
+                                ? ''
+                                : 'https://image.tmdb.org/t/p/w500${record.posterPath}',
+                            cs: cs,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  record.title,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _historySubtitle(record, currentUserId),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
         ],
       ),
     );
+  }
+
+  String _historySubtitle(_WatchRecord record, String currentUserId) {
+    final parts = <String>[];
+    if (record.isLikedBy(currentUserId)) parts.add('You liked');
+    if (record.isDislikedBy(currentUserId)) parts.add('You passed');
+    if (record.isWatchedBy(currentUserId)) parts.add('Watched');
+    if (parts.isEmpty) parts.add('No personal vote');
+    final date = record.updatedAt;
+    final dateLabel =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return '${parts.join(' • ')} · $dateLabel';
   }
 }
 
