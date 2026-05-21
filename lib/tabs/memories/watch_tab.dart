@@ -21,6 +21,7 @@ class _WatchTabState extends State<WatchTab> {
 
   _WatchFeedFilter _filter = _WatchFeedFilter.all;
   _TopView _topView = _TopView.suggestions;
+  int _currentRecommendationIndex = 0;
   String? _selectedGenre;
   double _minRating = 0;
   double _maxRuntime = 240;
@@ -97,6 +98,7 @@ class _WatchTabState extends State<WatchTab> {
                       onPressed: () {
                         setState(() {
                           _filter = _WatchFeedFilter.all;
+                          _currentRecommendationIndex = 0;
                           _selectedGenre = null;
                           _minRating = 0;
                           _maxRuntime = 240;
@@ -115,13 +117,22 @@ class _WatchTabState extends State<WatchTab> {
                   genres: genres,
                   minRating: _minRating,
                   maxRuntime: _maxRuntime,
-                  onFilterChanged: (value) => setState(() => _filter = value),
-                  onGenreChanged: (value) =>
-                      setState(() => _selectedGenre = value),
-                  onRatingChanged: (value) =>
-                      setState(() => _minRating = value),
-                  onRuntimeChanged: (value) =>
-                      setState(() => _maxRuntime = value),
+                  onFilterChanged: (value) => setState(() {
+                    _filter = value;
+                    _currentRecommendationIndex = 0;
+                  }),
+                  onGenreChanged: (value) => setState(() {
+                    _selectedGenre = value;
+                    _currentRecommendationIndex = 0;
+                  }),
+                  onRatingChanged: (value) => setState(() {
+                    _minRating = value;
+                    _currentRecommendationIndex = 0;
+                  }),
+                  onRuntimeChanged: (value) => setState(() {
+                    _maxRuntime = value;
+                    _currentRecommendationIndex = 0;
+                  }),
                 ),
               ],
             ),
@@ -287,6 +298,23 @@ class _WatchTabState extends State<WatchTab> {
     );
   }
 
+  Future<void> _voteAndAdvance({
+    required _WatchItem item,
+    required int currentListCount,
+    bool? liked,
+    bool? disliked,
+  }) async {
+    await _toggleAction(item: item, liked: liked, disliked: disliked);
+    if (!mounted || currentListCount <= 0) {
+      return;
+    }
+
+    setState(() {
+      _currentRecommendationIndex =
+          (_currentRecommendationIndex + 1) % currentListCount;
+    });
+  }
+
   Future<void> _openDetails(_WatchItem item) async {
     final details = await _repository.fetchDetails(item);
     if (!mounted) return;
@@ -431,10 +459,18 @@ class _WatchTabState extends State<WatchTab> {
                           value: details.item.rating.toStringAsFixed(1),
                         ),
                         const SizedBox(width: 10),
-                        _DetailStat(
-                          label: 'Runtime',
-                          value: details.item.runtimeLabel,
-                        ),
+                        if (details.item.mediaType == _WatchMediaType.tv)
+                          _DetailStat(
+                            label: 'Seasons',
+                            value: details.seasons != null
+                                ? '${details.seasons} seasons'
+                                : 'Seasons unavailable',
+                          )
+                        else
+                          _DetailStat(
+                            label: 'Runtime',
+                            value: details.item.runtimeLabel,
+                          ),
                         const SizedBox(width: 10),
                         _DetailStat(
                           label: 'Year',
@@ -563,6 +599,7 @@ class _WatchTabState extends State<WatchTab> {
                                   onChanged: (value) {
                                     setState(() {
                                       _topView = value;
+                                      _currentRecommendationIndex = 0;
                                       if (value == _TopView.suggestions) {
                                         _filter = _WatchFeedFilter.all;
                                       } else if (value == _TopView.matched) {
@@ -690,60 +727,52 @@ class _WatchTabState extends State<WatchTab> {
                           filteredItems.isEmpty)
                         const SliverToBoxAdapter(child: SizedBox.shrink())
                       else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                          sliver: SliverGrid(
-                            gridDelegate:
-                                const SliverGridDelegateWithMaxCrossAxisExtent(
-                                  maxCrossAxisExtent: 420,
-                                  mainAxisExtent: 560,
-                                  crossAxisSpacing: 14,
-                                  mainAxisSpacing: 14,
-                                ),
-                            delegate: SliverChildBuilderDelegate((
-                              context,
-                              index,
-                            ) {
-                              final item = filteredItems[index];
-                              final record = _recordFor(item, records);
-                              final score = _displayScore(
-                                item,
-                                record,
-                                user.uid,
-                                partnerUid,
-                              );
-                              return _RecommendationCard(
-                                cs: cs,
-                                item: item,
-                                score: score,
-                                record: record,
-                                currentUserId: user.uid,
-                                partnerUid: partnerUid,
-                                onOpenDetails: () => _openDetails(item),
-                                onYes: () => _toggleAction(
-                                  item: item,
-                                  liked:
-                                      !(record?.isLikedBy(user.uid) ?? false),
-                                ),
-                                onNo: () => _toggleAction(
-                                  item: item,
-                                  disliked:
-                                      !(record?.isDislikedBy(user.uid) ??
-                                          false),
-                                ),
-                                onFavorite: () => _toggleAction(
-                                  item: item,
-                                  favorited:
-                                      !(record?.isFavoritedBy(user.uid) ??
-                                          false),
-                                ),
-                                onWatched: () => _toggleAction(
-                                  item: item,
-                                  watched:
-                                      !(record?.isWatchedBy(user.uid) ?? false),
-                                ),
-                              );
-                            }, childCount: filteredItems.length),
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                            child: Builder(
+                              builder: (context) {
+                                final activeIndex =
+                                    _currentRecommendationIndex %
+                                    filteredItems.length;
+                                final item = filteredItems[activeIndex];
+                                final record = _recordFor(item, records);
+                                final score = _displayScore(
+                                  item,
+                                  record,
+                                  user.uid,
+                                  partnerUid,
+                                );
+
+                                return Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 420,
+                                    ),
+                                    child: _RecommendationCard(
+                                      cs: cs,
+                                      item: item,
+                                      score: score,
+                                      record: record,
+                                      currentUserId: user.uid,
+                                      partnerUid: partnerUid,
+                                      onOpenDetails: () => _openDetails(item),
+                                      onYes: () => _voteAndAdvance(
+                                        item: item,
+                                        liked: true,
+                                        currentListCount: filteredItems.length,
+                                      ),
+                                      onNo: () => _voteAndAdvance(
+                                        item: item,
+                                        disliked: true,
+                                        currentListCount: filteredItems.length,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                     ],
@@ -784,6 +813,7 @@ class _WatchItem {
   final double rating;
   final int runtimeMinutes;
   final DateTime? releaseDate;
+  final int? seasons;
   final List<String> genres;
   final double matchPercentage;
   final String matchReason;
@@ -798,6 +828,7 @@ class _WatchItem {
     required this.rating,
     required this.runtimeMinutes,
     required this.releaseDate,
+    required this.seasons,
     required this.genres,
     required this.matchPercentage,
     required this.matchReason,
@@ -816,6 +847,12 @@ class _WatchItem {
   String get genreLabel => genres.isEmpty ? 'Genre mix' : genres.join(' • ');
   String get mediaLabel =>
       mediaType == _WatchMediaType.movie ? 'Movie' : 'TV show';
+  String? get seasonsLabel {
+    if (mediaType != _WatchMediaType.tv || seasons == null) {
+      return null;
+    }
+    return seasons == 1 ? '1 season' : '$seasons seasons';
+  }
 
   _WatchItem copyWith({
     String? overview,
@@ -824,6 +861,7 @@ class _WatchItem {
     double? rating,
     int? runtimeMinutes,
     DateTime? releaseDate,
+    int? seasons,
     List<String>? genres,
     double? matchPercentage,
     String? matchReason,
@@ -838,6 +876,7 @@ class _WatchItem {
       rating: rating ?? this.rating,
       runtimeMinutes: runtimeMinutes ?? this.runtimeMinutes,
       releaseDate: releaseDate ?? this.releaseDate,
+      seasons: seasons ?? this.seasons,
       genres: genres ?? this.genres,
       matchPercentage: matchPercentage ?? this.matchPercentage,
       matchReason: matchReason ?? this.matchReason,
@@ -850,12 +889,14 @@ class _WatchDetails {
   final List<String> cast;
   final List<String> providers;
   final String? tagline;
+  final int? seasons;
 
   const _WatchDetails({
     required this.item,
     required this.cast,
     required this.providers,
     required this.tagline,
+    required this.seasons,
   });
 }
 
@@ -1000,6 +1041,7 @@ class _WatchRepository {
         cast: const ['Cast unavailable'],
         providers: const ['TMDb'],
         tagline: null,
+        seasons: null,
       );
     }
 
@@ -1022,6 +1064,7 @@ class _WatchRepository {
           .toList();
 
       final providerNames = _extractProviders(providers);
+      final seasons = (details['number_of_seasons'] as num?)?.toInt();
       return _WatchDetails(
         item: item.copyWith(
           overview: ((details['overview'] as String?) ?? item.overview).trim(),
@@ -1034,6 +1077,7 @@ class _WatchRepository {
             item.mediaType,
             item.runtimeMinutes,
           ),
+          seasons: seasons,
           releaseDate:
               _releaseDateFromDetails(details, item.mediaType) ??
               item.releaseDate,
@@ -1044,6 +1088,7 @@ class _WatchRepository {
         cast: cast.isEmpty ? const ['Cast unavailable'] : cast,
         providers: providerNames.isEmpty ? const ['TMDb'] : providerNames,
         tagline: _cleanString(details['tagline'] as String?),
+        seasons: seasons,
       );
     } catch (_) {
       return _WatchDetails(
@@ -1051,6 +1096,7 @@ class _WatchRepository {
         cast: const ['Cast unavailable'],
         providers: const ['TMDb'],
         tagline: null,
+        seasons: null,
       );
     }
   }
@@ -1206,6 +1252,7 @@ class _WatchRepository {
     final runtime = _runtimeFromDetails(details, seed.mediaType, 0);
     final genres = _genresFromDetails(details);
     final rating = (details['vote_average'] as num?)?.toDouble() ?? seed.rating;
+    final seasons = (details['number_of_seasons'] as num?)?.toInt();
 
     return seed.toItem().copyWith(
       overview: _cleanString(details['overview'] as String?) ?? seed.overview,
@@ -1213,6 +1260,7 @@ class _WatchRepository {
       backdropPath: (details['backdrop_path'] as String?) ?? seed.backdropPath,
       rating: rating,
       runtimeMinutes: runtime,
+      seasons: seasons,
       releaseDate:
           _releaseDateFromDetails(details, seed.mediaType) ?? seed.releaseDate,
       genres: genres.isEmpty ? _defaultGenresFor(seed.mediaType) : genres,
@@ -1400,6 +1448,7 @@ class _WatchRepository {
         rating: 8.5,
         runtimeMinutes: 132,
         releaseDate: DateTime(2019, 5, 30),
+        seasons: null,
         genres: const ['Drama', 'Thriller'],
         matchPercentage: 88,
         matchReason:
@@ -1416,6 +1465,7 @@ class _WatchRepository {
         rating: 8.6,
         runtimeMinutes: 30,
         releaseDate: DateTime(2022, 4, 22),
+        seasons: 3,
         genres: const ['Drama', 'Romance'],
         matchPercentage: 91,
         matchReason: 'A gentle TV pick centered on romance and warmth.',
@@ -1431,6 +1481,7 @@ class _WatchRepository {
         rating: 7.1,
         runtimeMinutes: 110,
         releaseDate: DateTime(2004, 11, 12),
+        seasons: null,
         genres: const ['Action', 'Comedy'],
         matchPercentage: 76,
         matchReason:
@@ -1447,6 +1498,7 @@ class _WatchRepository {
         rating: 8.2,
         runtimeMinutes: 22,
         releaseDate: DateTime(2016, 9, 19),
+        seasons: 4,
         genres: const ['Comedy', 'Fantasy'],
         matchPercentage: 89,
         matchReason: 'A cozy binge with comedy and a feel-good tone.',
@@ -1462,6 +1514,7 @@ class _WatchRepository {
         rating: 8.7,
         runtimeMinutes: 169,
         releaseDate: DateTime(2014, 11, 5),
+        seasons: null,
         genres: const ['Adventure', 'Drama', 'Sci-Fi'],
         matchPercentage: 82,
         matchReason:
@@ -1478,6 +1531,7 @@ class _WatchRepository {
         rating: 8.4,
         runtimeMinutes: 60,
         releaseDate: DateTime(2011, 4, 17),
+        seasons: 8,
         genres: const ['Drama', 'Fantasy'],
         matchPercentage: 71,
         matchReason: 'An epic, high-drama series for longer shared evenings.',
@@ -1518,6 +1572,7 @@ class _WatchSeed {
       rating: rating,
       runtimeMinutes: 0,
       releaseDate: releaseDate,
+      seasons: null,
       genres: const [],
       matchPercentage: 0,
       matchReason: '',
@@ -1695,7 +1750,6 @@ class _FilterPanel extends StatelessWidget {
       {'label': 'Both yes', 'value': _WatchFeedFilter.bothYes},
       {'label': 'One yes', 'value': _WatchFeedFilter.oneYes},
       {'label': 'Any no', 'value': _WatchFeedFilter.anyNo},
-      {'label': 'Favorites', 'value': _WatchFeedFilter.favorites},
       {'label': 'Watched', 'value': _WatchFeedFilter.watched},
       {'label': 'Unwatched', 'value': _WatchFeedFilter.unwatched},
       {'label': 'Movies', 'value': _WatchFeedFilter.movies},
@@ -2388,8 +2442,6 @@ class _RecommendationCard extends StatelessWidget {
   final VoidCallback onOpenDetails;
   final VoidCallback onYes;
   final VoidCallback onNo;
-  final VoidCallback onFavorite;
-  final VoidCallback onWatched;
 
   const _RecommendationCard({
     required this.cs,
@@ -2401,16 +2453,13 @@ class _RecommendationCard extends StatelessWidget {
     required this.onOpenDetails,
     required this.onYes,
     required this.onNo,
-    required this.onFavorite,
-    required this.onWatched,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isFavorite = record?.isFavoritedBy(currentUserId) ?? false;
-    final isWatched = record?.isWatchedBy(currentUserId) ?? false;
     final isLiked = record?.isLikedBy(currentUserId) ?? false;
     final isDisliked = record?.isDislikedBy(currentUserId) ?? false;
+    final seasonsLabel = item.seasonsLabel;
 
     return Material(
       color: Colors.transparent,
@@ -2422,6 +2471,13 @@ class _RecommendationCard extends StatelessWidget {
             color: cs.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: cs.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: cs.primary.withValues(alpha: 0.22),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2461,12 +2517,29 @@ class _RecommendationCard extends StatelessWidget {
                         right: 16,
                         top: 16,
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _Pill(
-                              label: item.mediaLabel,
-                              background: cs.surface.withValues(alpha: 0.86),
-                              foreground: cs.onSurface,
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _Pill(
+                                  label: item.mediaLabel,
+                                  background: cs.surface.withValues(
+                                    alpha: 0.86,
+                                  ),
+                                  foreground: cs.onSurface,
+                                ),
+                                if (seasonsLabel != null)
+                                  _Pill(
+                                    label: seasonsLabel,
+                                    background: cs.surface.withValues(
+                                      alpha: 0.86,
+                                    ),
+                                    foreground: cs.onSurface,
+                                  ),
+                              ],
                             ),
                             _Pill(
                               label: '${score.toStringAsFixed(0)}%',
@@ -2517,7 +2590,9 @@ class _RecommendationCard extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${item.releaseYear} • ${item.runtimeLabel}',
+                                    item.mediaType == _WatchMediaType.tv
+                                        ? '${item.releaseYear} • ${item.seasonsLabel ?? 'Seasons unavailable'}'
+                                        : '${item.releaseYear} • ${item.runtimeLabel}',
                                     style: Theme.of(context)
                                         .textTheme
                                         .labelSmall
@@ -2558,8 +2633,8 @@ class _RecommendationCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _ActionChip(
-                            label: isLiked ? 'Yes' : 'Interested',
-                            icon: Icons.favorite_rounded,
+                            label: 'Interested',
+                            icon: Icons.thumb_up_alt_rounded,
                             selected: isLiked,
                             onTap: onYes,
                           ),
@@ -2567,34 +2642,10 @@ class _RecommendationCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _ActionChip(
-                            label: isDisliked ? 'No' : 'Pass',
-                            icon: Icons.close_rounded,
+                            label: 'Pass',
+                            icon: Icons.thumb_down_alt_rounded,
                             selected: isDisliked,
                             onTap: onNo,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActionChip(
-                            label: isFavorite ? 'Saved' : 'Favorite',
-                            icon: isFavorite
-                                ? Icons.bookmark_rounded
-                                : Icons.bookmark_border_rounded,
-                            selected: isFavorite,
-                            onTap: onFavorite,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _ActionChip(
-                            label: isWatched ? 'Watched' : 'Watch',
-                            icon: Icons.visibility_rounded,
-                            selected: isWatched,
-                            onTap: onWatched,
                           ),
                         ),
                       ],
