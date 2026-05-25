@@ -1,5 +1,8 @@
 flutter_launcher_icons:
   image_path: "assets/closr_logo.png"
+  # Use the logo as the adaptive foreground so platforms generate modern
+  # adaptive/round icons similar to other apps.
+  adaptive_icon_foreground: "assets/closr_logo.png"
   adaptive_icon_background: "#FFF6E9"
   android: "adaptive_icon"
   ios: true

@@ -2367,7 +2367,25 @@ class _MatchedTimelineFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final watchedCount = entries.where((entry) {
+    final sortedEntries = [...entries]
+      ..sort((left, right) {
+        final leftWatched =
+            partnerUid != null &&
+            left.record.watchedBy.contains(currentUserId) &&
+            left.record.watchedBy.contains(partnerUid);
+        final rightWatched =
+            partnerUid != null &&
+            right.record.watchedBy.contains(currentUserId) &&
+            right.record.watchedBy.contains(partnerUid);
+
+        if (leftWatched != rightWatched) {
+          return leftWatched ? 1 : -1;
+        }
+
+        return right.record.updatedAt.compareTo(left.record.updatedAt);
+      });
+
+    final watchedCount = sortedEntries.where((entry) {
       final record = entry.record;
       return partnerUid != null &&
           record.watchedBy.contains(currentUserId) &&
@@ -2471,7 +2489,7 @@ class _MatchedTimelineFeed extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        for (final entry in entries) ...[
+        for (final entry in sortedEntries) ...[
           () {
             final record = entry.record;
             final watchedTogether =
@@ -2503,117 +2521,142 @@ class _MatchedTimelineFeed extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
                       children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.horizontal(
-                            left: Radius.circular(24),
-                          ),
-                          child: SizedBox(
-                            // keep poster at a 2:3 aspect ratio; reduced width for smaller cards
-                            width: 132,
-                            height: double.infinity,
-                            child: record.posterPath.isEmpty
-                                ? _PosterFallback(cs: cs)
-                                : Image.network(
-                                    'https://image.tmdb.org/t/p/w500${record.posterPath}',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _PosterFallback(cs: cs),
-                                  ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.horizontal(
+                                left: Radius.circular(24),
+                              ),
+                              child: SizedBox(
+                                // keep poster at a 2:3 aspect ratio; reduced width for smaller cards
+                                width: 132,
+                                height: double.infinity,
+                                child: record.posterPath.isEmpty
+                                    ? _PosterFallback(cs: cs)
+                                    : Image.network(
+                                        'https://image.tmdb.org/t/p/w500${record.posterPath}',
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            _PosterFallback(cs: cs),
+                                      ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  14,
+                                  14,
+                                  12,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _TimelineChip(
-                                      label: record.mediaType == 'tv'
-                                          ? 'TV show'
-                                          : 'Movie',
-                                      filled: true,
+                                    Row(
+                                      children: [
+                                        _TimelineChip(
+                                          label: record.mediaType == 'tv'
+                                              ? 'TV show'
+                                              : 'Movie',
+                                          filled: true,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _TimelineChip(label: 'Shared yes'),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    _TimelineChip(label: 'Shared yes'),
+                                    const SizedBox(height: 8),
+                                    // make the middle content flexible so the action button can sit
+                                    // at the bottom without causing overflow
+                                    Flexible(
+                                      fit: FlexFit.loose,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            record.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Matched ${_dateLabel(record.updatedAt)}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: cs.onSurfaceVariant,
+                                                ),
+                                          ),
+                                          if (record
+                                              .matchedGenres
+                                              .isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            Wrap(
+                                              spacing: 6,
+                                              runSpacing: 6,
+                                              children: record.matchedGenres
+                                                  .take(2)
+                                                  .map(
+                                                    (genre) => _TimelineChip(
+                                                      label: genre,
+                                                    ),
+                                                  )
+                                                  .toList(),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: FilledButton.tonalIcon(
+                                        onPressed:
+                                            partnerUid == null ||
+                                                watchedTogether
+                                            ? null
+                                            : () =>
+                                                  onMarkWatchedTogether(record),
+                                        icon: Icon(
+                                          watchedTogether
+                                              ? Icons
+                                                    .check_circle_outline_rounded
+                                              : Icons
+                                                    .play_circle_outline_rounded,
+                                        ),
+                                        label: Text(
+                                          watchedTogether
+                                              ? 'Watched together'
+                                              : 'Mark watched',
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                // make the middle content flexible so the action button can sit
-                                // at the bottom without causing overflow
-                                Flexible(
-                                  fit: FlexFit.loose,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        record.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Matched ${_dateLabel(record.updatedAt)}',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: cs.onSurfaceVariant,
-                                            ),
-                                      ),
-                                      if (record.matchedGenres.isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: record.matchedGenres
-                                              .take(2)
-                                              .map(
-                                                (genre) =>
-                                                    _TimelineChip(label: genre),
-                                              )
-                                              .toList(),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.tonalIcon(
-                                    onPressed:
-                                        partnerUid == null || watchedTogether
-                                        ? null
-                                        : () => onMarkWatchedTogether(record),
-                                    icon: Icon(
-                                      watchedTogether
-                                          ? Icons.check_circle_outline_rounded
-                                          : Icons.play_circle_outline_rounded,
-                                    ),
-                                    label: Text(
-                                      watchedTogether
-                                          ? 'Watched together'
-                                          : 'Mark watched',
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (watchedTogether)
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Container(
+                                color: Colors.black.withValues(alpha: 0.5),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),

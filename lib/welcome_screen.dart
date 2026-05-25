@@ -17,55 +17,39 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Decorative top accent
-              Padding(
-                padding: const EdgeInsets.only(top: 24),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: cs.primary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'CLOSR',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
+              // Top accent removed for a cleaner welcome screen
               const Spacer(flex: 2),
 
-              // Logo / illustration area
+              // Logo / illustration area — no filled circle behind the logo,
+              // only a primary-colored shadow (glow) to give depth.
               Center(
                 child: Container(
-                  width: 120,
-                  height: 120,
+                  width: 140,
+                  height: 140,
+                  // transparent background, with a primary-colored shadow
                   decoration: BoxDecoration(
+                    color: Colors.transparent,
                     shape: BoxShape.circle,
-                    color: cs.primaryContainer,
-                    border: Border.all(
-                      color: cs.primary.withOpacity(0.2),
-                      width: 2,
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cs.primary.withOpacity(0.32),
+                        blurRadius: 28,
+                        spreadRadius: 4,
+                        offset: const Offset(0, 0),
+                      ),
+                    ],
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/closr_logo.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(
-                        Icons.favorite_rounded,
-                        size: 52,
-                        color: cs.primary,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/closr_logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.favorite_rounded,
+                          size: 56,
+                          color: cs.primary,
+                        ),
                       ),
                     ),
                   ),
