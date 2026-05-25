@@ -303,7 +303,13 @@ class _StatCard extends StatelessWidget {
                 if (snapshot.data is DocumentSnapshot) {
                   final doc = snapshot.data as DocumentSnapshot;
                   final val = doc.data() is Map<String, dynamic>
-                      ? (doc.data() as Map<String, dynamic>)['streakCurrent']
+                      ? ((doc.data()
+                                as Map<
+                                  String,
+                                  dynamic
+                                >)['sharedStreakCurrent'] ??
+                            (doc.data()
+                                as Map<String, dynamic>)['streakCurrent'])
                       : null;
                   final textVal = val != null ? '$val' : '—';
                   return Text(
@@ -412,8 +418,16 @@ class _StreakCard extends StatelessWidget {
       stream: docStream,
       builder: (context, snapshot) {
         final data = snapshot.data?.data() as Map<String, dynamic>?;
-        final current = data != null ? (data['streakCurrent'] as int? ?? 0) : 0;
-        final best = data != null ? (data['streakBest'] as int? ?? 0) : 0;
+        final current = data != null
+            ? ((data['sharedStreakCurrent'] as int?) ??
+                  (data['streakCurrent'] as int?) ??
+                  0)
+            : 0;
+        final best = data != null
+            ? ((data['sharedStreakBest'] as int?) ??
+                  (data['streakBest'] as int?) ??
+                  0)
+            : 0;
 
         return Container(
           padding: const EdgeInsets.all(16),

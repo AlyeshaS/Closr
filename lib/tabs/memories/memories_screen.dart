@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../models/scrapbook_entry.dart';
+import '../../models/achievement_badge_reward.dart';
 import '../../models/timeline_event.dart';
+import '../../services/companion_rewards_service.dart';
 import '../../services/scrapbook_service.dart';
 import '../../services/timeline_service.dart';
 import 'watch_tab.dart';
@@ -1742,6 +1744,9 @@ class _MilestonesTab extends StatefulWidget {
 class _MilestonesTabState extends State<_MilestonesTab> {
   late final Stream<List<TimelineEntry>> _timelineStream = TimelineService()
       .streamTimelineEntries();
+  final CompanionRewardsService _rewardsService = CompanionRewardsService();
+  String? _lastRewardSignature;
+  bool _claimingRewards = false;
 
   String _dateLabel(DateTime date) {
     const months = [
@@ -1772,70 +1777,135 @@ class _MilestonesTabState extends State<_MilestonesTab> {
   }) {
     return [
       _AchievementSpec(
+        id: 'story_spark',
         icon: Icons.auto_awesome_rounded,
         title: 'First memory saved',
         description: 'Log any scrapbook, watch, love letter, or activity.',
         threshold: 1,
         current: storyCount,
         unlocked: storyCount >= 1,
+        badgeLabel: 'Story Spark',
+        badgePoints: 10,
       ),
       _AchievementSpec(
+        id: 'memory_keeper',
         icon: Icons.photo_library_rounded,
         title: 'Memory keeper',
         description: 'Collect 5 scrapbook moments.',
         threshold: 5,
         current: scrapbookCount,
         unlocked: scrapbookCount >= 5,
+        badgeLabel: 'Memory Keeper',
+        badgePoints: 20,
       ),
       _AchievementSpec(
+        id: 'love_notes',
         icon: Icons.mail_rounded,
         title: 'Love notes',
         description: 'Send 3 love letters.',
         threshold: 3,
         current: loveLetterCount,
         unlocked: loveLetterCount >= 3,
+        badgeLabel: 'Love Notes',
+        badgePoints: 25,
       ),
       _AchievementSpec(
+        id: 'shared_watchlist',
         icon: Icons.movie_rounded,
         title: 'Shared watchlist',
         description: 'Mark 3 watches together.',
         threshold: 3,
         current: watchCount,
         unlocked: watchCount >= 3,
+        badgeLabel: 'Watchmate',
+        badgePoints: 20,
       ),
       _AchievementSpec(
+        id: 'active_builder',
         icon: Icons.check_circle_rounded,
         title: 'Active builder',
         description: 'Complete 5 logged activities.',
         threshold: 5,
         current: activityCount,
         unlocked: activityCount >= 5,
+        badgeLabel: 'Quest Finisher',
+        badgePoints: 15,
       ),
       _AchievementSpec(
+        id: 'streak_starter',
         icon: Icons.local_fire_department_rounded,
         title: 'Streak starter',
-        description: 'Reach a 3-day streak.',
+        description: 'Reach a 3-day best streak.',
         threshold: 3,
-        current: currentStreak,
-        unlocked: currentStreak >= 3,
+        current: bestStreak,
+        unlocked: bestStreak >= 3,
+        badgeLabel: 'Streak Starter',
+        badgePoints: 15,
       ),
       _AchievementSpec(
+        id: 'week_of_momentum',
         icon: Icons.local_fire_department_rounded,
         title: 'Week of momentum',
-        description: 'Reach a 7-day streak.',
+        description: 'Reach a 7-day best streak.',
         threshold: 7,
-        current: currentStreak,
-        unlocked: currentStreak >= 7,
+        current: bestStreak,
+        unlocked: bestStreak >= 7,
+        badgeLabel: 'Momentum',
+        badgePoints: 30,
       ),
       _AchievementSpec(
+        id: 'best_run',
         icon: Icons.emoji_events_rounded,
         title: 'Best run',
-        description: 'Match or beat your best streak.',
-        threshold: bestStreak,
-        current: currentStreak,
-        unlocked: currentStreak >= bestStreak && bestStreak > 0,
+        description: 'Reach a 10-day best streak.',
+        threshold: 10,
+        current: bestStreak,
+        unlocked: bestStreak >= 10,
+        badgeLabel: 'Peak Run',
+        badgePoints: 40,
       ),
     ];
+  }
+
+  List<AchievementBadgeReward> _pendingBadgeRewards(
+    List<_AchievementSpec> achievements,
+    Set<String> claimedBadgeIds,
+  ) {
+    return achievements
+        .where((achievement) => achievement.unlocked)
+        .where((achievement) => !claimedBadgeIds.contains(achievement.id))
+        .map(
+          (achievement) => AchievementBadgeReward(
+            id: achievement.id,
+            label: achievement.badgeLabel,
+            points: achievement.badgePoints,
+          ),
+        )
+        .toList();
+  }
+
+  void _claimBadgeRewardsIfNeeded({
+    required String userId,
+    required List<AchievementBadgeReward> rewards,
+  }) {
+    if (rewards.isEmpty || _claimingRewards) return;
+    final signature = rewards.map((reward) => reward.id).join('|');
+    if (_lastRewardSignature == signature) return;
+
+    _lastRewardSignature = signature;
+    _claimingRewards = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await _rewardsService.claimBadgeRewards(
+          userId: userId,
+          rewards: rewards,
+        );
+      } finally {
+        if (!mounted) return;
+        setState(() => _claimingRewards = false);
+      }
+    });
   }
 
   String _progressText(_AchievementSpec spec) {
@@ -1877,8 +1947,20 @@ class _MilestonesTabState extends State<_MilestonesTab> {
           .snapshots(),
       builder: (context, userSnapshot) {
         final userData = userSnapshot.data?.data() ?? const <String, dynamic>{};
-        final currentStreak = (userData['streakCurrent'] as int?) ?? 0;
-        final bestStreak = (userData['streakBest'] as int?) ?? 0;
+        final currentStreak =
+            (userData['sharedStreakCurrent'] as int?) ??
+            (userData['streakCurrent'] as int?) ??
+            0;
+        final bestStreak =
+            (userData['sharedStreakBest'] as int?) ??
+            (userData['streakBest'] as int?) ??
+            0;
+        final companionPoints = (userData['companionPoints'] as int?) ?? 0;
+        final claimedBadgeIds = Set<String>.from(
+          List<String>.from(
+            (userData['claimedAchievementBadgeIds'] as List?) ?? const [],
+          ),
+        );
 
         return StreamBuilder<List<TimelineEntry>>(
           stream: _timelineStream,
@@ -1913,7 +1995,15 @@ class _MilestonesTabState extends State<_MilestonesTab> {
             final locked = achievements
                 .where((item) => !item.unlocked)
                 .toList();
+            final badgeRewards = _pendingBadgeRewards(
+              achievements,
+              claimedBadgeIds,
+            );
+            _claimBadgeRewardsIfNeeded(userId: user.uid, rewards: badgeRewards);
             final nextUp = locked.isNotEmpty ? locked.first : null;
+            final unlockedPoints = achievements
+                .where((item) => item.unlocked)
+                .fold<int>(0, (total, item) => total + item.badgePoints);
 
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -1971,7 +2061,14 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '$currentStreak day streak',
+                                    'Companion points',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$companionPoints',
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleLarge
@@ -1981,7 +2078,7 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Best run: $bestStreak days',
+                                    '$currentStreak day streak · Best run: $bestStreak days',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -1998,15 +2095,7 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                             Expanded(
                               child: _MiniStatCard(
                                 cs: cs,
-                                label: 'Story moments',
-                                value: storyCount.toString(),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MiniStatCard(
-                                cs: cs,
-                                label: 'Unlocked',
+                                label: 'Badges unlocked',
                                 value: unlocked.length.toString(),
                               ),
                             ),
@@ -2014,10 +2103,16 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                             Expanded(
                               child: _MiniStatCard(
                                 cs: cs,
-                                label: 'Next up',
-                                value: nextUp == null
-                                    ? 'Done'
-                                    : '${_progressText(nextUp)}',
+                                label: 'Badge points',
+                                value: unlockedPoints.toString(),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _MiniStatCard(
+                                cs: cs,
+                                label: 'Story moments',
+                                value: storyCount.toString(),
                               ),
                             ),
                           ],
@@ -2070,9 +2165,20 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Text(
-                            _progressText(nextUp),
-                            style: Theme.of(context).textTheme.labelLarge,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _progressText(nextUp),
+                                style: Theme.of(context).textTheme.labelLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '+${nextUp.badgePoints} pts',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -2167,6 +2273,27 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                                           ),
                                     ),
                                     const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        _BadgeChip(
+                                          cs: cs,
+                                          label: achievement.badgeLabel,
+                                          points: achievement.badgePoints,
+                                          filled: achievement.unlocked,
+                                        ),
+                                        _BadgeChip(
+                                          cs: cs,
+                                          label: achievement.unlocked
+                                              ? 'Claimed'
+                                              : 'Locked',
+                                          points: null,
+                                          filled: achievement.unlocked,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(99),
                                       child: LinearProgressIndicator(
@@ -2204,7 +2331,7 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                       icon: Icons.hourglass_bottom_rounded,
                       title: 'No achievements unlocked yet',
                       subtitle:
-                          'Start with a scrapbook entry, a love letter, or a completed quest.',
+                          'Start with a scrapbook entry, a love letter, or a completed quest to earn badges and points.',
                     )
                   else
                     ...unlocked
@@ -2251,7 +2378,7 @@ class _MilestonesTabState extends State<_MilestonesTab> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'Unlocked with ${_progressText(achievement)}',
+                                          'Unlocked with ${_progressText(achievement)} · +${achievement.badgePoints} pts',
                                           style: Theme.of(context)
                                               .textTheme
                                               .bodySmall
@@ -2297,15 +2424,69 @@ class _AchievementSpec {
   final int threshold;
   final int current;
   final bool unlocked;
+  final String id;
+  final String badgeLabel;
+  final int badgePoints;
 
   const _AchievementSpec({
+    required this.id,
     required this.icon,
     required this.title,
     required this.description,
     required this.threshold,
     required this.current,
     required this.unlocked,
+    required this.badgeLabel,
+    required this.badgePoints,
   });
+}
+
+class _BadgeChip extends StatelessWidget {
+  final ColorScheme cs;
+  final String label;
+  final int? points;
+  final bool filled;
+
+  const _BadgeChip({
+    required this.cs,
+    required this.label,
+    required this.points,
+    required this.filled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: filled ? cs.primary.withValues(alpha: 0.12) : cs.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: filled
+              ? cs.primary.withValues(alpha: 0.28)
+              : cs.outlineVariant,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_rounded, size: 14, color: cs.primary),
+          const SizedBox(width: 6),
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+          if (points != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              '+$points',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _MiniStatCard extends StatelessWidget {

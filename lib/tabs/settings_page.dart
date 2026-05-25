@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../auth/auth_service.dart';
 import '../theme_provider.dart';
 import '../services/notifications_service.dart';
+import '../services/companion_rewards_service.dart';
 import 'preferences/preferences_service.dart';
 
 // ── Companion data ─────────────────────────────────────────────────────────────
@@ -24,6 +25,53 @@ const _kCompanions = [
   _CompanionOption('🐼', 'Panda', 'Panda'),
   _CompanionOption('🦋', 'Luna', 'Butterfly'),
   _CompanionOption('🐻', 'Cosmo', 'Bear'),
+];
+
+class _CompanionShopItem {
+  final String id;
+  final String title;
+  final String description;
+  final String emoji;
+  final int cost;
+
+  const _CompanionShopItem({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.emoji,
+    required this.cost,
+  });
+}
+
+const _kCompanionShopItems = [
+  _CompanionShopItem(
+    id: 'star_collar',
+    title: 'Star Collar',
+    description: 'A bright collar for shared walks and cozy photos.',
+    emoji: '✨',
+    cost: 20,
+  ),
+  _CompanionShopItem(
+    id: 'heart_tag',
+    title: 'Heart Tag',
+    description: 'A little tag that keeps your companion close.',
+    emoji: '💗',
+    cost: 30,
+  ),
+  _CompanionShopItem(
+    id: 'cloud_blanket',
+    title: 'Cloud Blanket',
+    description: 'A soft blanket for rest days and recovery naps.',
+    emoji: '☁️',
+    cost: 40,
+  ),
+  _CompanionShopItem(
+    id: 'moon_halo',
+    title: 'Moon Halo',
+    description: 'A glowing halo for rare, special moments.',
+    emoji: '🌙',
+    cost: 60,
+  ),
 ];
 
 // ── Interests data ─────────────────────────────────────────────────────────────
@@ -90,7 +138,12 @@ class _SettingsPageState extends State<SettingsPage> {
   // companion state
   String _companionEmoji = '🦊';
   String _companionName = 'Ember';
+  int _companionPoints = 0;
+  Set<String> _ownedShopItemIds = <String>{};
   bool _companionLoading = true;
+
+  final CompanionRewardsService _companionRewardsService =
+      CompanionRewardsService();
 
   // partner state
   String _partnerEmail = '';
@@ -110,14 +163,23 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() => _companionLoading = false);
       return;
     }
+    final normalized = await _companionRewardsService.normalizeCompanionProfile(
+      userId: user.uid,
+    );
     final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .get();
     final data = doc.data() ?? {};
     setState(() {
-      _companionEmoji = (data['companionEmoji'] as String?) ?? '🦊';
-      _companionName = (data['companionName'] as String?) ?? 'Ember';
+      _companionEmoji =
+          normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🦊';
+      _companionName =
+          normalized?['name'] ?? (data['companionName'] as String?) ?? 'Ember';
+      _companionPoints = (data['companionPoints'] as int?) ?? 0;
+      _ownedShopItemIds = Set<String>.from(
+        List<String>.from((data['companionShopOwnedIds'] as List?) ?? const []),
+      );
       _partnerEmail =
           ((data['partnerEmailLower'] as String?) ??
                   (data['partnerEmail'] as String?) ??
@@ -130,6 +192,230 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       _companionLoading = false;
     });
+  }
+
+  Future<void> _openCompanionShop() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    var points = _companionPoints;
+    var ownedIds = Set<String>.from(_ownedShopItemIds);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(ctx).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            16,
+            24,
+            MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Companion shop',
+                  style: Theme.of(
+                    ctx,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Use achievement points to unlock shared accessories for both of your linked companions.',
+                  style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.stars_rounded,
+                        color: Theme.of(ctx).colorScheme.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Points available',
+                          style: Theme.of(ctx).textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(ctx).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$points',
+                        style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(ctx).colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _kCompanionShopItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final item = _kCompanionShopItems[index];
+                      final owned = ownedIds.contains(item.id);
+                      final canBuy = !owned && points >= item.cost;
+
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx).brightness == Brightness.dark
+                              ? const Color(0xFF231519)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: Theme.of(ctx).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  ctx,
+                                ).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  item.emoji,
+                                  style: const TextStyle(fontSize: 24),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.title,
+                                    style: Theme.of(ctx).textTheme.titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    item.description,
+                                    style: Theme.of(ctx).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            ctx,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    owned
+                                        ? 'Owned by both of you'
+                                        : '${item.cost} points',
+                                    style: Theme.of(ctx).textTheme.labelMedium
+                                        ?.copyWith(
+                                          color: owned
+                                              ? Theme.of(
+                                                  ctx,
+                                                ).colorScheme.primary
+                                              : Theme.of(
+                                                  ctx,
+                                                ).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FilledButton(
+                              onPressed: owned || !canBuy
+                                  ? null
+                                  : () async {
+                                      try {
+                                        final spent =
+                                            await _companionRewardsService
+                                                .purchaseShopItem(
+                                                  userId: user.uid,
+                                                  itemId: item.id,
+                                                  cost: item.cost,
+                                                );
+                                        if (spent <= 0) return;
+                                        setSheet(() {
+                                          points -= spent;
+                                          ownedIds.add(item.id);
+                                        });
+                                        if (!mounted) return;
+                                        await _loadCompanion();
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '${item.title} unlocked for both companions',
+                                            ),
+                                          ),
+                                        );
+                                      } on StateError catch (_) {
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Not enough companion points',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                              child: Text(owned ? 'Owned' : 'Buy'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showSupportDialog({
@@ -411,19 +697,20 @@ class _SettingsPageState extends State<SettingsPage> {
                     final newName = nameCtrl.text.trim().isEmpty
                         ? chosen.defaultName
                         : nameCtrl.text.trim();
+                    final user = FirebaseAuth.instance.currentUser;
+                    if (user != null) {
+                      await _companionRewardsService.syncCompanionProfile(
+                        userId: user.uid,
+                        emoji: chosen.emoji,
+                        name: newName,
+                      );
+                    }
                     setState(() {
                       _companionEmoji = chosen.emoji;
                       _companionName = newName;
                     });
-                    final user = FirebaseAuth.instance.currentUser;
-                    if (user != null) {
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .set({
-                            'companionEmoji': chosen.emoji,
-                            'companionName': newName,
-                          }, SetOptions(merge: true));
+                    if (mounted) {
+                      await _loadCompanion();
                     }
                     if (ctx.mounted) Navigator.pop(ctx);
                   },
@@ -702,6 +989,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Companion shop ──────────────────────────────────────────
+          _GroupLabel(text: 'Companion shop', cs: cs),
+          const SizedBox(height: 8),
+          _SettingsGroup(
+            cs: cs,
+            rows: [
+              _SettingsRowData(
+                icon: Icons.storefront_rounded,
+                label: 'Open shop',
+                onTap: _openCompanionShop,
+                trailing: const _TrailingArrow(),
+              ),
+              _SettingsRowData(
+                icon: Icons.stars_rounded,
+                label: 'Points balance',
+                trailing: Text(
+                  '$_companionPoints',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
 
