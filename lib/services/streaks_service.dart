@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models/timeline_event.dart';
+
 class StreaksService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -47,6 +49,21 @@ class StreaksService {
       'streakBest': best,
       'streakLastActive': now.toIso8601String(),
     }, SetOptions(merge: true));
+
+    try {
+      await docRef
+          .collection('timelineEvents')
+          .doc('activity_${now.microsecondsSinceEpoch}')
+          .set(
+            TimelineEntry.activityPayload(
+              activity: activity,
+              occurredAt: now,
+              currentStreak: current,
+              bestStreak: best,
+            ),
+            SetOptions(merge: true),
+          );
+    } catch (_) {}
   }
 
   Future<int> getCurrentStreak() async {

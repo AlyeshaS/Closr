@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../models/scrapbook_entry.dart';
+import '../../models/timeline_event.dart';
 import '../../services/scrapbook_service.dart';
+import '../../services/timeline_service.dart';
 import 'watch_tab.dart';
 
 class MemoriesScreen extends StatefulWidget {
@@ -86,164 +88,368 @@ class _MemoriesScreenState extends State<MemoriesScreen>
 
 // ── Timeline Tab ──────────────────────────────────────────────────────────────
 
-class _TimelineTab extends StatelessWidget {
+class _TimelineTab extends StatefulWidget {
   const _TimelineTab();
 
-  static final List<Map<String, dynamic>> _events = [
-    {
-      'date': 'May 2 · 2 days ago',
-      'title': 'Pottery class',
-      'sub': 'Added 3 photos · Creative date',
-      'emoji': '🎨',
-      'milestone': false,
-    },
-    {
-      'date': 'Apr 28 · Last week',
-      'title': '6-month anniversary ✨',
-      'sub': 'Milestone unlocked!',
-      'emoji': '🎉',
-      'milestone': true,
-    },
-    {
-      'date': 'Apr 20',
-      'title': 'Midnight picnic',
-      'sub': 'Deep Talk · 8 topics explored',
-      'emoji': '🌙',
-      'milestone': false,
-    },
-    {
-      'date': 'Apr 12',
-      'title': 'Movie marathon',
-      'sub': 'Watched 3 films together',
-      'emoji': '🎬',
-      'milestone': false,
-    },
-  ];
+  @override
+  State<_TimelineTab> createState() => _TimelineTabState();
+}
+
+class _TimelineTabState extends State<_TimelineTab> {
+  late final Stream<List<TimelineEntry>> _timelineStream = TimelineService()
+      .streamTimelineEntries();
+
+  String _dateLabel(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final now = DateTime.now();
+    final dayStart = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final diffDays = today.difference(dayStart).inDays;
+
+    if (diffDays == 0) return 'Today';
+    if (diffDays == 1) return 'Yesterday';
+    if (diffDays < 7) return '$diffDays days ago';
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  String _relativeLabel(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return '1 day ago';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return _dateLabel(date);
+  }
+
+  List<_TimelineStats> _buildStats(List<TimelineEntry> entries) {
+    return [
+      _TimelineStats(
+        label: 'Dates',
+        value: entries
+            .where((entry) => entry.type == TimelineEntryType.scrapbook)
+            .length,
+      ),
+      _TimelineStats(
+        label: 'Watches',
+        value: entries
+            .where((entry) => entry.type == TimelineEntryType.watch)
+            .length,
+      ),
+      _TimelineStats(
+        label: 'Activities',
+        value: entries
+            .where((entry) => entry.type == TimelineEntryType.activity)
+            .length,
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('YOUR STORY', style: Theme.of(context).textTheme.labelSmall),
-          const SizedBox(height: 16),
-          ...List.generate(_events.length, (i) {
-            final event = _events[i];
-            final isMilestone = event['milestone'] as bool;
-            final isLast = i == _events.length - 1;
-            return IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 32,
+    return StreamBuilder<List<TimelineEntry>>(
+      stream: _timelineStream,
+      builder: (context, snapshot) {
+        final entries = snapshot.data ?? const <TimelineEntry>[];
+
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('YOUR STORY', style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      cs.primaryContainer.withValues(alpha: 0.8),
+                      cs.secondaryContainer.withValues(alpha: 0.45),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cs.primary.withValues(alpha: 0.12),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: entries.isEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your timeline is empty right now.',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Log a scrapbook date, finish a quest, or watch something together to start building it.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${entries.length} moments logged',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: cs.onPrimaryContainer),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: _buildStats(entries)
+                                .map(
+                                  (stat) => Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                          horizontal: 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: cs.surface.withValues(
+                                            alpha: 0.78,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              stat.value.toString(),
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              stat.label,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.labelSmall,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 18),
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  entries.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 36),
+                  child: Center(
+                    child: CircularProgressIndicator(color: cs.primary),
+                  ),
+                )
+              else if (entries.isEmpty)
+                const SizedBox.shrink()
+              else
+                ...List.generate(entries.length, (i) {
+                  final entry = entries[i];
+                  final previous = i > 0 ? entries[i - 1] : null;
+                  final showDate =
+                      previous == null ||
+                      previous.occurredAt.year != entry.occurredAt.year ||
+                      previous.occurredAt.month != entry.occurredAt.month ||
+                      previous.occurredAt.day != entry.occurredAt.day;
+                  final isLast = i == entries.length - 1;
+
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: isMilestone ? 16 : 12,
-                          height: isMilestone ? 16 : 12,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isMilestone
-                                ? cs.primary
-                                : cs.primaryContainer,
-                            border: isMilestone
-                                ? null
-                                : Border.all(color: cs.primary, width: 1.5),
+                        if (showDate) ...[
+                          Text(
+                            _dateLabel(entry.occurredAt),
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 32,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: entry.isMilestone ? 16 : 12,
+                                      height: entry.isMilestone ? 16 : 12,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: entry.isMilestone
+                                            ? cs.primary
+                                            : cs.primaryContainer,
+                                        border: entry.isMilestone
+                                            ? null
+                                            : Border.all(
+                                                color: cs.primary,
+                                                width: 1.5,
+                                              ),
+                                      ),
+                                    ),
+                                    if (!isLast)
+                                      Expanded(
+                                        child: Container(
+                                          width: 1.5,
+                                          color: cs.primary.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: entry.isMilestone
+                                        ? cs.primaryContainer
+                                        : (isDark
+                                              ? const Color(0xFF231519)
+                                              : Colors.white),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: entry.isMilestone
+                                          ? cs.primary.withValues(alpha: 0.3)
+                                          : cs.outlineVariant,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        entry.emoji,
+                                        style: const TextStyle(fontSize: 22),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  entry.typeLabel,
+                                                  style: Theme.of(
+                                                    context,
+                                                  ).textTheme.labelSmall,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  _relativeLabel(
+                                                    entry.occurredAt,
+                                                  ),
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .labelSmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            cs.onSurfaceVariant,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              entry.title,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              entry.subtitle,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    color: cs.onSurfaceVariant,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        if (!isLast)
-                          Expanded(
-                            child: Container(
-                              width: 1.5,
-                              color: cs.primary.withValues(alpha: 0.2),
-                            ),
-                          ),
                       ],
                     ),
+                  );
+                }),
+              const SizedBox(height: 16),
+              Center(
+                child: Text(
+                  'Timeline syncs scrapbook, watch activity, and streak events.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                    fontSize: 12,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isMilestone
-                              ? cs.primaryContainer
-                              : (isDark
-                                    ? const Color(0xFF231519)
-                                    : Colors.white),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isMilestone
-                                ? cs.primary.withValues(alpha: 0.3)
-                                : cs.outlineVariant,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              event['emoji'],
-                              style: const TextStyle(fontSize: 22),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    event['date'],
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelSmall,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    event['title'],
-                                    style: Theme.of(context).textTheme.bodyLarge
-                                        ?.copyWith(fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    event['sub'],
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(color: cs.onSurfaceVariant),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            );
-          }),
-          const SizedBox(height: 16),
-          Center(
-            child: Text(
-              'Full activity timeline coming soon',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                fontSize: 12,
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+}
+
+class _TimelineStats {
+  final String label;
+  final int value;
+
+  const _TimelineStats({required this.label, required this.value});
 }
 
 // ── Scrapbook Tab ─────────────────────────────────────────────────────────────
