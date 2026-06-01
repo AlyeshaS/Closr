@@ -23,7 +23,7 @@ class GeminiService {
   }
 
   final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-  final String _model = 'models/gemini-2.0-flash';
+  final String _model = 'models/gemini-2.5-flash';
 
   Future<List<Map<String, dynamic>>> generateDateSuggestions(
     List<String> interests, {
