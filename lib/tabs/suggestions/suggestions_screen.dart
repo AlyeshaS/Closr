@@ -102,6 +102,16 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
   bool _loading = false;
   final GeminiService _geminiService = GeminiService();
 
+  Set<String> _tokenSet(String text) {
+    final cleaned = text
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-z0-9\s]"), ' ')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toSet();
+    return cleaned;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -193,17 +203,111 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
           )
           .toList();
     }
+    // If refresh requested, remove existing unswiped suggestions so regenerated
+    // ideas won't just reuse the previous set.
+    if (refresh) {
+      final mySuggestionsSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('suggestions')
+          .get();
+      for (final doc in mySuggestionsSnap.docs) {
+        final swipe = doc.data()?['swipe'];
+        if (swipe == null) {
+          await doc.reference.delete();
+        }
+      }
+    }
     final interests = await _getUserInterests();
     List<Map<String, dynamic>> geminiSuggestions = [];
     try {
+      // Collect user's existing suggestions so we can exclude them from regeneration
+      final userSuggestionsSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('suggestions')
+          .get();
+      final userSuggestions = userSuggestionsSnap.docs
+          .map(
+            (doc) => {'title': doc['title'] ?? '', 'desc': doc['desc'] ?? ''},
+          )
+          .toList();
+
+      // Build exclusions combining user's and partner's suggestions
+      final List<Map<String, String>> exclusions = [];
+      for (final s in userSuggestions) {
+        exclusions.add({
+          'title': (s['title'] ?? '').toString(),
+          'desc': (s['desc'] ?? '').toString(),
+        });
+      }
+      for (final s in partnerSuggestions) {
+        exclusions.add({
+          'title': (s['title'] ?? '').toString(),
+          'desc': (s['desc'] ?? '').toString(),
+        });
+      }
+
+      print(
+        'SuggestionsScreen: Calling generateDateSuggestions with exclusions count: ${exclusions.length}',
+      );
+      if (exclusions.isNotEmpty)
+        print('SuggestionsScreen: Sample exclusion[0]: ${exclusions[0]}');
       geminiSuggestions = await _geminiService
-          .generateDateSuggestions(interests)
-          .timeout(const Duration(seconds: 15));
+          .generateDateSuggestions(interests, exclusions: exclusions)
+          .timeout(const Duration(seconds: 60));
+      print(
+        'SuggestionsScreen: Received ${geminiSuggestions.length} geminiSuggestions',
+      );
+      for (var i = 0; i < geminiSuggestions.length; i++) {
+        print(
+          'Suggestion[$i]: id=${geminiSuggestions[i]['id']} title=${geminiSuggestions[i]['title']}',
+        );
+      }
+
+      // Client-side filter: remove suggestions that are similar to existing ones
+      final existingSuggestionsList = <Map<String, dynamic>>[];
+      existingSuggestionsList.addAll(
+        userSuggestions.map((s) => {'title': s['title'], 'desc': s['desc']}),
+      );
+      existingSuggestionsList.addAll(
+        partnerSuggestions.map((s) => {'title': s['title'], 'desc': s['desc']}),
+      );
+
+      bool isSimilarToAny(Map<String, dynamic> candidate) {
+        final candText = '${candidate['title']} ${candidate['desc']}'
+            .toString();
+        final candSet = _tokenSet(candText);
+        for (final s in existingSuggestionsList) {
+          final sText = '${s['title']} ${s['desc']}'.toString();
+          final sSet = _tokenSet(sText);
+          final intersect = candSet.intersection(sSet).length;
+          final smaller = candSet.length < sSet.length
+              ? candSet.length
+              : sSet.length;
+          if (smaller > 0 && intersect / smaller >= 0.75) return true;
+        }
+        return false;
+      }
+
+      final beforeFilter = geminiSuggestions.length;
+      geminiSuggestions = geminiSuggestions
+          .where((c) => !isSimilarToAny(c))
+          .toList();
+      print(
+        'SuggestionsScreen: Filtered suggestions: before=$beforeFilter after=${geminiSuggestions.length}',
+      );
+      for (var i = 0; i < geminiSuggestions.length; i++) {
+        print(
+          'Filtered[$i]: id=${geminiSuggestions[i]['id']} title=${geminiSuggestions[i]['title']}',
+        );
+      }
       // record streak activity for generating date ideas
       try {
         await StreaksService().recordActivity('date_ideas_view');
       } catch (_) {}
     } on TimeoutException {
+      print('SuggestionsScreen: generateDateSuggestions timed out after 60s');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -222,6 +326,9 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
     for (final s in geminiSuggestions) allSuggestionsMap[s['id']] = s;
     for (final s in partnerSuggestions) allSuggestionsMap[s['id']] = s;
     final allSuggestions = allSuggestionsMap.values.toList();
+    print(
+      'SuggestionsScreen: Saving ${allSuggestions.length} suggestions to Firestore',
+    );
     for (final suggestion in allSuggestions) {
       String cleanTitle = suggestion['title'];
       String cleanDesc = suggestion['desc'];
@@ -231,7 +338,9 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
       if (cleanDesc.startsWith('**')) {
         cleanDesc = cleanDesc.replaceFirst(RegExp(r'^\*\*+'), '').trim();
       }
-      await _suggestionService.saveSuggestion(suggestion['id'], {
+      final id = suggestion['id'];
+      print('SuggestionsScreen: Saving suggestion id=$id title=$cleanTitle');
+      await _suggestionService.saveSuggestion(id, {
         ...suggestion,
         'title': cleanTitle,
         'desc': cleanDesc,

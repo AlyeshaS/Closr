@@ -29,39 +29,93 @@ class GeminiService {
     List<String> interests, {
     List<Map<String, String>> exclusions = const [],
   }) async {
-    final prompt = _buildPrompt(interests, exclusions: exclusions);
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1/$_model:generateContent?key=$_apiKey',
     );
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': prompt},
-            ],
-          },
-        ],
-        'generationConfig': {'temperature': 0.8, 'maxOutputTokens': 300},
-      }),
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final text =
-          data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
-      print('GeminiService: Raw AI response:\n$text');
-      final suggestions = _parseSuggestions(text);
-      print('GeminiService: Parsed suggestions count: \\${suggestions.length}');
-      return suggestions;
-    } else {
-      print(
-        'GeminiService: Error response: \nStatus: \\${response.statusCode}\nBody: \\${response.body}',
+    const targetCount = 8;
+    final collected = <Map<String, dynamic>>[];
+    final seenTitles = <String>{};
+
+    for (
+      var attempt = 0;
+      attempt < 3 && collected.length < targetCount;
+      attempt++
+    ) {
+      final remaining = targetCount - collected.length;
+      final prompt = attempt == 0
+          ? _buildPrompt(interests, exclusions: exclusions)
+          : _buildContinuationPrompt(
+              interests,
+              collected,
+              remaining,
+              exclusions,
+            );
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {'text': prompt},
+              ],
+            },
+          ],
+          // increase token budget for continuation attempts
+          'generationConfig': {'temperature': 0.65, 'maxOutputTokens': 1024},
+        }),
       );
-      throw Exception('Failed to get suggestions from Gemini AI');
+
+      if (response.statusCode != 200) {
+        print(
+          'GeminiService: Error response (suggestions attempt $attempt): \nStatus: \\${response.statusCode}\nBody: \\${response.body}',
+        );
+        continue;
+      }
+
+      final data = jsonDecode(response.body);
+      final text = _extractResponseText(data);
+      print(
+        'GeminiService: Raw AI response (suggestions, attempt $attempt):\n$text',
+      );
+
+      var parsed = _parseSuggestions(text);
+
+      // If parsing yielded fewer than expected, log full data for diagnosis
+      if (parsed.length < remaining) {
+        print(
+          'GeminiService: Partial parse (got \\${parsed.length} of \\${remaining}). Full response JSON:\n\\${jsonEncode(data)}',
+        );
+      }
+
+      for (final s in parsed) {
+        final title = (s['title'] ?? '').toString().trim();
+        final low = title.toLowerCase();
+        if (title.isEmpty) continue;
+        if (seenTitles.contains(low)) continue;
+        seenTitles.add(low);
+        collected.add(s);
+        if (collected.length == targetCount) break;
+      }
     }
+
+    // If still short, pad with simple fallback suggestions
+    var padIdx = 0;
+    while (collected.length < targetCount) {
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      collected.add({
+        'id': 'suggestion_${ts}_pad_$padIdx',
+        'title': 'Cozy Night In',
+        'desc':
+            'Cook a new recipe together, set the mood with music, and share highlights of your week.',
+      });
+      padIdx++;
+    }
+
+    print('GeminiService: Final suggestions count: \\${collected.length}');
+    return collected;
   }
 
   String _buildPrompt(
@@ -92,6 +146,58 @@ Rules:
 - Make the ideas fun, thoughtful, and suitable for couples
 - Do not include any extra text before or after the list
 ''';
+  }
+
+  String _buildContinuationPrompt(
+    List<String> interests,
+    List<Map<String, dynamic>> alreadyReturned,
+    int remaining,
+    List<Map<String, String>> exclusions,
+  ) {
+    final buffer = StringBuffer();
+    buffer.writeln('You are an expert date planner for couples.');
+    buffer.writeln();
+    buffer.writeln('Based on these interests: ${interests.join(", ")}');
+    if (exclusions.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('Do NOT repeat any of these previous ideas:');
+      for (final ex in exclusions) {
+        buffer.writeln('- "${ex['title']}": ${ex['desc']}');
+      }
+    }
+
+    if (alreadyReturned.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('Previously returned ideas:');
+      for (var i = 0; i < alreadyReturned.length; i++) {
+        final s = alreadyReturned[i];
+        buffer.writeln('${i + 1}. ${s['title']}: ${s['desc']}');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln(
+      'Now, please generate exactly $remaining MORE creative and couple-friendly date ideas.',
+    );
+    buffer.writeln(
+      'Continue the numbered list starting at ${alreadyReturned.length + 1}.',
+    );
+    buffer.writeln();
+    buffer.writeln('For EACH idea, use this exact format:');
+    buffer.writeln('1. Title: Description');
+    buffer.writeln();
+    buffer.writeln('Rules:');
+    buffer.writeln(
+      '- Title must be short and describe a realistic, doable date activity',
+    );
+    buffer.writeln('- Description must be 1–2 sentences');
+    buffer.writeln('- Do not repeat any previously returned ideas');
+    buffer.writeln(
+      '- If the response is long, continue the list in a follow-up response',
+    );
+    buffer.writeln('- Do not include any extra text before or after the list');
+
+    return buffer.toString();
   }
 
   Future<List<Map<String, dynamic>>> generateDeepTalkTopics() async {
@@ -186,22 +292,27 @@ Rules:
   }
 
   String _extractResponseText(dynamic data) {
+    final buffer = StringBuffer();
     final candidates = data is Map<String, dynamic> ? data['candidates'] : null;
     if (candidates is List && candidates.isNotEmpty) {
-      final firstCandidate = candidates.first;
-      final content = firstCandidate is Map<String, dynamic>
-          ? firstCandidate['content']
-          : null;
-      final parts = content is Map<String, dynamic> ? content['parts'] : null;
-      if (parts is List) {
-        return parts
-            .map((part) => part is Map<String, dynamic> ? part['text'] : null)
-            .whereType<String>()
-            .join('\n')
-            .trim();
+      for (final cand in candidates) {
+        if (cand is Map<String, dynamic>) {
+          final content = cand['content'];
+          final parts = content is Map<String, dynamic>
+              ? content['parts']
+              : null;
+          if (parts is List) {
+            for (final part in parts) {
+              if (part is Map<String, dynamic> && part['text'] is String) {
+                if (buffer.isNotEmpty) buffer.writeln();
+                buffer.write((part['text'] as String).trim());
+              }
+            }
+          }
+        }
       }
     }
-    return '';
+    return buffer.toString().trim();
   }
 
   List<Map<String, dynamic>> _parseDeepTalkTopics(String text) {
@@ -279,9 +390,7 @@ Keep it to 2 short sentences, around 45-70 words total, and do not include any e
     );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final text =
-          data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
-      return text.trim();
+      return _extractResponseText(data);
     } else {
       print(
         'GeminiService: Error response (quote): \nStatus: \\${response.statusCode}\\nBody: \\${response.body}',
@@ -291,21 +400,28 @@ Keep it to 2 short sentences, around 45-70 words total, and do not include any e
   }
 
   List<Map<String, dynamic>> _parseSuggestions(String text) {
-    final lines = text.split(RegExp(r'\n|\r\n'));
     final suggestions = <Map<String, dynamic>>[];
-    int idx = 0;
-    for (var line in lines) {
-      final match = RegExp(r'\d+\.\s*(.+?):\s*(.+)').firstMatch(line);
-      if (match != null) {
-        final title = match.group(1)?.trim();
-        final desc = match.group(2)?.trim();
-        suggestions.add({
-          'id': 'suggestion_$idx',
-          'title': title ?? 'Untitled',
-          'desc': desc ?? 'No description available',
-        });
-        idx++;
-      }
+    // Match numbered entries like "1. Title: Description..." where description
+    // may span multiple lines until the next numbered item.
+    final entryRe = RegExp(
+      r'''\d+\.\s*(.+?):\s*([\s\S]*?)(?=(?:\n\d+\.|\n\Z))''',
+      dotAll: true,
+      multiLine: true,
+    );
+    final matches = entryRe.allMatches(text);
+    var idx = 0;
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    for (final m in matches) {
+      final title = m.group(1)?.trim();
+      var desc = m.group(2)?.trim() ?? '';
+      // Normalize line breaks inside the description to single spaces
+      desc = desc.replaceAll(RegExp(r'\s+'), ' ').trim();
+      suggestions.add({
+        'id': 'suggestion_${ts}_$idx',
+        'title': title ?? 'Untitled',
+        'desc': desc.isNotEmpty ? desc : 'No description available',
+      });
+      idx++;
     }
     return suggestions;
   }
