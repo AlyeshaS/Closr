@@ -2,11 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../gemini_service.dart';
 import '../../services/streaks_service.dart';
-import '../../services/streaks_service.dart';
 
 class DeepTalkService {
   final GeminiService _geminiService = GeminiService();
   final StreaksService _streaks = StreaksService();
+
+  bool _isTopicComplete(String topic) {
+    final wordCount = topic
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+    return wordCount >= 6 && topic.contains('?');
+  }
 
   /// Loads topics from Firestore, or generates via Gemini if not present.
   Future<List<Map<String, dynamic>>> getOrGenerateTopics() async {
@@ -18,11 +26,18 @@ class DeepTalkService {
         .collection('topics');
     final snapshot = await topicsRef.get();
     if (snapshot.docs.isNotEmpty) {
-      // record activity for using deep talk
-      await _streaks.recordActivity('deep_talk_view');
-      return snapshot.docs
+      final savedTopics = snapshot.docs
           .map((doc) => {'id': doc['id'], 'topic': doc['topic']})
           .toList();
+      final needsRefresh =
+          savedTopics.length != 10 ||
+          savedTopics.any(
+            (topic) => !_isTopicComplete((topic['topic'] ?? '').toString()),
+          );
+      if (!needsRefresh) {
+        await _streaks.recordActivity('deep_talk_view');
+        return savedTopics;
+      }
     }
     // If not found, generate from Gemini
     final aiTopics = await _geminiService.generateDeepTalkTopics();
