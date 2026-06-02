@@ -64,21 +64,27 @@ class HomePage extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _StatCard(
-                    label: 'MATCHED DATES',
-                    cs: cs,
-                    stream: user != null
-                        ? FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(user.uid)
-                              .collection('matched_suggestions')
-                              .snapshots()
-                        : null,
+                  child: SizedBox(
+                    height: 176,
+                    child: _StatCard(
+                      label: 'MATCHED DATES',
+                      cs: cs,
+                      stream: user != null
+                          ? FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .collection('matched_suggestions')
+                                .snapshots()
+                          : null,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _StreakCard(user: user, cs: cs),
+                  child: SizedBox(
+                    height: 176,
+                    child: _StreakCard(user: user, cs: cs),
+                  ),
                 ),
               ],
             ),
@@ -91,44 +97,174 @@ class HomePage extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(20),
-                border: Border(left: BorderSide(color: cs.primary, width: 3)),
+                gradient: LinearGradient(
+                  colors: [
+                    cs.surfaceContainerHighest,
+                    cs.primaryContainer.withValues(alpha: 0.45),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.7),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: FutureBuilder<String>(
                 future: GeminiService().fetchQuoteOfTheDay(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Row(
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: cs.primary,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: cs.surface.withValues(alpha: 0.7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Daily inspiration',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    letterSpacing: 1.0,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Fetching your tip...',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: cs.onSurfaceVariant),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cs.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Fetching your tip...',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
                         ),
                       ],
                     );
                   }
-                  return Text(
-                    snapshot.hasError
-                        ? 'Could not load tip.'
-                        : (snapshot.data ?? ''),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      fontFamily: 'CormorantGaramond',
-                      fontSize: 17,
-                      height: 1.6,
-                      color: cs.onSurface,
-                    ),
+                  final tipText = snapshot.hasError
+                      ? 'Could not load tip.'
+                      : (snapshot.data ?? '');
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: cs.surface.withValues(alpha: 0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 18,
+                              color: cs.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Daily inspiration',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  letterSpacing: 1.0,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.surface.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: cs.outlineVariant.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            child: Text(
+                              'Tip',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '“',
+                            style: Theme.of(context).textTheme.displayMedium
+                                ?.copyWith(
+                                  height: 0.8,
+                                  color: cs.primary,
+                                  fontFamily: 'CormorantGaramond',
+                                ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              tipText,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    fontStyle: FontStyle.italic,
+                                    fontFamily: 'CormorantGaramond',
+                                    fontSize: 18,
+                                    height: 1.65,
+                                    color: cs.onSurface,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '”',
+                          style: Theme.of(context).textTheme.displayMedium
+                              ?.copyWith(
+                                height: 0.8,
+                                color: cs.primary,
+                                fontFamily: 'CormorantGaramond',
+                              ),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -139,86 +275,200 @@ class HomePage extends StatelessWidget {
             _SectionLabel(text: 'Recent matches', cs: cs),
             const SizedBox(height: 10),
             Container(
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF231519)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: cs.outlineVariant),
+                gradient: LinearGradient(
+                  colors: [
+                    cs.surfaceContainerHighest,
+                    cs.primaryContainer.withValues(alpha: 0.35),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.7),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withValues(alpha: 0.06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              child: user == null
-                  ? Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        'Sign in to see your matches.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    )
-                  : StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .collection('matched_suggestions')
-                          .limit(5)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: cs.primary,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: cs.surface.withValues(alpha: 0.72),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.favorite_rounded,
+                              size: 18,
+                              color: cs.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Your latest matches',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.surface.withValues(alpha: 0.72),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: cs.outlineVariant.withValues(alpha: 0.7),
                               ),
                             ),
-                          );
-                        }
-                        final docs = snapshot.data?.docs ?? [];
-                        if (docs.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.favorite_border_rounded,
-                                  size: 36,
-                                  color: cs.outline,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'No matches yet — try the Connect tab!',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                            child: Text(
+                              user == null ? '0' : '5',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
                             ),
-                          );
-                        }
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: docs.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            color: cs.outlineVariant,
-                            indent: 16,
-                            endIndent: 16,
                           ),
-                          itemBuilder: (context, index) {
-                            final data =
-                                docs[index].data() as Map<String, dynamic>;
-                            return ExpandableMatchTile(
-                              title: data['title'] ?? 'No Title',
-                              description: data['desc'] ?? '',
-                            );
-                          },
-                        );
-                      },
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 6),
+                    user == null
+                        ? Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: cs.surface.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                'Sign in to see your matches.',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ),
+                          )
+                        : StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .collection('matched_suggestions')
+                                .limit(5)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    16,
+                                    16,
+                                    18,
+                                  ),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: cs.primary,
+                                    ),
+                                  ),
+                                );
+                              }
+                              final docs = snapshot.data?.docs ?? [];
+                              if (docs.isEmpty) {
+                                return Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    18,
+                                  ),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(18),
+                                    decoration: BoxDecoration(
+                                      color: cs.surface.withValues(alpha: 0.72),
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(
+                                        color: cs.outlineVariant.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.favorite_border_rounded,
+                                          size: 36,
+                                          color: cs.outline,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'No matches yet — try the Connect tab!',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: cs.onSurfaceVariant,
+                                              ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: docs.length,
+                                  separatorBuilder: (_, __) => Divider(
+                                    height: 1,
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.55,
+                                    ),
+                                    indent: 16,
+                                    endIndent: 16,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final data =
+                                        docs[index].data()
+                                            as Map<String, dynamic>;
+                                    return ExpandableMatchTile(
+                                      title: data['title'] ?? 'No Title',
+                                      description: data['desc'] ?? '',
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -275,31 +525,82 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.outlineVariant),
+        gradient: LinearGradient(
+          colors: [
+            cs.primaryContainer.withValues(alpha: 0.95),
+            cs.secondaryContainer.withValues(alpha: 0.7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.75)),
+        boxShadow: [
+          BoxShadow(
+            color: cs.primary.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: Theme.of(context).textTheme.labelSmall),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.1,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.surface.withValues(alpha: 0.65),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.favorite_rounded,
+                  size: 16,
+                  color: cs.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (stream != null)
             StreamBuilder<dynamic>(
               stream: stream,
               builder: (context, snapshot) {
-                // If this is a QuerySnapshot (collection), show docs length
                 if (snapshot.data is QuerySnapshot) {
                   final count = (snapshot.data as QuerySnapshot).docs.length;
-                  return Text(
-                    '$count',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: cs.onPrimaryContainer,
-                      fontSize: 28,
-                    ),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$count',
+                        style: Theme.of(context).textTheme.displaySmall
+                            ?.copyWith(
+                              color: cs.onPrimaryContainer,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        count == 1
+                            ? 'match waiting to be opened'
+                            : 'matches waiting to be opened',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   );
                 }
-                // If this is a DocumentSnapshot (single user doc), show a numeric field
                 if (snapshot.data is DocumentSnapshot) {
                   final doc = snapshot.data as DocumentSnapshot;
                   final val = doc.data() is Map<String, dynamic>
@@ -314,18 +615,17 @@ class _StatCard extends StatelessWidget {
                   final textVal = val != null ? '$val' : '—';
                   return Text(
                     textVal,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       color: cs.onPrimaryContainer,
-                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
                     ),
                   );
                 }
-                // Fallback
                 return Text(
                   staticValue ?? '—',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     color: cs.onPrimaryContainer,
-                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
                   ),
                 );
               },
@@ -333,18 +633,18 @@ class _StatCard extends StatelessWidget {
           else
             Text(
               staticValue ?? '—',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
                 color: cs.onPrimaryContainer,
-                fontSize: 28,
+                fontWeight: FontWeight.w700,
               ),
             ),
           if (staticSub != null) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               staticSub!,
               style: Theme.of(
                 context,
-              ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
           ],
         ],
@@ -378,35 +678,7 @@ class _StreakCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (user == null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cs.primaryContainer,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('STREAK', style: Theme.of(context).textTheme.labelSmall),
-            const SizedBox(height: 8),
-            Text(
-              '—',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: cs.onPrimaryContainer,
-                fontSize: 28,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'days in a row',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      );
+      return _streakContainer(context, '—', 'days in a row', 'Best: —');
     }
 
     final docStream = FirebaseFirestore.instance
@@ -429,58 +701,112 @@ class _StreakCard extends StatelessWidget {
                   0)
             : 0;
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: cs.outlineVariant),
+        return _streakContainer(
+          context,
+          '$current',
+          'days in a row',
+          'Best: $best days',
+        );
+      },
+    );
+  }
+
+  Widget _streakContainer(
+    BuildContext context,
+    String value,
+    String subtitle,
+    String bestLabel,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            cs.primaryContainer.withValues(alpha: 0.95),
+            cs.tertiaryContainer.withValues(alpha: 0.62),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.75)),
+        boxShadow: [
+          BoxShadow(
+            color: cs.primary.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text('STREAK', style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(height: 8),
-              Text(
-                '$current',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: cs.onPrimaryContainer,
-                  fontSize: 28,
+              Expanded(
+                child: Text(
+                  'STREAK',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.1,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Text(
-                    'days in a row',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: Text(
-                      'Best: $best',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.surface.withValues(alpha: 0.65),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 16,
+                  color: cs.primary,
+                ),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+              color: cs.onPrimaryContainer,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.topLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: cs.surface.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.85),
+                ),
+              ),
+              child: Text(
+                bestLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

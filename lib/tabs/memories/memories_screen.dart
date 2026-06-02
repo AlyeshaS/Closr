@@ -309,7 +309,7 @@ class _TimelineTabState extends State<_TimelineTab> {
               else if (entries.isEmpty)
                 const SizedBox.shrink()
               else ...[
-                if (removedCount > 0)
+                if (removedCount > 0 && visibleEntries.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: Text(
@@ -319,156 +319,199 @@ class _TimelineTabState extends State<_TimelineTab> {
                       ),
                     ),
                   ),
-                ...List.generate(visibleEntries.length, (i) {
-                  final entry = visibleEntries[i];
-                  final previous = i > 0 ? entries[i - 1] : null;
-                  // For date grouping, look at the previous visible entry
-                  final previousVisible = i > 0 ? visibleEntries[i - 1] : null;
-                  final showDate =
-                      previousVisible == null ||
-                      previousVisible.occurredAt.year !=
-                          entry.occurredAt.year ||
-                      previousVisible.occurredAt.month !=
-                          entry.occurredAt.month ||
-                      previousVisible.occurredAt.day != entry.occurredAt.day;
-                  final isLast = i == entries.length - 1;
-
-                  final isLastVisible = i == visibleEntries.length - 1;
-
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: isLastVisible ? 0 : 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (showDate) ...[
-                          Text(
-                            _dateLabel(entry.occurredAt),
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                if (visibleEntries.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: cs.surface.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              SizedBox(
-                                width: 32,
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      width: entry.isMilestone ? 16 : 12,
-                                      height: entry.isMilestone ? 16 : 12,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: entry.isMilestone
-                                            ? cs.primary
-                                            : cs.primaryContainer,
-                                        border: entry.isMilestone
-                                            ? null
-                                            : Border.all(
-                                                color: cs.primary,
-                                                width: 1.5,
-                                              ),
-                                      ),
-                                    ),
-                                    if (!isLastVisible)
-                                      Expanded(
-                                        child: Container(
-                                          width: 1.5,
-                                          color: cs.primary.withValues(
-                                            alpha: 0.2,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                              Icon(
+                                Icons.archive_outlined,
+                                color: cs.primary,
+                                size: 18,
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: entry.isMilestone
-                                        ? cs.primaryContainer
-                                        : (isDark
-                                              ? const Color(0xFF231519)
-                                              : Colors.white),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: entry.isMilestone
-                                          ? cs.primary.withValues(alpha: 0.3)
-                                          : cs.outlineVariant,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        entry.emoji,
-                                        style: const TextStyle(fontSize: 22),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  entry.typeLabel,
-                                                  style: Theme.of(
-                                                    context,
-                                                  ).textTheme.labelSmall,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  _relativeLabel(
-                                                    entry.occurredAt,
-                                                  ),
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .labelSmall
-                                                      ?.copyWith(
-                                                        color:
-                                                            cs.onSurfaceVariant,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Text(
-                                              entry.title,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodyLarge
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              entry.subtitle,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodyMedium
-                                                  ?.copyWith(
-                                                    color: cs.onSurfaceVariant,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Timeline archived for now',
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'There are no timeline items in the last 3 weeks yet. Add a scrapbook moment, watch activity, or new quest to bring it back to life.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                }),
+                  )
+                else ...[
+                  ...List.generate(visibleEntries.length, (i) {
+                    final entry = visibleEntries[i];
+                    final previousVisible = i > 0
+                        ? visibleEntries[i - 1]
+                        : null;
+                    final showDate =
+                        previousVisible == null ||
+                        previousVisible.occurredAt.year !=
+                            entry.occurredAt.year ||
+                        previousVisible.occurredAt.month !=
+                            entry.occurredAt.month ||
+                        previousVisible.occurredAt.day != entry.occurredAt.day;
+
+                    final isLastVisible = i == visibleEntries.length - 1;
+
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: isLastVisible ? 0 : 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (showDate) ...[
+                            Text(
+                              _dateLabel(entry.occurredAt),
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 32,
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        width: entry.isMilestone ? 16 : 12,
+                                        height: entry.isMilestone ? 16 : 12,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: entry.isMilestone
+                                              ? cs.primary
+                                              : cs.primaryContainer,
+                                          border: entry.isMilestone
+                                              ? null
+                                              : Border.all(
+                                                  color: cs.primary,
+                                                  width: 1.5,
+                                                ),
+                                        ),
+                                      ),
+                                      if (!isLastVisible)
+                                        Expanded(
+                                          child: Container(
+                                            width: 1.5,
+                                            color: cs.primary.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: entry.isMilestone
+                                          ? cs.primaryContainer
+                                          : (isDark
+                                                ? const Color(0xFF231519)
+                                                : Colors.white),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: entry.isMilestone
+                                            ? cs.primary.withValues(alpha: 0.3)
+                                            : cs.outlineVariant,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          entry.emoji,
+                                          style: const TextStyle(fontSize: 22),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    entry.typeLabel,
+                                                    style: Theme.of(
+                                                      context,
+                                                    ).textTheme.labelSmall,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    _relativeLabel(
+                                                      entry.occurredAt,
+                                                    ),
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .labelSmall
+                                                        ?.copyWith(
+                                                          color: cs
+                                                              .onSurfaceVariant,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                entry.title,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyLarge
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                entry.subtitle,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      color:
+                                                          cs.onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
                 if ((hasMoreToShow && !_expanded) || _expanded)
                   const SizedBox(height: 12),
                 if (hasMoreToShow && !_expanded)

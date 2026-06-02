@@ -57,43 +57,61 @@ class _MainPageState extends State<MainPage> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: BottomNavigationBar(
-              currentIndex: _selectedIndex,
-              onTap: _onItemTapped,
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.transparent,
-              selectedItemColor: cs.primary,
-              unselectedItemColor: cs.onSurfaceVariant.withOpacity(0.6),
-              elevation: 0,
-              selectedFontSize: 10,
-              unselectedFontSize: 10,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home_outlined),
-                  activeIcon: Icon(Icons.home_rounded),
-                  label: 'Home',
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                splashColor: cs.primary.withValues(alpha: 0.16),
+                highlightColor: cs.primary.withValues(alpha: 0.08),
+              ),
+              child: BottomNavigationBar(
+                currentIndex: _selectedIndex,
+                onTap: _onItemTapped,
+                type: BottomNavigationBarType.fixed,
+                backgroundColor: Colors.transparent,
+                selectedItemColor: cs.primary,
+                unselectedItemColor: cs.onSurfaceVariant.withOpacity(0.6),
+                selectedIconTheme: IconThemeData(color: cs.primary),
+                unselectedIconTheme: IconThemeData(
+                  color: cs.onSurfaceVariant.withOpacity(0.6),
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.favorite_outline_rounded),
-                  activeIcon: Icon(Icons.favorite_rounded),
-                  label: 'Connect',
+                selectedLabelStyle: TextStyle(
+                  color: cs.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.local_activity_outlined),
-                  activeIcon: Icon(Icons.local_activity_rounded),
-                  label: 'Activities',
+                unselectedLabelStyle: TextStyle(
+                  color: cs.onSurfaceVariant.withOpacity(0.6),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w400,
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.auto_stories_outlined),
-                  activeIcon: Icon(Icons.auto_stories_rounded),
-                  label: 'Memories',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person_outline_rounded),
-                  activeIcon: Icon(Icons.person_rounded),
-                  label: 'You',
-                ),
-              ],
+                elevation: 0,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home_outlined),
+                    activeIcon: Icon(Icons.home_rounded),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.favorite_outline_rounded),
+                    activeIcon: Icon(Icons.favorite_rounded),
+                    label: 'Connect',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.local_activity_outlined),
+                    activeIcon: Icon(Icons.local_activity_rounded),
+                    label: 'Activities',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.auto_stories_outlined),
+                    activeIcon: Icon(Icons.auto_stories_rounded),
+                    label: 'Memories',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.person_outline_rounded),
+                    activeIcon: Icon(Icons.person_rounded),
+                    label: 'You',
+                  ),
+                ],
+              ),
             ),
           ),
         ),
