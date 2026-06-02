@@ -99,6 +99,7 @@ class _TimelineTab extends StatefulWidget {
 class _TimelineTabState extends State<_TimelineTab> {
   late final Stream<List<TimelineEntry>> _timelineStream = TimelineService()
       .streamTimelineEntries();
+  bool _expanded = false; // when true, show up to 3 weeks; otherwise 1 week
 
   String _dateLabel(DateTime date) {
     const months = [
@@ -161,6 +162,13 @@ class _TimelineTabState extends State<_TimelineTab> {
     ];
   }
 
+  List<TimelineEntry> entriesWhereWithin(
+    List<TimelineEntry> entries,
+    DateTime cutoff,
+  ) {
+    return entries.where((e) => !e.occurredAt.isBefore(cutoff)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -170,6 +178,23 @@ class _TimelineTabState extends State<_TimelineTab> {
       stream: _timelineStream,
       builder: (context, snapshot) {
         final entries = snapshot.data ?? const <TimelineEntry>[];
+
+        // Filter entries by recency: default 1 week, expand to 3 weeks.
+        final now = DateTime.now();
+        final oneWeekAgo = now.subtract(const Duration(days: 7));
+        final threeWeeksAgo = now.subtract(const Duration(days: 21));
+
+        final entriesWithinThreeWeeks = entries
+            .where((e) => e.occurredAt.isAfter(threeWeeksAgo))
+            .toList();
+        final visibleEntries = _expanded
+            ? entriesWithinThreeWeeks
+            : entriesWhereWithin(entries, oneWeekAgo);
+
+        final removedCount = entries.length - entriesWithinThreeWeeks.length;
+        final hasMoreToShow =
+            entriesWithinThreeWeeks.length >
+            entriesWhereWithin(entries, oneWeekAgo).length;
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -283,19 +308,35 @@ class _TimelineTabState extends State<_TimelineTab> {
                 )
               else if (entries.isEmpty)
                 const SizedBox.shrink()
-              else
-                ...List.generate(entries.length, (i) {
-                  final entry = entries[i];
+              else ...[
+                if (removedCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Text(
+                      'Some older events (more than 3 weeks) were hidden.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ...List.generate(visibleEntries.length, (i) {
+                  final entry = visibleEntries[i];
                   final previous = i > 0 ? entries[i - 1] : null;
+                  // For date grouping, look at the previous visible entry
+                  final previousVisible = i > 0 ? visibleEntries[i - 1] : null;
                   final showDate =
-                      previous == null ||
-                      previous.occurredAt.year != entry.occurredAt.year ||
-                      previous.occurredAt.month != entry.occurredAt.month ||
-                      previous.occurredAt.day != entry.occurredAt.day;
+                      previousVisible == null ||
+                      previousVisible.occurredAt.year !=
+                          entry.occurredAt.year ||
+                      previousVisible.occurredAt.month !=
+                          entry.occurredAt.month ||
+                      previousVisible.occurredAt.day != entry.occurredAt.day;
                   final isLast = i == entries.length - 1;
 
+                  final isLastVisible = i == visibleEntries.length - 1;
+
                   return Padding(
-                    padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+                    padding: EdgeInsets.only(bottom: isLastVisible ? 0 : 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -330,7 +371,7 @@ class _TimelineTabState extends State<_TimelineTab> {
                                               ),
                                       ),
                                     ),
-                                    if (!isLast)
+                                    if (!isLastVisible)
                                       Expanded(
                                         child: Container(
                                           width: 1.5,
@@ -428,16 +469,51 @@ class _TimelineTabState extends State<_TimelineTab> {
                     ),
                   );
                 }),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  'Timeline syncs scrapbook, watch activity, and streak events.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                    fontSize: 12,
+                if ((hasMoreToShow && !_expanded) || _expanded)
+                  const SizedBox(height: 12),
+                if (hasMoreToShow && !_expanded)
+                  Align(
+                    alignment: Alignment.center,
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _expanded = true),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text('Show more'),
+                    ),
+                  ),
+                if (_expanded)
+                  Align(
+                    alignment: Alignment.center,
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _expanded = false),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text('Show less'),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Center(
+                  child: Text(
+                    'Timeline syncs scrapbook, watch activity, and streak events.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         );
