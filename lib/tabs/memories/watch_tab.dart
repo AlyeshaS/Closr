@@ -31,110 +31,113 @@ class _WatchTabState extends State<WatchTab> {
     _recommendationsFuture = _repository.fetchRecommendations();
   }
 
-  String _activeFilterLabel(_WatchFeedFilter filter, String? genre) {
-    final filterLabel = switch (filter) {
-      _WatchFeedFilter.all => 'All media',
-      _WatchFeedFilter.bothYes => 'Both yes',
-      _WatchFeedFilter.oneYes => 'One yes',
-      _WatchFeedFilter.anyNo => 'Any no',
-      _WatchFeedFilter.favorites => 'Favorites',
-      _WatchFeedFilter.watched => 'Watched',
-      _WatchFeedFilter.unwatched => 'Unwatched',
-      _WatchFeedFilter.movies => 'Movies only',
-      _WatchFeedFilter.tv => 'TV shows only',
-    };
-
-    if (genre == null) {
-      return filterLabel;
-    }
-
-    return '$filterLabel · $genre';
-  }
-
   Future<void> _openFilterSheet({
     required ColorScheme cs,
     required _WatchFeedFilter filter,
     required String? selectedGenre,
     required List<String> genres,
   }) async {
+    var tempFilter = _filter;
+    var tempGenre = selectedGenre;
+    var tempMinRating = _minRating;
+    var tempMaxRuntime = _maxRuntime;
+
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return Container(
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: cs.outlineVariant,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
                 ),
-                const SizedBox(height: 14),
-                Row(
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'Filter watch picks',
-                        style: Theme.of(sheetContext).textTheme.titleLarge,
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: cs.outlineVariant,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Filter watch picks',
+                            style: Theme.of(sheetContext).textTheme.titleLarge,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _filter = _WatchFeedFilter.all;
+                              _currentRecommendationIndex = 0;
+                              _selectedGenre = null;
+                              _minRating = 0;
+                              _maxRuntime = 240;
+                            });
+                            Navigator.of(sheetContext).pop();
+                          },
+                          child: const Text('Reset'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _FilterPanel(
+                      cs: cs,
+                      filter: tempFilter,
+                      selectedGenre: tempGenre,
+                      genres: genres,
+                      minRating: tempMinRating,
+                      maxRuntime: tempMaxRuntime,
+                      onFilterChanged: (value) {
+                        setSheetState(() => tempFilter = value);
                         setState(() {
-                          _filter = _WatchFeedFilter.all;
+                          _filter = value;
                           _currentRecommendationIndex = 0;
-                          _selectedGenre = null;
-                          _minRating = 0;
-                          _maxRuntime = 240;
                         });
-                        Navigator.of(sheetContext).pop();
                       },
-                      child: const Text('Reset'),
+                      onGenreChanged: (value) {
+                        setSheetState(() => tempGenre = value);
+                        setState(() {
+                          _selectedGenre = value;
+                          _currentRecommendationIndex = 0;
+                        });
+                      },
+                      onRatingChanged: (value) {
+                        setSheetState(() => tempMinRating = value);
+                        setState(() {
+                          _minRating = value;
+                          _currentRecommendationIndex = 0;
+                        });
+                      },
+                      onRuntimeChanged: (value) {
+                        setSheetState(() => tempMaxRuntime = value);
+                        setState(() {
+                          _maxRuntime = value;
+                          _currentRecommendationIndex = 0;
+                        });
+                      },
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _FilterPanel(
-                  cs: cs,
-                  filter: filter,
-                  selectedGenre: selectedGenre,
-                  genres: genres,
-                  minRating: _minRating,
-                  maxRuntime: _maxRuntime,
-                  onFilterChanged: (value) => setState(() {
-                    _filter = value;
-                    _currentRecommendationIndex = 0;
-                  }),
-                  onGenreChanged: (value) => setState(() {
-                    _selectedGenre = value;
-                    _currentRecommendationIndex = 0;
-                  }),
-                  onRatingChanged: (value) => setState(() {
-                    _minRating = value;
-                    _currentRecommendationIndex = 0;
-                  }),
-                  onRuntimeChanged: (value) => setState(() {
-                    _maxRuntime = value;
-                    _currentRecommendationIndex = 0;
-                  }),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -188,38 +191,8 @@ class _WatchTabState extends State<WatchTab> {
     String currentUid,
     String? partnerUid,
   ) {
-    final currentLiked = record?.isLikedBy(currentUid) ?? false;
-    final currentDisliked = record?.isDislikedBy(currentUid) ?? false;
-    final currentFavorited = record?.isFavoritedBy(currentUid) ?? false;
-    final currentWatched = record?.isWatchedBy(currentUid) ?? false;
-    final partnerLiked = partnerUid != null
-        ? record?.isLikedBy(partnerUid) ?? false
-        : false;
-    final partnerDisliked = partnerUid != null
-        ? record?.isDislikedBy(partnerUid) ?? false
-        : false;
-
     switch (_filter) {
       case _WatchFeedFilter.all:
-        break;
-      case _WatchFeedFilter.bothYes:
-        if (!(currentLiked && partnerLiked)) return false;
-        break;
-      case _WatchFeedFilter.oneYes:
-        final yesCount = (currentLiked ? 1 : 0) + (partnerLiked ? 1 : 0);
-        if (yesCount != 1) return false;
-        break;
-      case _WatchFeedFilter.anyNo:
-        if (!(currentDisliked || partnerDisliked)) return false;
-        break;
-      case _WatchFeedFilter.favorites:
-        if (!currentFavorited) return false;
-        break;
-      case _WatchFeedFilter.watched:
-        if (!currentWatched) return false;
-        break;
-      case _WatchFeedFilter.unwatched:
-        if (currentWatched) return false;
         break;
       case _WatchFeedFilter.movies:
         if (item.mediaType != _WatchMediaType.movie) return false;
@@ -229,7 +202,8 @@ class _WatchTabState extends State<WatchTab> {
         break;
     }
 
-    if (_selectedGenre != null && !item.genres.contains(_selectedGenre)) {
+    final activeGenre = _selectedGenre;
+    if (activeGenre != null && !item.genres.contains(activeGenre)) {
       return false;
     }
 
@@ -242,29 +216,6 @@ class _WatchTabState extends State<WatchTab> {
     }
 
     return true;
-  }
-
-  String _headlineForFilter() {
-    switch (_filter) {
-      case _WatchFeedFilter.all:
-        return 'Your cozy movie and TV shortlist.';
-      case _WatchFeedFilter.bothYes:
-        return 'Items you both already said yes to.';
-      case _WatchFeedFilter.oneYes:
-        return 'Ideas where one of you has already shown interest.';
-      case _WatchFeedFilter.anyNo:
-        return 'Places where you have mixed opinions.';
-      case _WatchFeedFilter.favorites:
-        return 'Your saved favorites, ready for tonight.';
-      case _WatchFeedFilter.watched:
-        return 'What you have already watched together.';
-      case _WatchFeedFilter.unwatched:
-        return 'Fresh picks you have not watched yet.';
-      case _WatchFeedFilter.movies:
-        return 'Just movies for a film night.';
-      case _WatchFeedFilter.tv:
-        return 'Just TV shows for a longer cuddle session.';
-    }
   }
 
   double _displayScore(
@@ -320,13 +271,11 @@ class _WatchTabState extends State<WatchTab> {
     bool? disliked,
   }) async {
     await _toggleAction(item: item, liked: liked, disliked: disliked);
-    if (!mounted || currentListCount <= 0) {
-      return;
-    }
+
+    if (!mounted) return;
 
     setState(() {
-      _currentRecommendationIndex =
-          (_currentRecommendationIndex + 1) % currentListCount;
+      _currentRecommendationIndex = 0;
     });
   }
 
@@ -615,10 +564,21 @@ class _WatchTabState extends State<WatchTab> {
                             : null;
                         final filteredItems = recommendations.where((item) {
                           final record = _recordFor(item, records);
+
+                          final currentUserInteracted =
+                              record?.isLikedBy(user.uid) == true ||
+                              record?.isDislikedBy(user.uid) == true;
+
+                          if (_topView == _TopView.suggestions &&
+                              currentUserInteracted) {
+                            return false;
+                          }
+
                           if (selectedGenre != null &&
                               !item.genres.contains(selectedGenre)) {
                             return false;
                           }
+
                           return _matchesFilter(
                             item,
                             record,
@@ -655,10 +615,6 @@ class _WatchTabState extends State<WatchTab> {
                                               if (value ==
                                                   _TopView.suggestions) {
                                                 _filter = _WatchFeedFilter.all;
-                                              } else if (value ==
-                                                  _TopView.matched) {
-                                                _filter =
-                                                    _WatchFeedFilter.bothYes;
                                               }
                                             });
                                           },
@@ -811,10 +767,19 @@ class _WatchTabState extends State<WatchTab> {
                                       ),
                                     ),
                                   )
-                              else if (_topView == _TopView.history ||
-                                  filteredItems.isEmpty)
+                              else if (_topView == _TopView.history)
                                 const SliverToBoxAdapter(
                                   child: SizedBox.shrink(),
+                                )
+                              else if (filteredItems.isEmpty)
+                                SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: _EmptyWatchState(
+                                    cs: cs,
+                                    title: 'No new picks right now',
+                                    subtitle:
+                                        'You may have interacted with all current suggestions. Try changing filters or loading more movies.',
+                                  ),
                                 )
                               else
                                 SliverFillRemaining(
@@ -892,17 +857,7 @@ class _WatchTabState extends State<WatchTab> {
   }
 }
 
-enum _WatchFeedFilter {
-  all,
-  bothYes,
-  oneYes,
-  anyNo,
-  favorites,
-  watched,
-  unwatched,
-  movies,
-  tv,
-}
+enum _WatchFeedFilter { all, movies, tv }
 
 enum _WatchMediaType { movie, tv }
 
@@ -1215,7 +1170,7 @@ class _WatchRepository {
         _fetchSeeds(_WatchMediaType.tv),
       ]);
       final allSeeds = [...seeds[0], ...seeds[1]];
-      final enriched = await Future.wait(allSeeds.take(10).map(_enrichSeed));
+      final enriched = await Future.wait(allSeeds.take(30).map(_enrichSeed));
       enriched.sort((a, b) => b.matchPercentage.compareTo(a.matchPercentage));
       return enriched;
     } catch (_) {
@@ -1569,7 +1524,7 @@ class _WatchRepository {
     final results = json['results'] as List? ?? const [];
 
     return results
-        .take(8)
+        .take(20)
         .map((raw) {
           final data = Map<String, dynamic>.from(raw as Map);
           final title = type == _WatchMediaType.movie
@@ -2093,11 +2048,6 @@ class _FilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <Map<String, dynamic>>[
       {'label': 'All', 'value': _WatchFeedFilter.all},
-      {'label': 'Both yes', 'value': _WatchFeedFilter.bothYes},
-      {'label': 'One yes', 'value': _WatchFeedFilter.oneYes},
-      {'label': 'Any no', 'value': _WatchFeedFilter.anyNo},
-      {'label': 'Watched', 'value': _WatchFeedFilter.watched},
-      {'label': 'Unwatched', 'value': _WatchFeedFilter.unwatched},
       {'label': 'Movies', 'value': _WatchFeedFilter.movies},
       {'label': 'TV shows', 'value': _WatchFeedFilter.tv},
     ];
@@ -2113,7 +2063,7 @@ class _FilterPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Couple match filters',
+            'Filter watch picks',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
@@ -2130,35 +2080,25 @@ class _FilterPanel extends StatelessWidget {
             }).toList(),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Genres both users matched on',
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
+          Text('Genres', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: const Text('All genres'),
-                    selected: selectedGenre == null,
-                    onSelected: (_) => onGenreChanged(null),
-                  ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('All genres'),
+                selected: selectedGenre == null,
+                onSelected: (_) => onGenreChanged(null),
+              ),
+              ...genres.map(
+                (genre) => FilterChip(
+                  label: Text(genre),
+                  selected: selectedGenre == genre,
+                  onSelected: (_) => onGenreChanged(genre),
                 ),
-                ...genres.map(
-                  (genre) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(genre),
-                      selected: selectedGenre == genre,
-                      onSelected: (_) => onGenreChanged(genre),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 18),
           Text('Rating', style: Theme.of(context).textTheme.labelSmall),
