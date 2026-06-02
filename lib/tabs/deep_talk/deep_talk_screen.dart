@@ -14,6 +14,7 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
   List<Map<String, dynamic>> _topics = [];
   int _currentIndex = 0;
   bool _loading = false;
+  bool _loggedCompletedRun = false;
 
   // Topic depth labels for display
   final List<String> _depthLabels = [
@@ -36,6 +37,7 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
     setState(() {
       _topics = topics;
       _currentIndex = 0;
+      _loggedCompletedRun = false;
       _loading = false;
     });
   }
@@ -45,8 +47,20 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
     final topics = await _service.getOrGenerateTopics();
     setState(() {
       _topics = topics;
+      _loggedCompletedRun = false;
       _loading = false;
     });
+  }
+
+  Future<void> _goToIndex(int nextIndex) async {
+    setState(() => _currentIndex = nextIndex);
+    if (_topics.isEmpty) return;
+    if (nextIndex == _topics.length - 1 && !_loggedCompletedRun) {
+      _loggedCompletedRun = true;
+      try {
+        await _service.recordCompletedRun();
+      } catch (_) {}
+    }
   }
 
   String _depthLabelFor(int index) {
@@ -207,7 +221,9 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                           _NavButton(
                             icon: Icons.arrow_back_rounded,
                             onPressed: _currentIndex > 0
-                                ? () => setState(() => _currentIndex--)
+                                ? () {
+                                    _goToIndex(_currentIndex - 1);
+                                  }
                                 : null,
                             cs: cs,
                           ),
@@ -215,7 +231,9 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                           _NavButton(
                             icon: Icons.arrow_forward_rounded,
                             onPressed: _currentIndex < _topics.length - 1
-                                ? () => setState(() => _currentIndex++)
+                                ? () {
+                                    _goToIndex(_currentIndex + 1);
+                                  }
                                 : null,
                             cs: cs,
                             primary: true,

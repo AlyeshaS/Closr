@@ -161,7 +161,7 @@ class TimelineService {
         id: 'love-letter:${letter.id}',
         type: TimelineEntryType.loveLetter,
         title: 'Love letter sent',
-        subtitle: TimelineEntry.loveLetterSnippet(letter.text),
+        subtitle: TimelineEntry.loveLetterSnippet(),
         emoji: '💌',
         occurredAt: letter.createdAt,
         isMilestone: false,

@@ -35,7 +35,6 @@ class DeepTalkService {
             (topic) => !_isTopicComplete((topic['topic'] ?? '').toString()),
           );
       if (!needsRefresh) {
-        await _streaks.recordActivity('deep_talk_view');
         return savedTopics;
       }
     }
@@ -72,7 +71,12 @@ class DeepTalkService {
       batch.set(docRef, topic);
     }
     await batch.commit();
+    await _streaks.recordActivity('deep_talk_generate');
     return aiTopics;
+  }
+
+  Future<void> recordCompletedRun() async {
+    await _streaks.recordActivity('deep_talk_complete');
   }
 
   /// Loads completed topics from Firestore

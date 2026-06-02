@@ -147,7 +147,10 @@ class StreaksService {
             ),
             SetOptions(merge: true),
           );
-    } catch (_) {}
+      print('🧭 Timeline event saved for activity: $activity');
+    } catch (error) {
+      print('⚠️ Timeline event write failed for $activity: $error');
+    }
   }
 
   Future<int> getCurrentStreak() async {
