@@ -86,11 +86,14 @@ class _ExpandableMatchTileState extends State<ExpandableMatchTile> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(
-                      _expanded
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                      color: cs.onSurfaceVariant,
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
