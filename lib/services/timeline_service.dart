@@ -10,6 +10,26 @@ import '../models/timeline_event.dart';
 class TimelineService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  Future<void> logDateIdeasGeneratedFromReload({int? ideaCount}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('timelineEvents')
+        .add({
+          'activity': 'date_ideas_generated',
+          'title': 'New date ideas created',
+          'subtitle': ideaCount == null
+              ? 'Generated from reload'
+              : 'Generated $ideaCount fresh date ideas from reload',
+          'emoji': '✨',
+          'occurredAt': FieldValue.serverTimestamp(),
+          'isMilestone': false,
+        });
+  }
+
   Stream<List<TimelineEntry>> streamTimelineEntries() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Stream.empty();
