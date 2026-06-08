@@ -338,11 +338,35 @@ class HomePage extends StatelessWidget {
                                 color: cs.outlineVariant.withValues(alpha: 0.7),
                               ),
                             ),
-                            child: Text(
-                              user == null ? '0' : '5',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
+                            child: user == null
+                                ? Text(
+                                    '0',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: cs.onSurfaceVariant),
+                                  )
+                                : StreamBuilder<QuerySnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(user.uid)
+                                        .collection('matched_suggestions')
+                                        .snapshots(),
+                                    builder: (context, snapshot) {
+                                      final count =
+                                          snapshot.data?.docs.length ?? 0;
+
+                                      return Text(
+                                        '$count',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: cs.onSurfaceVariant,
+                                            ),
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
