@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/love_letter_service.dart';
-import '../widgets/love_letter_tile.dart';
-import '../models/love_letter.dart';
+import '../../services/love_letter_service.dart';
+import '../../widgets/love_letter_tile.dart';
+import '../../models/love_letter.dart';
 import 'compose_love_letter.dart';
 
 class LoveLettersTab extends StatefulWidget {

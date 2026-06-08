@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/love_letter_service.dart';
-import '../models/love_letter.dart';
+import '../../services/love_letter_service.dart';
+import '../../models/love_letter.dart';
 
 class ComposeLoveLetterPage extends StatefulWidget {
   final LoveLetter? editingLetter;

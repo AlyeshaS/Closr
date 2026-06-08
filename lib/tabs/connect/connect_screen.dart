@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../deep_talk/deep_talk_screen.dart';
 import 'resolve_screen.dart';
-import '../love_letters_tab.dart';
+import './love_letters_tab.dart';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});

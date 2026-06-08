@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/love_letter.dart';
+import '../../models/love_letter.dart';
 
 class LoveLetterDetailPage extends StatelessWidget {
   final LoveLetter letter;

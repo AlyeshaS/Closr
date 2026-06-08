@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/love_letter.dart';
-import '../tabs/love_letter_detail.dart';
+import '../tabs/connect/love_letter_detail.dart';
 
 class LoveLetterTile extends StatelessWidget {
   final LoveLetter letter;
