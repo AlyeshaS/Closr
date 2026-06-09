@@ -1,6 +1,7 @@
-// play_screen.dart
+// activities_screen.dart
 import 'package:flutter/material.dart';
 import '../suggestions/suggestions_screen.dart';
+import 'trivia/trivia_dashboard_tab.dart'; // Clean import route
 
 class ActivitiesScreen extends StatefulWidget {
   const ActivitiesScreen({super.key});
@@ -60,13 +61,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen>
               controller: _tabController,
               children: [
                 const _QuestsTab(),
-                _ComingSoonTab(
-                  icon: Icons.sports_esports_outlined,
-                  title: 'Game Recommendations',
-                  subtitle:
-                      'Curated games for two — online and in-person — matched to your vibe.',
-                  cs: cs,
-                ),
+                const TriviaDashboardTab(), // Clean substitution for the dashboard
                 _ComingSoonTab(
                   icon: Icons.explore_outlined,
                   title: 'Date Generator',
