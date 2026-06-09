@@ -1,5 +1,5 @@
-// lib/tabs/play/trivia/trivia_dashboard_tab.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Added authentication import
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia_controller.dart';
 import 'trivia_game_screen.dart';
@@ -14,24 +14,45 @@ class TriviaDashboardTab extends StatefulWidget {
 class _TriviaDashboardTabState extends State<TriviaDashboardTab> {
   final TriviaController _controller = TriviaController();
 
-  // TODO: Link these variables directly to your global Session getters/provider models
-  final String myAuthUserEmail = 'user1@example.com';
-  final String partnerAuthUserEmail = 'user2@example.com';
+  String _myUid = '';
+  bool _initializingAuth = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveCurrentUser();
+  }
+
+  void _resolveCurrentUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _myUid = user.uid;
+    }
+    setState(() {
+      _initializingAuth = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final String partnerName = "Your Partner";
 
+    // Show loading barrier while finding out who is authenticated
+    if (_initializingAuth || _myUid.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _controller.listenToMyTrivia(myAuthUserEmail),
+      stream: _controller.listenToMyTrivia(_myUid),
       builder: (context, mySnapshot) {
         if (mySnapshot.hasData) {
-          _controller.updateMyData(mySnapshot.data!);
+          _controller.updateMyData(mySnapshot.data!, _myUid);
         }
 
+        // Fixed parameter: listenToPartnerTrivia takes your user ID to trace the active matchId link internally
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: _controller.listenToPartnerTrivia(partnerAuthUserEmail),
+          stream: _controller.listenToPartnerTrivia(_myUid),
           builder: (context, partnerSnapshot) {
             if (partnerSnapshot.hasData) {
               _controller.updatePartnerData(partnerSnapshot.data!);
@@ -80,12 +101,10 @@ class _TriviaDashboardTabState extends State<TriviaDashboardTab> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          // Clean and simple: no more email parameters needed!
                           builder: (_) => const TriviaGameScreen(),
                         ),
                       );
                     },
-                    // Ensure you close the child widget of your GestureDetector below
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(

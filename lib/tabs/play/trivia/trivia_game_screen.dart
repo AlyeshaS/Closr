@@ -176,11 +176,12 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
       );
     }
 
+    //  FIX: Wrapped in your own trivia document snapshot stream to sync local answers and stages
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _controller.listenToMyTrivia(_myUid),
       builder: (context, mySnapshot) {
         if (mySnapshot.hasData && mySnapshot.data!.exists) {
-          _controller.updateMyData(mySnapshot.data!);
+          _controller.updateMyData(mySnapshot.data!, _myUid);
         }
 
         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -196,12 +197,12 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
 
               if (_currentQuestionIndex >= 10) _currentQuestionIndex = 9;
 
-              // AUTOMATIC STATE TRANSITION BLOCK
-              // If I am waiting, and my partner's answers are fully locked in, push me directly to guessing!
+              // CRITICAL FIX: BOTH USERS ARE WAITING TRIGGER
+              // If both players have completed step 1 and are waiting, auto-advance them together!
               if (_controller.myStage == 'waiting' &&
                   _controller.isPartnerSetupComplete) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _controller.updateUserStage(_myUid, 'guessing');
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  await _controller.updateUserStage(_myUid, 'guessing');
                 });
               }
             }

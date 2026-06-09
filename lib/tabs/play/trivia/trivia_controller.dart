@@ -27,39 +27,69 @@ class TriviaController {
         .snapshots();
   }
 
-  /// Real-time stream tracking the partner's trivia profile node using the active match link.
+  /// Real-time stream tracking the partner's trivia profile node using their email link.
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenToPartnerTrivia(
     String myUid,
   ) {
-    // We stream the user's root document to find their active matchId dynamically,
-    // then map it to pipe the partner's trivia subcollection snapshot back to the UI.
+    // 1. Listen to your own root user document first
     return _firestore.collection('users').doc(myUid).snapshots().asyncExpand((
       userDoc,
     ) {
-      final String matchId = userDoc.data()?['matchId'] ?? '';
+      // 2. Extract the partner email field saved by your AuthService
+      final String partnerEmailLower =
+          userDoc.data()?['partnerEmailLower'] ?? '';
 
-      if (matchId.isEmpty) {
-        // Return an empty stream if no active relationship link is present
+      if (partnerEmailLower.isEmpty) {
         return const Stream.empty();
       }
 
+      // 3. Query the users collection to find the document where 'emailLower' matches your partner's email
       return _firestore
           .collection('users')
-          .doc(matchId)
-          .collection('trivia')
-          .doc('session')
-          .snapshots();
+          .where('emailLower', isEqualTo: partnerEmailLower)
+          .snapshots()
+          .asyncExpand((querySnapshot) {
+            if (querySnapshot.docs.isEmpty) {
+              // Partner hasn't logged in yet, or the matching record isn't created under their UID
+              return const Stream.empty();
+            }
+
+            // 4. Get the partner's actual user UID doc and stream their trivia session subcollection
+            final partnerUserUid = querySnapshot.docs.first.id;
+            return _firestore
+                .collection('users')
+                .doc(partnerUserUid)
+                .collection('trivia')
+                .doc('session')
+                .snapshots();
+          });
     });
   }
 
   /// Synchronizes incoming Firestore changes into the controller's local instance variables for your own profile.
-  void updateMyData(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+  /// Synchronizes incoming Firestore changes into the controller's local instance variables for your own profile.
+  void updateMyData(
+    DocumentSnapshot<Map<String, dynamic>> snapshot,
+    String myUid,
+  ) {
     if (!snapshot.exists || snapshot.data() == null) {
-      // Safe default initialization if no cloud document has been written yet
       myStage = 'setup';
       mySelfAnswers = [];
       myGuessesForPartner = [];
       myGlobalWins = 0;
+
+      //  AUTO-INITIALIZE: If document was deleted, create a fresh one instantly!
+      _firestore
+          .collection('users')
+          .doc(myUid)
+          .collection('trivia')
+          .doc('session')
+          .set({
+            'stage': 'setup',
+            'selfAnswers': [],
+            'guessesForPartner': [],
+            'globalWins': 0,
+          }, SetOptions(merge: true));
       return;
     }
 
