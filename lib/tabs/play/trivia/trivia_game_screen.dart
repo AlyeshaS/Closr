@@ -1,5 +1,6 @@
-// lib/screens/activities/trivia/trivia_game_screen.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia_controller.dart';
 
 class TriviaGameScreen extends StatefulWidget {
@@ -12,6 +13,11 @@ class TriviaGameScreen extends StatefulWidget {
 class _TriviaGameScreenState extends State<TriviaGameScreen> {
   final TriviaController _controller = TriviaController();
   int? _selectedAnswerIndex;
+  int _currentQuestionIndex = 0;
+
+  // Resolved Firebase Auth credentials
+  String _myUid = '';
+  bool _initializingAuth = true;
 
   final List<Map<String, dynamic>> _tenQuestions = [
     {
@@ -106,82 +112,132 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
     },
   ];
 
-  void _handleNextStep() {
-    if (_selectedAnswerIndex == null) return;
+  @override
+  void initState() {
+    super.initState();
+    _resolveCurrentUser();
+  }
 
+  void _resolveCurrentUser() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _myUid = user.uid;
+    }
     setState(() {
-      if (_controller.localUserStage == 'setup') {
-        _controller.mySelfAnswers.add(_selectedAnswerIndex!);
-        if (_controller.currentQuestionIndex < _tenQuestions.length - 1) {
-          _controller.currentQuestionIndex++;
-          _selectedAnswerIndex = null;
-        } else {
-          _controller.localUserStage = 'waiting';
-          _controller.currentQuestionIndex = 0;
-          _selectedAnswerIndex = null;
-        }
-      } else if (_controller.localUserStage == 'guessing') {
-        _controller.myGuessesForPartner.add(_selectedAnswerIndex!);
-        if (_controller.currentQuestionIndex < _tenQuestions.length - 1) {
-          _controller.currentQuestionIndex++;
-          _selectedAnswerIndex = null;
-        } else {
-          // If partner is already done guessing too, calculate the game score instantly
-          if (_controller.partnerGuessesForMe.length == 10) {
-            _controller.evaluateWinnerAndIncrementGlobalScore();
-            _controller.localUserStage = 'results';
-          } else {
-            _controller.localUserStage =
-                'waiting'; // Wait for partner's final guesses
-          }
-        }
-      }
+      _initializingAuth = false;
     });
+  }
+
+  void _handleNextStep() async {
+    if (_selectedAnswerIndex == null || _myUid.isEmpty) return;
+
+    final int databaseValue = _selectedAnswerIndex! + 1; // 1 to 4 scaling
+
+    if (_controller.myStage == 'setup') {
+      List<int> updatedAnswers = List<int>.from(_controller.mySelfAnswers)
+        ..add(databaseValue);
+
+      await _controller.submitSelfAnswer(_myUid, updatedAnswers);
+
+      if (_currentQuestionIndex < _tenQuestions.length - 1) {
+        setState(() {
+          _currentQuestionIndex++;
+          _selectedAnswerIndex = null;
+        });
+      } else {
+        await _controller.updateUserStage(_myUid, 'waiting');
+        setState(() => _selectedAnswerIndex = null);
+      }
+    } else if (_controller.myStage == 'guessing') {
+      List<int> updatedGuesses = List<int>.from(_controller.myGuessesForPartner)
+        ..add(databaseValue);
+      await _controller.submitGuessAnswer(_myUid, updatedGuesses);
+
+      if (_currentQuestionIndex < _tenQuestions.length - 1) {
+        setState(() {
+          _currentQuestionIndex++;
+          _selectedAnswerIndex = null;
+        });
+      } else {
+        setState(() => _selectedAnswerIndex = null);
+        await _controller.updateUserStage(_myUid, 'results');
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: cs.surface,
-      appBar: AppBar(
+    if (_initializingAuth || _myUid.isEmpty) {
+      return Scaffold(
         backgroundColor: cs.surface,
-        elevation: 0,
-        title: Text(
-          _controller.localUserStage == 'setup' ||
-                  _controller.localUserStage == 'guessing'
-              ? 'Question ${_controller.currentQuestionIndex + 1} of 10'
-              : 'Our Trivia',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: _buildCurrentStateLayout(cs),
-        ),
-      ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _controller.listenToMyTrivia(_myUid),
+      builder: (context, mySnapshot) {
+        if (mySnapshot.hasData && mySnapshot.data!.exists) {
+          _controller.updateMyData(mySnapshot.data!);
+        }
+
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: _controller.listenToPartnerTrivia(_myUid),
+          builder: (context, partnerSnapshot) {
+            if (partnerSnapshot.hasData && partnerSnapshot.data!.exists) {
+              _controller.updatePartnerData(partnerSnapshot.data!);
+
+              // Calculate index values dynamically matching lengths inside Firestore database arrays
+              _currentQuestionIndex = _controller.myStage == 'guessing'
+                  ? _controller.myGuessesForPartner.length
+                  : _controller.mySelfAnswers.length;
+
+              if (_currentQuestionIndex >= 10) _currentQuestionIndex = 9;
+
+              // AUTOMATIC STATE TRANSITION BLOCK
+              // If I am waiting, and my partner's answers are fully locked in, push me directly to guessing!
+              if (_controller.myStage == 'waiting' &&
+                  _controller.isPartnerSetupComplete) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _controller.updateUserStage(_myUid, 'guessing');
+                });
+              }
+            }
+
+            return Scaffold(
+              backgroundColor: cs.surface,
+              appBar: AppBar(
+                backgroundColor: cs.surface,
+                elevation: 0,
+                title: Text(
+                  _controller.myStage == 'setup' ||
+                          _controller.myStage == 'guessing'
+                      ? 'Question ${_currentQuestionIndex + 1} of 10'
+                      : 'Our Trivia',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                centerTitle: true,
+                leading: IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+              body: SafeArea(child: _buildCurrentStateLayout(cs)),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildCurrentStateLayout(ColorScheme cs) {
-    // ── STEP 2: DYNAMIC WAITING & CUTE TRANSITION VIEW ───────────────────────
-    if (_controller.localUserStage == 'waiting') {
-      final bool isReadyToGuess =
-          _controller.isPartnerSetupComplete &&
-          _controller.myGuessesForPartner.length < 10;
-      final bool isWaitingForPartnerFinalGuesses =
-          _controller.myGuessesForPartner.length == 10 &&
-          _controller.partnerGuessesForMe.length < 10;
-
+    if (_controller.myStage == 'waiting') {
       return Center(
-        key: const ValueKey('waiting_stage'),
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -195,27 +251,19 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isReadyToGuess
-                      ? Icons.favorite_rounded
-                      : Icons.hourglass_top_rounded,
+                  Icons.hourglass_top_rounded,
                   size: 36,
                   color: cs.primary,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
-                isReadyToGuess
-                    ? 'Your turn to guess! ✨'
-                    : 'Answers locked in! 🔒',
+                'Answers locked in! 🔒',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 12),
               Text(
-                isReadyToGuess
-                    ? 'Your partner has submitted their choices! Tap below to read their mind.'
-                    : isWaitingForPartnerFinalGuesses
-                    ? 'You completed your guesses! Hanging tight until your partner answers your challenge pool to reveal the final winner.'
-                    : 'Your profile answers are saved. We are waiting for your partner to create their challenge pool!',
+                'Your profile answers are safely saved. Once your partner finishes locking in their setup choices, this screen will instantly change so you can start guessing!',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: cs.onSurfaceVariant,
@@ -223,85 +271,42 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
                   fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 40),
-
-              // Cute Action Button appeared if data criteria is fulfilled
-              if (isReadyToGuess)
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: FilledButton.icon(
-                    onPressed: () =>
-                        setState(() => _controller.localUserStage = 'guessing'),
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text(
-                      'Let\'s Guess Their Answers! 🧸',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(backgroundColor: cs.primary),
-                  ),
-                ),
-
-              // Simulation Dev Dashboard Controllers
-              const SizedBox(height: 32),
-              const Divider(),
-              Text(
-                'PROTOTYPING TOOLS',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: cs.outline),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton(
-                    onPressed: () => setState(
-                      () => _controller.simulatePartnerFinishedSetup(),
-                    ),
-                    child: const Text('1. Mock Partner Setup Done'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _controller.simulatePartnerFinishedGuessing();
-                        if (_controller.myGuessesForPartner.length == 10) {
-                          _controller.evaluateWinnerAndIncrementGlobalScore();
-                          _controller.localUserStage = 'results';
-                        }
-                      });
-                    },
-                    child: const Text('2. Mock Partner Guesses Done'),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
       );
     }
 
-    // ── STEP 4: HEAD-TO-HEAD FINAL SUMMARY SPLIT VIEW ────────────────────────
-    if (_controller.localUserStage == 'results') {
-      final myScore = _controller.myScoreOutof10;
-      final partnerScore = _controller.partnerScoreOutof10;
+    if (_controller.myStage == 'results') {
+      int myScore = 0;
+      for (int i = 0; i < _controller.myGuessesForPartner.length; i++) {
+        if (i < _controller.partnerSelfAnswers.length &&
+            _controller.myGuessesForPartner[i] ==
+                _controller.partnerSelfAnswers[i]) {
+          myScore++;
+        }
+      }
+
+      int partnerScore = 0;
+      for (int i = 0; i < _controller.partnerGuessesForMe.length; i++) {
+        if (i < _controller.mySelfAnswers.length &&
+            _controller.partnerGuessesForMe[i] ==
+                _controller.mySelfAnswers[i]) {
+          partnerScore++;
+        }
+      }
 
       String matchOutcomeTitle = "It's a Tie! 🤝";
       if (myScore > partnerScore) matchOutcomeTitle = "You Won This Round! 🎉";
       if (partnerScore > myScore) matchOutcomeTitle = "Your Partner Won! 👑";
 
       return SingleChildScrollView(
-        key: const ValueKey('results_stage'),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           children: [
             const SizedBox(height: 20),
             Text(
               matchOutcomeTitle,
-              textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'CormorantGaramond',
                 fontSize: 38,
@@ -310,8 +315,6 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
               ),
             ),
             const SizedBox(height: 28),
-
-            // Scoreboard Comparer Blocks
             Row(
               children: [
                 Expanded(
@@ -376,17 +379,12 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
               width: double.infinity,
               height: 54,
               child: FilledButton(
-                onPressed: () {
-                  _controller.resetGame();
-                  Navigator.pop(context);
+                onPressed: () async {
+                  await _controller.evaluateAndPurgeMatch(_myUid);
+                  if (mounted) Navigator.pop(context);
                 },
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
                 child: const Text(
-                  'Complete Challenge',
+                  'Complete Round & Purge Answers',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -396,45 +394,33 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
       );
     }
 
-    // ── QUESTION SUB-VIEW (SETUP & GUESSING) ──────────────────────────────────
-    final currentQuestion = _tenQuestions[_controller.currentQuestionIndex];
+    final currentQuestion = _tenQuestions[_currentQuestionIndex];
     final List<String> options = currentQuestion["options"];
 
     return Padding(
-      key: ValueKey(
-        'question_${_controller.localUserStage}_${_controller.currentQuestionIndex}',
-      ),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value:
-                  (_controller.currentQuestionIndex + 1) / _tenQuestions.length,
-              backgroundColor: cs.primary.withOpacity(0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
-              minHeight: 4,
-            ),
+          LinearProgressIndicator(
+            value: (_currentQuestionIndex + 1) / _tenQuestions.length,
+            minHeight: 4,
           ),
           const SizedBox(height: 28),
           Text(
-            _controller.localUserStage == 'setup'
+            _controller.myStage == 'setup'
                 ? "STEP 1: ANSWER FOR YOURSELF"
                 : "STEP 3: GUESS THEIR ANSWER",
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.primary,
-              letterSpacing: 1.2,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: cs.primary),
           ),
           const SizedBox(height: 12),
           Text(
             currentQuestion["q"],
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              height: 1.3,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 28),
           Expanded(
@@ -446,13 +432,8 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: InkWell(
                     onTap: () => setState(() => _selectedAnswerIndex = index),
-                    borderRadius: BorderRadius.circular(16),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? cs.primaryContainer
@@ -460,7 +441,6 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected ? cs.primary : cs.outlineVariant,
-                          width: isSelected ? 2 : 1,
                         ),
                       ),
                       child: Row(
@@ -468,21 +448,16 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
                           Expanded(
                             child: Text(
                               options[index],
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    color: isSelected
-                                        ? cs.onPrimaryContainer
-                                        : cs.onSurface,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                  ),
+                              style: TextStyle(
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
                             ),
                           ),
                           Radio<int>(
                             value: index,
                             groupValue: _selectedAnswerIndex,
-                            activeColor: cs.primary,
                             onChanged: (val) =>
                                 setState(() => _selectedAnswerIndex = val),
                           ),
@@ -499,20 +474,12 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
             height: 54,
             child: FilledButton(
               onPressed: _selectedAnswerIndex == null ? null : _handleNextStep,
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
               child: Text(
-                _controller.currentQuestionIndex == _tenQuestions.length - 1 &&
-                        _controller.localUserStage == 'guessing'
+                _currentQuestionIndex == _tenQuestions.length - 1 &&
+                        _controller.myStage == 'guessing'
                     ? 'Show Results'
                     : 'Next Question',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ),
