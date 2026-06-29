@@ -1,4 +1,4 @@
-// lib/play/letter_locked/letter_locked_dashboard.dart
+// lib/tabs/play/letter_locked/letter_locked_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,8 +15,9 @@ class LetterLockedDashboard extends StatefulWidget {
 class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
   final LetterLockedController _controller = LetterLockedController();
   String _myUid = '';
-  String _coupleId = '';
+  String _roomId = '';
   String _partnerUid = '';
+  String _partnerEmail = '';
   bool _isLoading = true;
 
   @override
@@ -30,14 +31,37 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         _myUid = user.uid;
+
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(_myUid)
             .get();
+
         if (userDoc.exists && userDoc.data() != null) {
           final data = userDoc.data()!;
-          _coupleId = data['coupleId'] ?? data['couple_id'] ?? '';
-          _partnerUid = data['partnerUid'] ?? data['partner_uid'] ?? '';
+          _partnerEmail =
+              data['partnerEmailLower'] ?? data['partnerEmail'] ?? '';
+          _partnerEmail = _partnerEmail.trim().toLowerCase();
+
+          if (_partnerEmail.isNotEmpty) {
+            var partnerQuery = await FirebaseFirestore.instance
+                .collection('users')
+                .where('emailLower', isEqualTo: _partnerEmail)
+                .get();
+
+            if (partnerQuery.docs.isEmpty) {
+              partnerQuery = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: _partnerEmail)
+                  .get();
+            }
+
+            if (partnerQuery.docs.isNotEmpty) {
+              _partnerUid = partnerQuery.docs.first.id;
+              List<String> uids = [_myUid, _partnerUid]..sort();
+              _roomId = 'letterlocked_${uids[0]}_${uids[1]}';
+            }
+          }
         }
       }
     } catch (_) {}
@@ -46,21 +70,46 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
     }
   }
 
-  void _setupAndLaunchGame(String mode) async {
+  void _handleGameRouting(String mode) async {
+    if (_roomId.isEmpty) return;
+
     setState(() => _isLoading = true);
-    await _controller.startNewGame(
-      coupleId: _coupleId,
-      myUid: _myUid,
-      partnerUid: _partnerUid,
-      mode: mode,
-    );
-    if (mounted) {
-      // Replace layout so the back button on game screen routes smoothly back to the core hub
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => LetterLockedGameScreen(coupleId: _coupleId),
-        ),
-      );
+
+    try {
+      final gameDoc = await FirebaseFirestore.instance
+          .collection('games')
+          .doc(_roomId)
+          .get();
+
+      if (mounted) {
+        if (gameDoc.exists && gameDoc.data()?['status'] == 'active') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => LetterLockedGameScreen(roomId: _roomId),
+            ),
+          );
+        } else {
+          await _controller.startNewGame(
+            roomId: _roomId,
+            myUid: _myUid,
+            partnerUid: _partnerUid,
+            mode: mode,
+          );
+
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => LetterLockedGameScreen(roomId: _roomId),
+              ),
+            );
+          }
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -72,40 +121,83 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      backgroundColor: cs.surface,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'CHOOSE YOUR MODE',
+    if (_roomId.isEmpty) {
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Text(
+              _partnerEmail.isEmpty
+                  ? 'Link accounts with your partner in settings to start playing together!'
+                  : 'Waiting for your partner to register an account with $_partnerEmail...',
+              textAlign: TextAlign.center,
               style: Theme.of(
                 context,
-              ).textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
+              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
-            const SizedBox(height: 16),
-            _buildCleanModeCard(
-              context: context,
-              title: 'Co-op Vault Mode',
-              subtitle:
-                  'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative.',
-              onTap: () => _setupAndLaunchGame('coop'),
-              cs: cs,
-            ),
-            const SizedBox(height: 12),
-            _buildCleanModeCard(
-              context: context,
-              title: 'Versus Word Trap',
-              subtitle:
-                  'Change exactly one letter to morph the word. Trap your partner by locking their choices out.',
-              onTap: () => _setupAndLaunchGame('versus'),
-              cs: cs,
-            ),
-          ],
+          ),
         ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('games')
+            .doc(_roomId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final gameData = snapshot.data!.data();
+            if (gameData?['status'] == 'active') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => LetterLockedGameScreen(roomId: _roomId),
+                    ),
+                  );
+                }
+              });
+            }
+          }
+
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CHOOSE YOUR MODE',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
+                ),
+                const SizedBox(height: 16),
+                _buildCleanModeCard(
+                  context: context,
+                  title: 'Co-op Vault Mode',
+                  subtitle:
+                      'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative.',
+                  onTap: () => _handleGameRouting('coop'),
+                  cs: cs,
+                ),
+                const SizedBox(height: 12),
+                _buildCleanModeCard(
+                  context: context,
+                  title: 'Versus Word Trap',
+                  subtitle:
+                      'Change exactly one letter to morph the word. Trap your partner by locking their choices out.',
+                  onTap: () => _handleGameRouting('versus'),
+                  cs: cs,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

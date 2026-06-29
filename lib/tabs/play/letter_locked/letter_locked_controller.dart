@@ -5,16 +5,16 @@ class LetterLockedController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Stream to listen to the shared LetterLocked game room document
-  Stream<DocumentSnapshot<Map<String, dynamic>>> listenToGame(String coupleId) {
+  Stream<DocumentSnapshot<Map<String, dynamic>>> listenToGame(String roomId) {
     return _firestore
         .collection('games')
-        .doc('letterlocked_$coupleId')
+        .doc(roomId) // Mapped explicitly to clean email-resolved path
         .snapshots();
   }
 
   /// Initializes a brand new match room for LetterLocked
   Future<void> startNewGame({
-    required String coupleId,
+    required String roomId,
     required String myUid,
     required String partnerUid,
     required String mode, // 'coop' or 'versus'
@@ -24,9 +24,8 @@ class LetterLockedController {
         ? ['T', 'A', 'E', 'L', 'M', 'K', 'S', 'O', 'R']
         : [];
 
-    await _firestore.collection('games').doc('letterlocked_$coupleId').set({
-      'gameId': 'letterlocked_$coupleId',
-      'coupleId': coupleId,
+    await _firestore.collection('games').doc(roomId).set({
+      'gameId': roomId,
       'gameType': 'letter_locked',
       'gameMode': mode,
       'status': 'active',
@@ -46,13 +45,13 @@ class LetterLockedController {
 
   /// Submits a player's move and flips the turn to the partner
   Future<void> submitMove({
-    required String coupleId,
+    required String roomId,
     required String partnerUid,
     required String newWord,
     required List<int> updatedLockedIndices,
     required List<String> updatedUsedLetters,
   }) async {
-    await _firestore.collection('games').doc('letterlocked_$coupleId').update({
+    await _firestore.collection('games').doc(roomId).update({
       'turn': partnerUid, // Toggle turn to partner immediately
       'updatedAt': FieldValue.serverTimestamp(),
       'gameData.currentWord': newWord.toUpperCase(),

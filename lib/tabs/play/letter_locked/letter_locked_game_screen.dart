@@ -6,8 +6,8 @@ import 'letter_locked_controller.dart';
 import 'letter_locked_models.dart';
 
 class LetterLockedGameScreen extends StatefulWidget {
-  final String coupleId;
-  const LetterLockedGameScreen({super.key, required this.coupleId});
+  final String roomId;
+  const LetterLockedGameScreen({super.key, required this.roomId});
 
   @override
   State<LetterLockedGameScreen> createState() => _LetterLockedGameScreenState();
@@ -30,12 +30,157 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     super.dispose();
   }
 
+  // ── Rules Overlay Bottom Sheet ─────────────────────────────────────────────
+  void _showRulesOverlay(BuildContext context, String mode, ColorScheme cs) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          16,
+          24,
+          MediaQuery.of(ctx).viewInsets.bottom + 32,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              mode == 'coop'
+                  ? 'How to Play: Co-op Vault'
+                  : 'How to Play: Word Trap',
+              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'DMSans',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Divider(color: cs.outlineVariant, height: 1),
+            const SizedBox(height: 16),
+            if (mode == 'coop') ...[
+              _buildRuleRow(
+                cs,
+                '1',
+                'Work together as a team to consume the letters displayed on your 3x3 grid.',
+              ),
+              _buildRuleRow(
+                cs,
+                '2',
+                'Your submitted word must start with the very last letter of your partner\'s previous word.',
+              ),
+              _buildRuleRow(
+                cs,
+                '3',
+                'Matching letters turn color on the board. Illuminate all 9 letters to crack the vault and win!',
+              ),
+            ] else ...[
+              _buildRuleRow(
+                cs,
+                '1',
+                'This is a competitive turn-based word mutation battle.',
+              ),
+              _buildRuleRow(
+                cs,
+                '2',
+                'On your turn, submit a word of identical length, mutating exactly one letter (e.g., LANE → LATE).',
+              ),
+              _buildRuleRow(
+                cs,
+                '3',
+                'The index position you change instantly locks out. Your partner cannot change that letter position on their turn.',
+              ),
+              _buildRuleRow(
+                cs,
+                '4',
+                'Trap your partner into a corner where they run out of valid words to win the crown!',
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Got it',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRuleRow(ColorScheme cs, String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: TextStyle(
+                  color: cs.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                height: 1.4,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _controller.listenToGame(widget.coupleId),
+      stream: _controller.listenToGame(widget.roomId),
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Scaffold(
@@ -61,9 +206,17 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             ),
             centerTitle: true,
             leading: IconButton(
-              icon: const Icon(Icons.close_rounded),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               onPressed: () => Navigator.pop(context),
             ),
+            // Added rules context action button inside parent toolbar frame
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.info_outline_rounded, size: 22),
+                onPressed: () => _showRulesOverlay(context, game.gameMode, cs),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
           body: SafeArea(
             child: Column(
@@ -99,7 +252,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                       : _buildVersusLayout(game, cs),
                 ),
 
-                // Core Input Row
+                // Core Action Submission Input Row
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                   child: Row(
@@ -309,7 +462,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       }
 
       await _controller.submitMove(
-        coupleId: widget.coupleId,
+        roomId: widget.roomId,
         partnerUid: partnerUid,
         newWord: input,
         updatedLockedIndices: [],
@@ -347,7 +500,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       }
 
       await _controller.submitMove(
-        coupleId: widget.coupleId,
+        roomId: widget.roomId,
         partnerUid: partnerUid,
         newWord: input,
         updatedLockedIndices: changedIndices,
