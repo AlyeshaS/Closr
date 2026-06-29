@@ -6,10 +6,7 @@ class LetterLockedController {
 
   /// Stream to listen to the shared LetterLocked game room document
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenToGame(String roomId) {
-    return _firestore
-        .collection('games')
-        .doc(roomId) // Mapped explicitly to clean email-resolved path
-        .snapshots();
+    return _firestore.collection('games').doc(roomId).snapshots();
   }
 
   /// Initializes a brand new match room for LetterLocked

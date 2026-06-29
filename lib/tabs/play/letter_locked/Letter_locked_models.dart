@@ -1,19 +1,18 @@
-// lib/play/letter_locked/letter_locked_models.dart
-
 class LetterLockedModel {
   final String gameId;
   final String coupleId;
-  final String gameType; // 'letter_locked'
-  final String gameMode; // 'coop' or 'versus'
-  final String status; // 'active', 'completed'
-  final String turn; // UID of the player whose turn it is
+  final String gameType;
+  final String gameMode;
+  final String status;
+  final String turn;
 
-  // Game data specific to LetterLocked
   final String currentWord;
   final List<int> lockedIndices;
   final List<String> boardLetters;
   final List<String> usedLetters;
-  final Map<String, int> scores; // uid: score
+  final List<String>
+  wordsUsed; // 1️⃣ Check that this exact property field is here!
+  final Map<String, int> scores;
 
   LetterLockedModel({
     required this.gameId,
@@ -26,6 +25,7 @@ class LetterLockedModel {
     required this.lockedIndices,
     required this.boardLetters,
     required this.usedLetters,
+    required this.wordsUsed, // 2️⃣ Check that this parameter is here!
     required this.scores,
   });
 
@@ -47,6 +47,9 @@ class LetterLockedModel {
       lockedIndices: List<int>.from(gameData['lockedIndices'] ?? []),
       boardLetters: List<String>.from(gameData['boardLetters'] ?? []),
       usedLetters: List<String>.from(gameData['usedLetters'] ?? []),
+      wordsUsed: List<String>.from(
+        gameData['wordsUsed'] ?? [],
+      ), // 3️⃣ Check that this parser is here!
       scores: scoresMap.map((key, value) => MapEntry(key, value as int)),
     );
   }

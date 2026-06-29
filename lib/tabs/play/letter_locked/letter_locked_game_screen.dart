@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/dictionary_service.dart';
 import 'letter_locked_controller.dart';
 import 'letter_locked_models.dart';
 
@@ -30,7 +31,40 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     super.dispose();
   }
 
-  // ── Rules Overlay Bottom Sheet ─────────────────────────────────────────────
+  /// ✨ GAME THEORY BOT: Simulates all possible letter modifications to
+  /// check if there are zero legal moves left for the current player.
+  bool _isUserTrulyTrapped(LetterLockedModel game) {
+    if (game.gameMode != 'versus' || game.currentWord.length != 4) return false;
+
+    final currentChars = game.currentWord.split('');
+    final validWords = DictionaryService.getValidFourLetterWords();
+    final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+    // Loop through every letter index slot (0 to 3)
+    for (int i = 0; i < 4; i++) {
+      // Skip this slot if your partner locked it out!
+      if (game.lockedIndices.contains(i)) continue;
+
+      // Try substituting every alphabet letter into the unlocked slot
+      for (String letter in alphabet) {
+        if (letter == currentChars[i]) continue; // Must change the letter
+
+        List<String> testChars = List.from(currentChars);
+        testChars[i] = letter;
+        String simulatedWord = testChars.join('');
+
+        // If the simulated word is a real word AND hasn't been used yet, you are NOT trapped!
+        if (validWords.contains(simulatedWord) &&
+            !game.wordsUsed.contains(simulatedWord)) {
+          return false;
+        }
+      }
+    }
+
+    // Checked every option and found nothing? You are genuinely trapped.
+    return true;
+  }
+
   void _showRulesOverlay(BuildContext context, String mode, ColorScheme cs) {
     showModalBottomSheet(
       context: context,
@@ -66,10 +100,9 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               mode == 'coop'
                   ? 'How to Play: Co-op Vault'
                   : 'How to Play: Word Trap',
-              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontFamily: 'DMSans',
-              ),
+              style: Theme.of(
+                ctx,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Divider(color: cs.outlineVariant, height: 1),
@@ -78,55 +111,52 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               _buildRuleRow(
                 cs,
                 '1',
-                'Work together as a team to consume the letters displayed on your 3x3 grid.',
+                'Work together to consume letters displayed on your 3x3 grid.',
               ),
               _buildRuleRow(
                 cs,
                 '2',
-                'Your submitted word must start with the very last letter of your partner\'s previous word.',
+                'Words must start with the last letter of the previous word.',
               ),
               _buildRuleRow(
                 cs,
                 '3',
-                'Matching letters turn color on the board. Illuminate all 9 letters to crack the vault and win!',
+                'Illuminate all 9 letters to crack the vault and win!',
               ),
             ] else ...[
               _buildRuleRow(
                 cs,
                 '1',
-                'This is a competitive turn-based word mutation battle.',
+                'Mutate exactly one letter per turn to create a new 4-letter word.',
               ),
               _buildRuleRow(
                 cs,
                 '2',
-                'On your turn, submit a word of identical length, mutating exactly one letter (e.g., LANE → LATE).',
+                'The position you change locks out for your partner\'s turn.',
               ),
               _buildRuleRow(
                 cs,
                 '3',
-                'The index position you change instantly locks out. Your partner cannot change that letter position on their turn.',
+                'No repeat words are allowed during the entire match!',
               ),
               _buildRuleRow(
                 cs,
                 '4',
-                'Trap your partner into a corner where they run out of valid words to win the crown!',
+                'Every submission must be a valid English word from the game dictionary.',
+              ),
+              _buildRuleRow(
+                cs,
+                '5',
+                'The "I\'m Trapped" button will automatically appear if you run out of legal moves.',
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: FilledButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text(
-                  'Got it',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                child: const Text('Got it'),
               ),
             ),
           ],
@@ -137,36 +167,30 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
 
   Widget _buildRuleRow(ColorScheme cs, String number, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                number,
-                style: TextStyle(
-                  color: cs.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
+          CircleAvatar(
+            radius: 11,
+            backgroundColor: cs.primaryContainer,
+            child: Text(
+              number,
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 color: cs.onSurfaceVariant,
-                height: 1.4,
                 fontSize: 14,
+                height: 1.4,
               ),
             ),
           ),
@@ -194,6 +218,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
           snapshot.data!.id,
         );
         final bool isMyTurn = game.turn == _myUid;
+        final bool showTrappedButton = isMyTurn && _isUserTrulyTrapped(game);
 
         return Scaffold(
           backgroundColor: cs.surface,
@@ -209,7 +234,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               onPressed: () => Navigator.pop(context),
             ),
-            // Added rules context action button inside parent toolbar frame
             actions: [
               IconButton(
                 icon: const Icon(Icons.info_outline_rounded, size: 22),
@@ -221,10 +245,13 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
           body: SafeArea(
             child: Column(
               children: [
-                // Minimalist Turn Banner
+                // ── Intelligent Turn Banner ──
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: isMyTurn
                         ? cs.primaryContainer.withOpacity(0.4)
@@ -233,28 +260,117 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                       bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
                     ),
                   ),
-                  child: Center(
-                    child: Text(
-                      isMyTurn ? "Your Turn! ⚡" : "Waiting for partner... ⏳",
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isMyTurn ? cs.primary : cs.onSurfaceVariant,
-                        letterSpacing: 0.5,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            isMyTurn
+                                ? "Your Turn! ⚡"
+                                : "Waiting for partner... ⏳",
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isMyTurn
+                                      ? cs.primary
+                                      : cs.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
                       ),
-                    ),
+                      // ✨ SMART CHECK: Only displays if showTrappedButton resolves to TRUE
+                      if (showTrappedButton)
+                        TextButton(
+                          onPressed: () async {
+                            final pUids = game.scores.keys.toList();
+                            final String partnerUid = pUids.firstWhere(
+                              (uid) => uid != _myUid,
+                              orElse: () => '',
+                            );
+                            if (partnerUid.isNotEmpty) {
+                              await FirebaseFirestore.instance
+                                  .collection('games')
+                                  .doc(widget.roomId)
+                                  .update({
+                                    'status': 'completed',
+                                    'gameData.scores.$partnerUid':
+                                        FieldValue.increment(1),
+                                  });
+                              if (mounted) Navigator.pop(context);
+                            }
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            minimumSize: Size.zero,
+                          ),
+                          child: Text(
+                            'I\'m Trapped 🪤',
+                            style: TextStyle(
+                              color: cs.error,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
 
+                // ── Main Board Canvas ──
                 Expanded(
+                  flex: 3,
                   child: game.gameMode == 'coop'
                       ? _buildCoopLayout(game, cs)
                       : _buildVersusLayout(game, cs),
                 ),
 
-                // Core Action Submission Input Row
+                // ── Used Words Ledger ──
+                if (game.wordsUsed.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'WORDS USED (${game.wordsUsed.length})',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 40,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: game.wordsUsed.length,
+                      itemBuilder: (context, idx) {
+                        return Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          child: RawChip(
+                            label: Text(game.wordsUsed[idx]),
+                            backgroundColor: cs.surfaceContainerHighest
+                                .withOpacity(0.5),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            side: BorderSide(color: cs.outlineVariant),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+
+                // ── Submission Row ──
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   child: Row(
                     children: [
                       Expanded(
@@ -267,9 +383,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                             hintText: isMyTurn
                                 ? 'Type submission word...'
                                 : 'Locked until turn changes',
-                            hintStyle: TextStyle(
-                              color: cs.onSurfaceVariant.withOpacity(0.6),
-                            ),
                             filled: true,
                             fillColor: cs.surfaceContainerLow,
                             contentPadding: const EdgeInsets.symmetric(
@@ -331,7 +444,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               context,
             ).textTheme.labelSmall?.copyWith(letterSpacing: 1.0),
           ),
-          const SizedBox(height: 4),
           Text(
             game.currentWord.isEmpty ? "NONE" : game.currentWord,
             style: TextStyle(
@@ -341,7 +453,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               color: cs.primary,
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -434,6 +546,31 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     final String input = _wordInputController.text.trim().toUpperCase();
     if (input.isEmpty) return;
 
+    if (!DictionaryService.isValidWord(input, game.gameMode)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            game.gameMode == 'versus'
+                ? '"$input" is not in the game dictionary. Try a real 4-letter word!'
+                : '"$input" contains invalid characters or format!',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (game.wordsUsed.contains(input)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '"$input" has already been used this game! Choose a unique word.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final pUids = game.scores.keys.toList();
     final String partnerUid = pUids.firstWhere(
       (uid) => uid != _myUid,
@@ -459,6 +596,21 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             !newUsedLetters.contains(char)) {
           newUsedLetters.add(char);
         }
+      }
+
+      if (newUsedLetters.length >= game.boardLetters.length) {
+        final batch = FirebaseFirestore.instance.batch();
+        final roomRef = FirebaseFirestore.instance
+            .collection('games')
+            .doc(widget.roomId);
+        batch.update(roomRef, {
+          'status': 'completed',
+          'gameData.scores.$_myUid': FieldValue.increment(1),
+          'gameData.scores.$partnerUid': FieldValue.increment(1),
+        });
+        await batch.commit();
+        if (mounted) Navigator.pop(context);
+        return;
       }
 
       await _controller.submitMove(

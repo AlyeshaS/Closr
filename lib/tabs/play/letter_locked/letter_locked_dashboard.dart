@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/dictionary_service.dart'; // ✨ IMPORT THE DICTIONARY SERVICE
 import 'letter_locked_controller.dart';
 import 'letter_locked_game_screen.dart';
 
@@ -23,7 +24,11 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
   @override
   void initState() {
     super.initState();
-    _resolveSession();
+
+    // ✨ FIXED: Pre-loads the full 4-letter dictionary into memory instantly
+    DictionaryService.initialize();
+
+    _resolveSession(); // Resolves your dynamic email connections
   }
 
   void _resolveSession() async {
