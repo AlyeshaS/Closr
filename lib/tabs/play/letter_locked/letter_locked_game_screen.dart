@@ -53,47 +53,55 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         return Scaffold(
           backgroundColor: cs.surface,
           appBar: AppBar(
+            backgroundColor: cs.surface,
+            elevation: 0,
             title: Text(
-              game.gameMode == 'coop'
-                  ? 'LetterLocked: Co-op Vault'
-                  : 'LetterLocked: Word Trap',
+              game.gameMode == 'coop' ? 'Co-op Vault' : 'Word Trap',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
           body: SafeArea(
             child: Column(
               children: [
-                // Turn Indicator Banner
+                // Minimalist Turn Banner
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  color: isMyTurn
-                      ? cs.primaryContainer
-                      : cs.surfaceContainerLow,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isMyTurn
+                        ? cs.primaryContainer.withOpacity(0.4)
+                        : cs.surfaceContainerLow,
+                    border: Border(
+                      bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+                    ),
+                  ),
                   child: Center(
                     child: Text(
                       isMyTurn ? "Your Turn! ⚡" : "Waiting for partner... ⏳",
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: isMyTurn
-                            ? cs.onPrimaryContainer
-                            : cs.onSurfaceVariant,
+                        color: isMyTurn ? cs.primary : cs.onSurfaceVariant,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Main Dynamic Layout Router
                 Expanded(
                   child: game.gameMode == 'coop'
                       ? _buildCoopLayout(game, cs)
                       : _buildVersusLayout(game, cs),
                 ),
 
-                // Input Actions Row
+                // Core Input Row
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                   child: Row(
                     children: [
                       Expanded(
@@ -101,29 +109,50 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                           controller: _wordInputController,
                           enabled: isMyTurn,
                           textCapitalization: TextCapitalization.characters,
+                          style: Theme.of(context).textTheme.bodyLarge,
                           decoration: InputDecoration(
                             hintText: isMyTurn
                                 ? 'Type submission word...'
                                 : 'Locked until turn changes',
+                            hintStyle: TextStyle(
+                              color: cs.onSurfaceVariant.withOpacity(0.6),
+                            ),
+                            filled: true,
+                            fillColor: cs.surfaceContainerLow,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: cs.outlineVariant),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: cs.outlineVariant),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: cs.primary),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       SizedBox(
-                        height: 56,
+                        height: 54,
+                        width: 54,
                         child: FilledButton(
                           onPressed: isMyTurn
                               ? () => _handleMoveSubmission(game)
                               : null,
                           style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: const Icon(Icons.send_rounded),
+                          child: const Icon(Icons.send_rounded, size: 20),
                         ),
                       ),
                     ],
@@ -137,16 +166,27 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
-  // ── Co-op Mode UI Builder (3x3 Safe Dial) ──────────────────────────────────
   Widget _buildCoopLayout(LetterLockedModel game, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            'LAST SUBMITTED: ${game.currentWord.isEmpty ? "NONE" : game.currentWord}',
-            style: Theme.of(context).textTheme.titleMedium,
+            'LAST SUBMITTED',
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            game.currentWord.isEmpty ? "NONE" : game.currentWord,
+            style: TextStyle(
+              fontFamily: 'CormorantGaramond',
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: cs.primary,
+            ),
           ),
           const SizedBox(height: 32),
           GridView.builder(
@@ -154,8 +194,8 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
             itemCount: game.boardLetters.length,
             itemBuilder: (context, i) {
@@ -163,18 +203,18 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               final bool isUsed = game.usedLetters.contains(letter);
               return Container(
                 decoration: BoxDecoration(
-                  color: isUsed ? cs.primaryContainer : Colors.white,
+                  color: isUsed ? cs.primaryContainer : cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isUsed ? cs.primary : cs.outlineVariant,
-                    width: 2,
+                    width: 1.5,
                   ),
                 ),
                 child: Center(
                   child: Text(
                     letter,
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: isUsed ? cs.onPrimaryContainer : cs.onSurface,
                     ),
@@ -188,12 +228,11 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
-  // ── Versus Mode UI Builder (Padlocked Word Chain Row) ──────────────────────
   Widget _buildVersusLayout(LetterLockedModel game, ColorScheme cs) {
     final letters = game.currentWord.split('');
     return Center(
       child: Wrap(
-        spacing: 12,
+        spacing: 10,
         runSpacing: 12,
         alignment: WrapAlignment.center,
         children: List.generate(letters.length, (index) {
@@ -202,21 +241,23 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 64,
-                height: 72,
+                width: 56,
+                height: 64,
                 decoration: BoxDecoration(
-                  color: isLocked ? cs.surfaceContainerHighest : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  color: isLocked
+                      ? cs.surfaceContainerHighest.withOpacity(0.5)
+                      : cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isLocked ? cs.outline : cs.primary,
-                    width: 2,
+                    color: isLocked ? cs.outline : cs.primary.withOpacity(0.5),
+                    width: 1.5,
                   ),
                 ),
                 child: Center(
                   child: Text(
                     letters[index],
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: isLocked ? cs.onSurfaceVariant : cs.onSurface,
                     ),
@@ -226,8 +267,8 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               const SizedBox(height: 6),
               Icon(
                 isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
-                size: 18,
-                color: isLocked ? cs.error : cs.outline,
+                size: 16,
+                color: isLocked ? cs.error : cs.outline.withOpacity(0.5),
               ),
             ],
           );
@@ -236,7 +277,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
-  // ── Game Logic Processor ───────────────────────────────────────────────────
   void _handleMoveSubmission(LetterLockedModel game) async {
     final String input = _wordInputController.text.trim().toUpperCase();
     if (input.isEmpty) return;
@@ -248,20 +288,18 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
 
     if (game.gameMode == 'coop') {
-      // Co-op Logic Check: Must match the last character of the previous input word
       if (game.currentWord.isNotEmpty &&
           !input.startsWith(game.currentWord.characters.last)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Word must start with letter: ${game.currentWord.characters.last}',
+              'Word must start with: ${game.currentWord.characters.last}',
             ),
           ),
         );
         return;
       }
 
-      // Track newly illuminated characters
       List<String> newUsedLetters = List<String>.from(game.usedLetters);
       for (var char in input.split('')) {
         if (game.boardLetters.contains(char) &&
@@ -278,27 +316,23 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         updatedUsedLetters: newUsedLetters,
       );
     } else {
-      // Versus Logic Check: Must be exactly equal in length
       if (input.length != game.currentWord.length) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Word must keep the exact same character length'),
+            content: Text('Word length must remain exactly identical'),
           ),
         );
         return;
       }
 
-      // Extract variations
       List<int> changedIndices = [];
       for (int i = 0; i < input.length; i++) {
-        if (input[i] != game.currentWord[i]) {
-          changedIndices.add(i);
-        }
+        if (input[i] != game.currentWord[i]) changedIndices.add(i);
       }
 
       if (changedIndices.length != 1) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You must change EXACTLY one letter!')),
+          const SnackBar(content: Text('You must change exactly one letter')),
         );
         return;
       }
@@ -306,7 +340,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       if (game.lockedIndices.contains(changedIndices.first)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('That letter position is locked by your partner!'),
+            content: Text('That position is locked by your partner'),
           ),
         );
         return;
@@ -316,8 +350,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         coupleId: widget.coupleId,
         partnerUid: partnerUid,
         newWord: input,
-        updatedLockedIndices:
-            changedIndices, // This slot is now locked for the partner
+        updatedLockedIndices: changedIndices,
         updatedUsedLetters: [],
       );
     }

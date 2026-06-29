@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'trivia/trivia_dashboard_tab.dart';
+import 'trivia/trivia_game_screen.dart'; // Route directly to the game screen
 import 'letter_locked/letter_locked_dashboard.dart';
 
 class GamesDashboardTab extends StatefulWidget {
@@ -49,7 +49,6 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _coupleId.isEmpty
@@ -75,105 +74,43 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Solid Rich Score Split Banner (Matches Quests Theme) ────────
+              // ── Adaptive Premium Split Scoreboard Panel ─────────────────────
               Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 24,
-                  horizontal: 16,
-                ),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  // Uses the solid primary container color matching your weekly quest design
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: cs.primary.withOpacity(0.2),
-                    width: 1,
-                  ),
+                  color: cs.surfaceContainerHighest.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // My Score Segment
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            'MY SCORE',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  letterSpacing: 2.0,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onPrimaryContainer.withOpacity(0.8),
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$myScore',
-                            style: TextStyle(
-                              fontFamily: 'CormorantGaramond',
-                              fontSize: 44,
-                              fontWeight: FontWeight.w500,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    _buildScoreColumn(
+                      context,
+                      '$myScore',
+                      'Your Wins',
+                      cs.primary,
                     ),
-
-                    // Elegant split line that matches the content contrast
-                    Container(
-                      width: 1,
-                      height: 50,
-                      color: cs.onPrimaryContainer.withOpacity(0.15),
-                    ),
-
-                    // Partner Score Segment
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            'PARTNER',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  letterSpacing: 2.0,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onPrimaryContainer.withOpacity(0.8),
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$partnerScore',
-                            style: TextStyle(
-                              fontFamily: 'CormorantGaramond',
-                              fontSize: 44,
-                              fontWeight: FontWeight.w500,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    Container(width: 1, height: 40, color: cs.outlineVariant),
+                    _buildScoreColumn(
+                      context,
+                      '$partnerScore',
+                      "Partner's Wins",
+                      cs.secondary,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 24),
 
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 16),
-                child: Text(
-                  'CHOOSE A GAME',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSurfaceVariant.withOpacity(0.9),
-                  ),
-                ),
-              ),
+              Text('GAMES', style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(height: 12),
 
-              // 1. LetterLocked Editorial Card
+              // 1. LetterLocked Clean Custom Card
               _buildCleanGameCard(
                 context: context,
                 title: 'LetterLocked',
@@ -182,15 +119,29 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const LetterLockedDashboard(),
+                      builder: (_) => Scaffold(
+                        backgroundColor: cs.surface,
+                        appBar: AppBar(
+                          title: const Text('LetterLocked'),
+                          centerTitle: true,
+                          leading: IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 18,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        body: const LetterLockedDashboard(),
+                      ),
                     ),
                   );
                 },
                 cs: cs,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // 2. Our Trivia Editorial Card
+              // 2. Our Trivia Clean Custom Card - Routes Directly to the Game Screen now!
               _buildCleanGameCard(
                 context: context,
                 title: 'Our Trivia',
@@ -198,9 +149,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                     'Test your compatibility! Sync matching responses and see who remembers best.',
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const TriviaDashboardTab(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const TriviaGameScreen()),
                   );
                 },
                 cs: cs,
@@ -209,6 +158,29 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildScoreColumn(
+    BuildContext context,
+    String value,
+    String label,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'CormorantGaramond',
+            fontSize: 36,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+      ],
     );
   }
 
@@ -221,32 +193,27 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1D1214) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark
-                ? cs.outlineVariant.withOpacity(0.15)
-                : cs.outlineVariant.withOpacity(0.7),
-            width: 1,
-          ),
-          boxShadow: [
-            if (!isDark)
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-          ],
+          color: isDark ? const Color(0xFF231519) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.primary.withOpacity(0.3), width: 1.5),
         ),
         child: Row(
           children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.star_rounded, color: cs.primary),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,29 +221,21 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                       color: cs.onSurface,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant.withOpacity(0.75),
-                      fontSize: 13,
-                      height: 1.4,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: cs.outline.withOpacity(0.5),
-            ),
+            Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
           ],
         ),
       ),

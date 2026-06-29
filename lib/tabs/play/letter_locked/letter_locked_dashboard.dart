@@ -26,20 +26,24 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
   }
 
   void _resolveSession() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _myUid = user.uid;
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_myUid)
-          .get();
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
-        _coupleId = data['coupleId'] ?? 'fallback_couple_id';
-        _partnerUid = data['partnerUid'] ?? 'fallback_partner_id';
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _myUid = user.uid;
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_myUid)
+            .get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final data = userDoc.data()!;
+          _coupleId = data['coupleId'] ?? data['couple_id'] ?? '';
+          _partnerUid = data['partnerUid'] ?? data['partner_uid'] ?? '';
+        }
       }
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
-    setState(() => _isLoading = false);
   }
 
   void _setupAndLaunchGame(String mode) async {
@@ -51,13 +55,13 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
       mode: mode,
     );
     if (mounted) {
-      Navigator.of(context).push(
+      // Replace layout so the back button on game screen routes smoothly back to the core hub
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => LetterLockedGameScreen(coupleId: _coupleId),
         ),
       );
     }
-    setState(() => _isLoading = false);
   }
 
   @override
@@ -70,9 +74,9 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
 
     return Scaffold(
       backgroundColor: cs.surface,
-      appBar: AppBar(title: const Text('LetterLocked'), centerTitle: true),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -83,24 +87,20 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
               ).textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
             ),
             const SizedBox(height: 16),
-            _buildModeCard(
+            _buildCleanModeCard(
               context: context,
               title: 'Co-op Vault Mode',
               subtitle:
-                  'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative!',
-              icon: Icons.gpp_good_outlined,
-              color: cs.primaryContainer,
+                  'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative.',
               onTap: () => _setupAndLaunchGame('coop'),
               cs: cs,
             ),
-            const SizedBox(height: 16),
-            _buildModeCard(
+            const SizedBox(height: 12),
+            _buildCleanModeCard(
               context: context,
               title: 'Versus Word Trap',
               subtitle:
-                  'Change exactly one letter to morph the word. Trap your partner by locking their choices out!',
-              icon: Icons.local_fire_department_outlined,
-              color: cs.secondaryContainer,
+                  'Change exactly one letter to morph the word. Trap your partner by locking their choices out.',
               onTap: () => _setupAndLaunchGame('versus'),
               cs: cs,
             ),
@@ -110,40 +110,48 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
     );
   }
 
-  Widget _buildModeCard({
+  Widget _buildCleanModeCard({
     required BuildContext context,
     required String title,
     required String subtitle,
-    required IconData icon,
-    required Color color,
     required VoidCallback onTap,
     required ColorScheme cs,
   }) {
-    return InkWell(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: cs.outlineVariant),
+          color: isDark ? const Color(0xFF231519) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.primary.withOpacity(0.3), width: 1.5),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 40, color: cs.primary),
-            const SizedBox(width: 16),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.layers_rounded, color: cs.primary),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -153,7 +161,7 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: cs.outline),
+            Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
           ],
         ),
       ),
