@@ -49,6 +49,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _coupleId.isEmpty
@@ -74,64 +75,110 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Premium Match-Score Banner (Matches Quests Styling) ──────────
+              // ── Solid Rich Score Split Banner (Matches Quests Theme) ────────
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
                 decoration: BoxDecoration(
+                  // Uses the solid primary container color matching your weekly quest design
                   color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: cs.primary.withOpacity(0.2),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   children: [
+                    // My Score Segment
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'ARCADE PROGRESS',
-                            style: Theme.of(context).textTheme.labelSmall,
+                            'MY SCORE',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  letterSpacing: 2.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onPrimaryContainer.withOpacity(0.8),
+                                ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Text(
-                            'Scoreboard matching live session',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: cs.onSurfaceVariant),
+                            '$myScore',
+                            style: TextStyle(
+                              fontFamily: 'CormorantGaramond',
+                              fontSize: 44,
+                              fontWeight: FontWeight.w500,
+                              color: cs.primary,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '$myScore - $partnerScore',
-                      style: TextStyle(
-                        fontFamily: 'CormorantGaramond',
-                        fontSize: 36,
-                        fontWeight: FontWeight.w500,
-                        color: cs.primary,
+
+                    // Elegant split line that matches the content contrast
+                    Container(
+                      width: 1,
+                      height: 50,
+                      color: cs.onPrimaryContainer.withOpacity(0.15),
+                    ),
+
+                    // Partner Score Segment
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'PARTNER',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  letterSpacing: 2.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onPrimaryContainer.withOpacity(0.8),
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '$partnerScore',
+                            style: TextStyle(
+                              fontFamily: 'CormorantGaramond',
+                              fontSize: 44,
+                              fontWeight: FontWeight.w500,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 36),
 
-              Text(
-                'CHOOSE A GAME',
-                style: Theme.of(context).textTheme.labelSmall,
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 16),
+                child: Text(
+                  'CHOOSE A GAME',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurfaceVariant.withOpacity(0.9),
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
 
-              // 1. LetterLocked Custom Card
+              // 1. LetterLocked Editorial Card
               _buildCleanGameCard(
                 context: context,
                 title: 'LetterLocked',
                 subtitle:
-                    'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock rows.',
-                emoji: '🔏',
+                    'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -141,15 +188,14 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                 },
                 cs: cs,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              // 2. Our Trivia Custom Card
+              // 2. Our Trivia Editorial Card
               _buildCleanGameCard(
                 context: context,
                 title: 'Our Trivia',
                 subtitle:
-                    'Test your compatibility! Sync match responses and test memory.',
-                emoji: '🧠',
+                    'Test your compatibility! Sync matching responses and see who remembers best.',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -170,7 +216,6 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
     required BuildContext context,
     required String title,
     required String subtitle,
-    required String emoji,
     required VoidCallback onTap,
     required ColorScheme cs,
   }) {
@@ -178,29 +223,30 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 24),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF231519) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cs.outlineVariant),
+          color: isDark ? const Color(0xFF1D1214) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? cs.outlineVariant.withOpacity(0.15)
+                : cs.outlineVariant.withOpacity(0.7),
+            width: 1,
+          ),
+          boxShadow: [
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+          ],
         ),
         child: Row(
           children: [
-            // Styled Emoji Square container matching Quest UI items
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 18)),
-              ),
-            ),
-            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,23 +256,26 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: cs.onSurface,
                       fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant.withOpacity(0.8),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withOpacity(0.75),
+                      fontSize: 13,
+                      height: 1.4,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 14,
-              color: cs.outline.withOpacity(0.7),
+              color: cs.outline.withOpacity(0.5),
             ),
           ],
         ),
