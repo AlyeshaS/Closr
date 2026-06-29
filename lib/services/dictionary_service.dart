@@ -12,7 +12,7 @@ class DictionaryService {
     try {
       // Reads the full document from assets
       final String rawData = await rootBundle.loadString(
-        'assets/data/4_letter_words.txt',
+        'assets/four_letter_words.txt',
       );
 
       // Splits lines and sanitizes white spaces/returns
