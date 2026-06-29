@@ -1,7 +1,8 @@
 // activities_screen.dart
 import 'package:flutter/material.dart';
 import '../suggestions/suggestions_screen.dart';
-import 'trivia/trivia_dashboard_tab.dart'; // Clean import route
+import '../../services/streaks_service.dart';
+import 'games_dashboard_tab.dart';
 
 class ActivitiesScreen extends StatefulWidget {
   const ActivitiesScreen({super.key});
@@ -61,7 +62,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen>
               controller: _tabController,
               children: [
                 const _QuestsTab(),
-                const TriviaDashboardTab(), // Clean substitution for the dashboard
+                const GamesDashboardTab(), // Styled game hub with functional real-time scores
                 _ComingSoonTab(
                   icon: Icons.explore_outlined,
                   title: 'Date Generator',
@@ -80,7 +81,6 @@ class _ActivitiesScreenState extends State<ActivitiesScreen>
 }
 
 // ── Quests Tab ────────────────────────────────────────────────────────────────
-
 class _QuestsTab extends StatefulWidget {
   const _QuestsTab();
 
@@ -89,7 +89,6 @@ class _QuestsTab extends StatefulWidget {
 }
 
 class _QuestsTabState extends State<_QuestsTab> {
-  // Placeholder quest data — will come from Firestore
   final List<Map<String, dynamic>> _quests = [
     {'title': 'Cook a new recipe together', 'done': true, 'emoji': '🍳'},
     {'title': 'Watch the sunset', 'done': true, 'emoji': '🌅'},
@@ -110,7 +109,6 @@ class _QuestsTabState extends State<_QuestsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Progress banner
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -161,18 +159,22 @@ class _QuestsTabState extends State<_QuestsTab> {
             ),
           ),
           const SizedBox(height: 24),
-
           Text('ACTIVITIES', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 12),
-
-          // Quest items
           ...List.generate(_quests.length, (i) {
             final quest = _quests[i];
             final done = quest['done'] as bool;
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: GestureDetector(
-                onTap: () => setState(() => _quests[i]['done'] = !done),
+                onTap: () async {
+                  setState(() => _quests[i]['done'] = !done);
+                  try {
+                    if (!done) {
+                      await StreaksService().recordActivity('quest_completed');
+                    }
+                  } catch (_) {}
+                },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(16),
@@ -191,7 +193,6 @@ class _QuestsTabState extends State<_QuestsTab> {
                   ),
                   child: Row(
                     children: [
-                      // Emoji icon
                       Container(
                         width: 38,
                         height: 38,
@@ -223,7 +224,6 @@ class _QuestsTabState extends State<_QuestsTab> {
                               ),
                         ),
                       ),
-                      // Checkbox
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         width: 24,
@@ -251,8 +251,6 @@ class _QuestsTabState extends State<_QuestsTab> {
             );
           }),
           const SizedBox(height: 8),
-
-          // Coming soon note
           Center(
             child: Text(
               'More quests & bingo challenges coming soon',
@@ -269,7 +267,6 @@ class _QuestsTabState extends State<_QuestsTab> {
 }
 
 // ── Shared Coming Soon widget ─────────────────────────────────────────────────
-
 class _ComingSoonTab extends StatelessWidget {
   final IconData icon;
   final String title;
