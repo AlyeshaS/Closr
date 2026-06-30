@@ -4,56 +4,61 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class LetterLockedController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Stream to listen to the shared LetterLocked game room document
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenToGame(String roomId) {
     return _firestore.collection('games').doc(roomId).snapshots();
   }
 
-  /// Initializes a brand new match room for LetterLocked
   Future<void> startNewGame({
     required String roomId,
     required String myUid,
     required String partnerUid,
-    required String mode, // 'coop' or 'versus'
+    required String mode,
+    Map<String, int>?
+    existingScores, // ✨ NEW: Receives persistent ongoing counters
   }) async {
-    // Standard starting letters for a co-op match or empty state for versus
     List<String> startingBoard = mode == 'coop'
         ? ['T', 'A', 'E', 'L', 'M', 'K', 'S', 'O', 'R']
         : [];
+    String baseWord = mode == 'versus' ? 'LANE' : '';
+
+    // If no score history is found, pass baseline defaults
+    Map<String, int> finalScores = existingScores ?? {myUid: 0, partnerUid: 0};
 
     await _firestore.collection('games').doc(roomId).set({
       'gameId': roomId,
       'gameType': 'letter_locked',
       'gameMode': mode,
       'status': 'active',
-      'turn': myUid, // Whichever player clicks start goes first
+      'turn': myUid,
       'updatedAt': FieldValue.serverTimestamp(),
       'gameData': {
-        'currentWord': mode == 'versus'
-            ? 'LANE'
-            : '', // Versus needs a starting trap word
+        'currentWord': baseWord,
         'lockedIndices': [],
         'boardLetters': startingBoard,
         'usedLetters': [],
-        'scores': {myUid: 0, partnerUid: 0},
+        'wordsUsed': baseWord.isNotEmpty ? [baseWord] : [],
+        'scores': finalScores,
       },
     });
   }
 
-  /// Submits a player's move and flips the turn to the partner
   Future<void> submitMove({
     required String roomId,
+    required String myUid,
     required String partnerUid,
     required String newWord,
     required List<int> updatedLockedIndices,
     required List<String> updatedUsedLetters,
   }) async {
+    final cleanWord = newWord.toUpperCase();
     await _firestore.collection('games').doc(roomId).update({
-      'turn': partnerUid, // Toggle turn to partner immediately
+      'turn': partnerUid,
       'updatedAt': FieldValue.serverTimestamp(),
-      'gameData.currentWord': newWord.toUpperCase(),
+      'gameData.currentWord': cleanWord,
       'gameData.lockedIndices': updatedLockedIndices,
       'gameData.usedLetters': updatedUsedLetters,
+      'gameData.wordsUsed': FieldValue.arrayUnion([cleanWord]),
+      'gameData.scores.$myUid': FieldValue.increment(1),
     });
   }
 }

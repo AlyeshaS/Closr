@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../services/dictionary_service.dart'; // ✨ IMPORT THE DICTIONARY SERVICE
+import '../../../services/dictionary_service.dart';
 import 'letter_locked_controller.dart';
 import 'letter_locked_game_screen.dart';
 
@@ -24,11 +24,8 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
   @override
   void initState() {
     super.initState();
-
-    // ✨ FIXED: Pre-loads the full 4-letter dictionary into memory instantly
     DictionaryService.initialize();
-
-    _resolveSession(); // Resolves your dynamic email connections
+    _resolveSession();
   }
 
   void _resolveSession() async {
@@ -77,7 +74,6 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
 
   void _handleGameRouting(String mode) async {
     if (_roomId.isEmpty) return;
-
     setState(() => _isLoading = true);
 
     try {
@@ -88,21 +84,33 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
 
       if (mounted) {
         if (gameDoc.exists && gameDoc.data()?['status'] == 'active') {
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => LetterLockedGameScreen(roomId: _roomId),
             ),
           );
         } else {
+          // ✨ Dynamic Cumulative Score Capture Check:
+          // Reads old points if they exist so they NEVER reset to 0
+          Map<String, int> existingScores = {_myUid: 0, _partnerUid: 0};
+          if (gameDoc.exists &&
+              gameDoc.data()?['gameData']?['scores'] != null) {
+            final oldScores =
+                gameDoc.data()?['gameData']['scores'] as Map<String, dynamic>;
+            existingScores[_myUid] = oldScores[_myUid] ?? 0;
+            existingScores[_partnerUid] = oldScores[_partnerUid] ?? 0;
+          }
+
           await _controller.startNewGame(
             roomId: _roomId,
             myUid: _myUid,
             partnerUid: _partnerUid,
             mode: mode,
+            existingScores: existingScores, // Pass persistent scores through!
           );
 
           if (mounted) {
-            Navigator.of(context).pushReplacement(
+            Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => LetterLockedGameScreen(roomId: _roomId),
               ),
@@ -156,10 +164,13 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data!.exists) {
             final gameData = snapshot.data!.data();
+
+            // 🕹️ If game is active and we are just sitting on the dashboard, navigate in!
             if (gameData?['status'] == 'active') {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
-                  Navigator.of(context).pushReplacement(
+                  // Check if we are already displaying the game screen to avoid duplicate pushing
+                  Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => LetterLockedGameScreen(roomId: _roomId),
                     ),
