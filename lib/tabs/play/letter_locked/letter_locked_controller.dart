@@ -1,5 +1,7 @@
 // lib/play/letter_locked/letter_locked_controller.dart
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/dictionary_service.dart';
 
 class LetterLockedController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -15,10 +17,19 @@ class LetterLockedController {
     required String mode,
     Map<String, int>? existingScores,
   }) async {
-    List<String> startingBoard = mode == 'coop'
-        ? ['T', 'A', 'E', 'L', 'M', 'K', 'S', 'O', 'R']
-        : [];
-    String baseWord = mode == 'versus' ? 'LANE' : '';
+    List<String> startingBoard = [];
+    String baseWord = '';
+
+    if (mode == 'coop') {
+      // 🎲 DYNAMIC CO-OP BOARD: Randomly choose 9 unique letters
+      final List<String> alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      alphabet.shuffle(Random());
+      startingBoard = alphabet.take(9).toList();
+    } else {
+      // 🎲 DYNAMIC VERSUS WORD: Grab a random valid 4-letter word from your asset dictionary file
+      baseWord = DictionaryService.getRandomFourLetterWord();
+    }
+
     Map<String, int> finalScores = existingScores ?? {myUid: 0, partnerUid: 0};
 
     await _firestore.collection('games').doc(roomId).set({

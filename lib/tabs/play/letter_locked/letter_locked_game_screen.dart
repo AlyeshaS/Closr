@@ -82,6 +82,55 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
+  void _showHowToPlayVersus(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'How to Play: Word Trap ⚔️',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '• Change exactly ONE letter of the current word to submit a new turn.\n'
+                '• The single index position you changed becomes locked for your partner.\n'
+                '• You earn +1 Point for every successful word placement calculation.\n'
+                '• Trap your opponent into a dead-end with no valid dictionary words to win the match!',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.5,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showGameEndedAlert(LetterLockedModel game, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
@@ -249,11 +298,16 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               onPressed: () => _handleManualSurrender(finalGameModel),
             ),
             actions: [
-              if (finalGameModel.gameMode == 'coop')
-                IconButton(
-                  icon: const Icon(Icons.help_outline_rounded),
-                  onPressed: () => _showHowToPlayCoop(context),
-                ),
+              IconButton(
+                icon: const Icon(Icons.help_outline_rounded),
+                onPressed: () {
+                  if (finalGameModel.gameMode == 'coop') {
+                    _showHowToPlayCoop(context);
+                  } else {
+                    _showHowToPlayVersus(context);
+                  }
+                },
+              ),
             ],
           ),
           body: SafeArea(
@@ -283,13 +337,27 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // ✨ FIXED: Added comprehensive constraint maps so that contents expand fully
+                // and vertically align perfectly to the dead-center point of the scroll area view.
                 Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: finalGameModel.gameMode == 'coop'
-                        ? _buildCoopLayout(finalGameModel, cs)
-                        : _buildVersusLayout(finalGameModel, cs),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: IntrinsicHeight(
+                            child: Center(
+                              child: finalGameModel.gameMode == 'coop'
+                                  ? _buildCoopLayout(finalGameModel, cs)
+                                  : _buildVersusLayout(finalGameModel, cs),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
 
@@ -470,6 +538,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
           Text(
@@ -530,30 +599,34 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
 
   Widget _buildVersusLayout(LetterLockedModel game, ColorScheme cs) {
     final letters = game.currentWord.split('');
-    return Padding(
-      padding: const EdgeInsets.only(top: 32),
-      child: Center(
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Wrap(
-          spacing: 10,
-          runSpacing: 12,
+          spacing: 12,
+          runSpacing: 14,
           alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: List.generate(letters.length, (index) {
             final bool isLocked = game.lockedIndices.contains(index);
             return Column(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 56,
-                  height: 64,
+                  width: 58,
+                  height: 66,
                   decoration: BoxDecoration(
                     color: isLocked
                         ? cs.surfaceContainerHighest.withOpacity(0.5)
                         : cs.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isLocked
                           ? cs.outline
-                          : cs.primary.withOpacity(0.5),
+                          : cs.primary.withOpacity(0.4),
                       width: 1.5,
                     ),
                   ),
@@ -568,11 +641,11 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Icon(
                   isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
                   size: 16,
-                  color: isLocked ? cs.error : cs.outline.withOpacity(0.5),
+                  color: isLocked ? cs.error : cs.outline.withOpacity(0.4),
                 ),
               ],
             );

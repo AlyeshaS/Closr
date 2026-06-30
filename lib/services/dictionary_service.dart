@@ -1,10 +1,20 @@
 // lib/services/dictionary_service.dart
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:characters/characters.dart';
+import 'dart:math';
 
 class DictionaryService {
   static Set<String> _validFourLetterWords = {};
   static bool _isLoaded = false;
+
+  static String getRandomFourLetterWord() {
+    if (_validFourLetterWords.isEmpty) {
+      return 'LANE'; // Reliable fallback word if dictionary asset fails to load
+    }
+    final List<String> wordsList = _validFourLetterWords.toList();
+    final int randomIndex = Random().nextInt(wordsList.length);
+    return wordsList[randomIndex];
+  }
 
   /// Returns true if the asset file loaded perfectly, false if it failed.
   static Future<bool> initialize() async {
