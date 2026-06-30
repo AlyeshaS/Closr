@@ -18,7 +18,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
   final LetterLockedController _controller = LetterLockedController();
   final TextEditingController _wordInputController = TextEditingController();
   String _myUid = '';
-  bool _endDialogShown = false; // Prevents duplicate triggers locally
+  bool _endDialogShown = false;
 
   @override
   void initState() {
@@ -32,55 +32,110 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     super.dispose();
   }
 
+  void _showHowToPlayCoop(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'How to Play: Co-op Vault 🔐',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '• Work as a team to light up all 9 letters on the grid dial.\n'
+                '• You take turns submitting valid 4-letter words.\n'
+                '• Every word MUST start with the last letter of the previous word.\n'
+                '• Using a letter on the grid lights it up. Turn the whole board primary colored to win!\n'
+                '• If either player gets stuck with no moves left, the team loses together.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.5,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showGameEndedAlert(LetterLockedModel game, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
 
-    // 1. Calculate a local fallback winner if winnerUid field hasn't propagated yet
+    final bool isCoop = game.gameMode == 'coop';
     final String calculatedWinner = game.scores.keys.firstWhere(
       (uid) => uid != game.turn,
       orElse: () => '',
     );
 
-    // 2. ✨ Check game.winnerUid safely (this will be correct since we pass finalGameModel now)
     final bool iWon =
         game.winnerUid == _myUid ||
         (game.winnerUid.isEmpty && calculatedWinner == _myUid);
-
-    // 3. ✨ Grab the true endReason written to Firebase instead of guessing by lockedIndices length
-    // We'll read the game parameters to see if a real trap or manual resignation happened
-    String reason = game.lockedIndices.isNotEmpty ? 'trapped' : 'surrendered';
-
-    // If it's a structural Versus game dead-end, guarantee it flags as a tactical trap
-    if (game.gameMode == 'versus' &&
-        game.wordsUsed.length > 1 &&
-        game.lockedIndices.isEmpty) {
-      // If no indices were changed this turn but moves are 0, it means they clicked the forfeit button
-      reason = 'trapped';
-    }
 
     String title = "";
     String message = "";
     IconData icon;
     Color iconColor;
 
-    if (iWon) {
-      title = "🎉 CONGRATULATIONS!";
-      icon = Icons.emoji_events_rounded;
-      iconColor = Colors.amber;
-      message = reason == 'trapped'
-          ? "Incredible tactical work! You completely trapped your partner with no moves remaining! 🧠"
-          : "You won by surrender! Your partner left the match frame. 🏳️";
+    if (isCoop) {
+      if (game.winnerUid == 'TEAM_WIN') {
+        title = "🎉 VAULT CRACKED!";
+        icon = Icons.emoji_events_rounded;
+        iconColor = Colors.amber;
+        message =
+            "Brilliant teamwork! You and your partner successfully illuminated the entire letter dial! +1 Point added to both scores.";
+      } else {
+        title = "💥 VAULT LOCKED OUT";
+        icon = Icons.disabled_by_default_rounded;
+        iconColor = Colors.redAccent;
+        message =
+            "The vault locked down because your team ran out of combinations or surrendered. Better luck next time!";
+      }
     } else {
-      title = "💥 GAME OVER";
-      icon = Icons.disabled_by_default_rounded;
-      iconColor = Colors.redAccent;
-      message = reason == 'trapped'
-          ? "Ah, you got caught in a corner! Your partner trapped your word positions with zero moves left."
-          : "You forfeited the match by backing out.";
+      String reason = game.lockedIndices.isNotEmpty ? 'trapped' : 'surrendered';
+      if (game.wordsUsed.length <= 1) reason = 'surrendered';
+
+      if (iWon) {
+        title = "🎉 CONGRATULATIONS!";
+        icon = Icons.emoji_events_rounded;
+        iconColor = Colors.amber;
+        message = reason == 'trapped'
+            ? "Incredible tactical work! You completely trapped your partner with no moves remaining! 🧠"
+            : "You won by surrender! Your partner left the match frame. 🏳️";
+      } else {
+        title = "💥 GAME OVER";
+        icon = Icons.disabled_by_default_rounded;
+        iconColor = Colors.redAccent;
+        message = reason == 'trapped'
+            ? "Ah, you got caught in a corner! Your partner trapped your word positions with zero moves left."
+            : "You forfeited the match by backing out.";
+      }
     }
 
-    // ... rest of your showDialog code remains exactly the same
     showDialog(
       context: screenContext,
       barrierDismissible: false,
@@ -112,15 +167,12 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
           actions: [
             TextButton(
               onPressed: () async {
-                Navigator.pop(dialogContext); // Close dialogue box
-
-                // Archive the game doc state so dashboard stays clean
+                Navigator.pop(dialogContext);
                 await FirebaseFirestore.instance
                     .collection('games')
                     .doc(widget.roomId)
                     .update({'status': 'archived'});
 
-                // Safely bounce back to main menu dashboard!
                 if (screenContext.mounted) {
                   Navigator.of(
                     screenContext,
@@ -158,7 +210,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         final data = snapshot.data!.data()!;
         final game = LetterLockedModel.fromFirestore(data, snapshot.data!.id);
 
-        // Inject remote field payloads cleanly inside tracking system wrappers
         final finalGameModel = LetterLockedModel(
           gameId: game.gameId,
           coupleId: game.coupleId,
@@ -177,7 +228,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
 
         final bool isMyTurn = finalGameModel.turn == _myUid;
 
-        // ✨ FIXED: Passing finalGameModel instead of original game unmapped constructor wrapper
         if (finalGameModel.status == 'completed') {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _showGameEndedAlert(finalGameModel, context);
@@ -198,11 +248,17 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               onPressed: () => _handleManualSurrender(finalGameModel),
             ),
+            actions: [
+              if (finalGameModel.gameMode == 'coop')
+                IconButton(
+                  icon: const Icon(Icons.help_outline_rounded),
+                  onPressed: () => _showHowToPlayCoop(context),
+                ),
+            ],
           ),
           body: SafeArea(
             child: Column(
               children: [
-                // Minimalist Turn Banner
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -227,14 +283,16 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Main Gameplay Layout Frame Canvas
                 Expanded(
-                  child: finalGameModel.gameMode == 'coop'
-                      ? _buildCoopLayout(finalGameModel, cs)
-                      : _buildVersusLayout(finalGameModel, cs),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: finalGameModel.gameMode == 'coop'
+                        ? _buildCoopLayout(finalGameModel, cs)
+                        : _buildVersusLayout(finalGameModel, cs),
+                  ),
                 ),
 
-                // Visual Words Used Scrolling Ledger Row
                 if (finalGameModel.wordsUsed.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -266,9 +324,8 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                             label: Text(finalGameModel.wordsUsed[idx]),
                             backgroundColor: cs.surfaceContainerHighest
                                 .withOpacity(0.4),
-                            labelStyle: TextStyle(
+                            labelStyle: const TextStyle(
                               fontSize: 12,
-                              color: cs.onSurfaceVariant,
                               fontWeight: FontWeight.bold,
                             ),
                             shape: RoundedRectangleBorder(
@@ -284,7 +341,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                   ),
                 ],
 
-                // Action Input Field Box + Testing Trap Button
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   child: Column(
@@ -323,9 +379,11 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                               ),
                             ),
                             icon: const Icon(Icons.flag_rounded, size: 18),
-                            label: const Text(
-                              "I'M TRAPPED! (TESTING FORFEIT)",
-                              style: TextStyle(
+                            label: Text(
+                              finalGameModel.gameMode == 'coop'
+                                  ? "WE ARE TRAPPED! (GIVE UP)"
+                                  : "I'M TRAPPED! (TESTING FORFEIT)",
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
                                 letterSpacing: 0.5,
@@ -412,8 +470,8 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 12),
           Text(
             'LAST SUBMITTED',
             style: Theme.of(
@@ -472,49 +530,54 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
 
   Widget _buildVersusLayout(LetterLockedModel game, ColorScheme cs) {
     final letters = game.currentWord.split('');
-    return Center(
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 12,
-        alignment: WrapAlignment.center,
-        children: List.generate(letters.length, (index) {
-          final bool isLocked = game.lockedIndices.contains(index);
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: isLocked
-                      ? cs.surfaceContainerHighest.withOpacity(0.5)
-                      : cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isLocked ? cs.outline : cs.primary.withOpacity(0.5),
-                    width: 1.5,
+    return Padding(
+      padding: const EdgeInsets.only(top: 32),
+      child: Center(
+        child: Wrap(
+          spacing: 10,
+          runSpacing: 12,
+          alignment: WrapAlignment.center,
+          children: List.generate(letters.length, (index) {
+            final bool isLocked = game.lockedIndices.contains(index);
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: isLocked
+                        ? cs.surfaceContainerHighest.withOpacity(0.5)
+                        : cs.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isLocked
+                          ? cs.outline
+                          : cs.primary.withOpacity(0.5),
+                      width: 1.5,
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Text(
-                    letters[index],
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: isLocked ? cs.onSurfaceVariant : cs.onSurface,
+                  child: Center(
+                    child: Text(
+                      letters[index],
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: isLocked ? cs.onSurfaceVariant : cs.onSurface,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Icon(
-                isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
-                size: 16,
-                color: isLocked ? cs.error : cs.outline.withOpacity(0.5),
-              ),
-            ],
-          );
-        }),
+                const SizedBox(height: 6),
+                Icon(
+                  isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
+                  size: 16,
+                  color: isLocked ? cs.error : cs.outline.withOpacity(0.5),
+                ),
+              ],
+            );
+          }),
+        ),
       ),
     );
   }
@@ -525,10 +588,13 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Are you sure?'),
-          content: const Text(
-            'Our solver detects that there are still valid words available to play! '
-            'Do you want to surrender the match anyway?',
+          title: Text(
+            game.gameMode == 'coop' ? 'Surrender Team Match?' : 'Are you sure?',
+          ),
+          content: Text(
+            game.gameMode == 'coop'
+                ? 'Giving up will log a game loss for both you and your partner. No score points will be added.'
+                : 'Our solver detects that there are still valid words available to play! Do you want to surrender?',
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -565,17 +631,28 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
     if (partnerUid.isEmpty) return;
 
-    // ✨ FIXED: Added endReason payload flag field
-    await FirebaseFirestore.instance
-        .collection('games')
-        .doc(widget.roomId)
-        .update({
-          'status': 'completed',
-          'winnerUid': partnerUid,
-          'endReason': 'trapped',
-          'gameData.scores.$partnerUid': FieldValue.increment(1),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+    if (game.gameMode == 'coop') {
+      await FirebaseFirestore.instance
+          .collection('games')
+          .doc(widget.roomId)
+          .update({
+            'status': 'completed',
+            'winnerUid': 'TEAM_LOSS',
+            'endReason': 'trapped',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+    } else {
+      await FirebaseFirestore.instance
+          .collection('games')
+          .doc(widget.roomId)
+          .update({
+            'status': 'completed',
+            'winnerUid': partnerUid,
+            'endReason': 'trapped',
+            'gameData.scores.$partnerUid': FieldValue.increment(1),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+    }
   }
 
   void _handleManualSurrender(LetterLockedModel game) async {
@@ -586,8 +663,10 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Quit Game?'),
-          content: const Text(
-            'Leaving mid-match counts as a total forfeit. Your partner will receive the win points!',
+          content: Text(
+            game.gameMode == 'coop'
+                ? 'Exiting midway fails the vault raid challenge completely. No scores will increment.'
+                : 'Leaving mid-match counts as a total forfeit. Your partner will receive the win points!',
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -600,25 +679,37 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             TextButton(
               onPressed: () async {
                 Navigator.pop(dialogContext);
-
                 final pUids = game.scores.keys.toList();
                 final String partnerUid = pUids.firstWhere(
                   (uid) => uid != _myUid,
                   orElse: () => '',
                 );
 
-                // ✨ FIXED: Added endReason payload flag field
-                if (partnerUid.isNotEmpty) {
+                if (game.gameMode == 'coop') {
                   await FirebaseFirestore.instance
                       .collection('games')
                       .doc(widget.roomId)
                       .update({
                         'status': 'completed',
-                        'winnerUid': partnerUid,
+                        'winnerUid': 'TEAM_LOSS',
                         'endReason': 'surrendered',
-                        'gameData.scores.$partnerUid': FieldValue.increment(1),
                         'updatedAt': FieldValue.serverTimestamp(),
                       });
+                } else {
+                  if (partnerUid.isNotEmpty) {
+                    await FirebaseFirestore.instance
+                        .collection('games')
+                        .doc(widget.roomId)
+                        .update({
+                          'status': 'completed',
+                          'winnerUid': partnerUid,
+                          'endReason': 'surrendered',
+                          'gameData.scores.$partnerUid': FieldValue.increment(
+                            1,
+                          ),
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        });
+                  }
                 }
               },
               child: Text(
@@ -638,12 +729,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
 
     if (game.wordsUsed.contains(input)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '"$input" has already been used this game! Try a unique combination.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text('"$input" has already been used this game!')),
       );
       return;
     }
@@ -651,9 +737,8 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     if (!DictionaryService.isValidWord(input, game.gameMode)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('"$input" is not a valid word in our dictionary!'),
+          content: Text('"$input" is not a valid word!'),
           backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -683,14 +768,40 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         }
       }
 
-      await _controller.submitMove(
-        roomId: widget.roomId,
-        myUid: _myUid,
-        partnerUid: partnerUid,
-        newWord: input,
-        updatedLockedIndices: [],
-        updatedUsedLetters: newUsedLetters,
+      final boardSet = game.boardLetters
+          .map((e) => e.trim().toUpperCase())
+          .toSet();
+      final usedSet = newUsedLetters.map((e) => e.trim().toUpperCase()).toSet();
+      bool allLettersUsed = boardSet.every(
+        (letter) => usedSet.contains(letter),
       );
+
+      if (allLettersUsed) {
+        await FirebaseFirestore.instance
+            .collection('games')
+            .doc(widget.roomId)
+            .update({
+              'status': 'completed',
+              'winnerUid': 'TEAM_WIN',
+              'endReason': 'completed',
+              'gameData.currentWord': input,
+              'gameData.usedLetters': newUsedLetters,
+              'gameData.wordsUsed': FieldValue.arrayUnion([input]),
+              'gameData.scores.$_myUid': FieldValue.increment(1),
+              'gameData.scores.$partnerUid': FieldValue.increment(1),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+      } else {
+        await _controller.submitMove(
+          roomId: widget.roomId,
+          myUid: _myUid,
+          partnerUid: partnerUid,
+          newWord: input,
+          updatedLockedIndices: [],
+          updatedUsedLetters: newUsedLetters,
+          isCoopTurn: true,
+        );
+      }
     } else {
       if (input.length != game.currentWord.length) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -729,6 +840,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         newWord: input,
         updatedLockedIndices: changedIndices,
         updatedUsedLetters: [],
+        isCoopTurn: false,
       );
     }
 

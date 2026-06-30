@@ -7,7 +7,7 @@ class LetterLockedModel {
   final String gameMode; // 'coop' or 'versus'
   final String status; // 'active', 'completed', 'archived'
   final String turn; // UID of the player whose turn it is
-  final String winnerUid; // ✨ DEFINED COMPONENT FIELD
+  final String winnerUid; // Tracks who won the game for victory banners
 
   // Game data specific to LetterLocked
   final String currentWord;
@@ -24,7 +24,7 @@ class LetterLockedModel {
     required this.gameMode,
     required this.status,
     required this.turn,
-    required this.winnerUid, // ✨ DEFINED NAMED CONSTRUCTOR PARAMETER
+    required this.winnerUid,
     required this.currentWord,
     required this.lockedIndices,
     required this.boardLetters,
@@ -47,7 +47,7 @@ class LetterLockedModel {
       gameMode: data['gameMode'] ?? 'coop',
       status: data['status'] ?? 'active',
       turn: data['turn'] ?? '',
-      winnerUid: data['winnerUid'] ?? '', // ✨ DEFINED FACTORY MAPPING VALUE
+      winnerUid: data['winnerUid'] ?? '',
       currentWord: gameData['currentWord'] ?? '',
       lockedIndices: List<int>.from(gameData['lockedIndices'] ?? []),
       boardLetters: List<String>.from(gameData['boardLetters'] ?? []),

@@ -13,15 +13,12 @@ class LetterLockedController {
     required String myUid,
     required String partnerUid,
     required String mode,
-    Map<String, int>?
-    existingScores, // ✨ NEW: Receives persistent ongoing counters
+    Map<String, int>? existingScores,
   }) async {
     List<String> startingBoard = mode == 'coop'
         ? ['T', 'A', 'E', 'L', 'M', 'K', 'S', 'O', 'R']
         : [];
     String baseWord = mode == 'versus' ? 'LANE' : '';
-
-    // If no score history is found, pass baseline defaults
     Map<String, int> finalScores = existingScores ?? {myUid: 0, partnerUid: 0};
 
     await _firestore.collection('games').doc(roomId).set({
@@ -49,16 +46,23 @@ class LetterLockedController {
     required String newWord,
     required List<int> updatedLockedIndices,
     required List<String> updatedUsedLetters,
+    required bool isCoopTurn,
   }) async {
     final cleanWord = newWord.toUpperCase();
-    await _firestore.collection('games').doc(roomId).update({
+
+    final Map<String, dynamic> updates = {
       'turn': partnerUid,
       'updatedAt': FieldValue.serverTimestamp(),
       'gameData.currentWord': cleanWord,
       'gameData.lockedIndices': updatedLockedIndices,
       'gameData.usedLetters': updatedUsedLetters,
       'gameData.wordsUsed': FieldValue.arrayUnion([cleanWord]),
-      'gameData.scores.$myUid': FieldValue.increment(1),
-    });
+    };
+
+    if (!isCoopTurn) {
+      updates['gameData.scores.$myUid'] = FieldValue.increment(1);
+    }
+
+    await _firestore.collection('games').doc(roomId).update(updates);
   }
 }
