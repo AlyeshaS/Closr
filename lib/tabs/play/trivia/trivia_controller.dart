@@ -1,3 +1,4 @@
+// lib/screens/activities/trivia/trivia_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TriviaController {
@@ -40,34 +41,28 @@ class TriviaController {
     });
   }
 
-  // Local state mirrored from Firestore streams
-  String myStage = 'setup'; // 'setup', 'waiting', 'guessing', 'results'
+  String myStage = 'setup';
   List<int> mySelfAnswers = [];
   List<int> myGuessesForPartner = [];
-  int myGlobalWins = 0; // Tracking personal lifetime leaderboard wins
+  int myGlobalWins = 0;
 
   bool isPartnerSetupComplete = false;
   List<int> partnerSelfAnswers = [];
   List<int> partnerGuessesForMe = [];
-  int partnerGlobalWins = 0; // Tracking partner lifetime leaderboard wins
+  int partnerGlobalWins = 0;
 
-  /// Real-time stream targeting the current user's trivia profile node.
-  /// This automatically pulls data from the subcollection within the user's document.
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenToMyTrivia(
     String myUid,
   ) {
     return _watchTriviaDoc(myUid);
   }
 
-  /// Real-time stream tracking the partner's trivia profile node using their email link.
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenToPartnerTrivia(
     String myUid,
   ) {
-    // 1. Listen to your own root user document first
     return _firestore.collection('users').doc(myUid).snapshots().asyncExpand((
       userDoc,
     ) {
-      // 2. Extract the partner email field saved by your AuthService
       final String partnerEmailLower =
           userDoc.data()?['partnerEmailLower'] ?? '';
 
@@ -75,26 +70,21 @@ class TriviaController {
         return const Stream.empty();
       }
 
-      // 3. Query the users collection to find the document where 'emailLower' matches your partner's email
       return _firestore
           .collection('users')
           .where('emailLower', isEqualTo: partnerEmailLower)
           .snapshots()
           .asyncExpand((querySnapshot) {
             if (querySnapshot.docs.isEmpty) {
-              // Partner hasn't logged in yet, or the matching record isn't created under their UID
               return const Stream.empty();
             }
 
-            // 4. Get the partner's actual user UID doc and stream their trivia session subcollection
             final partnerUserUid = querySnapshot.docs.first.id;
             return _watchTriviaDoc(partnerUserUid);
           });
     });
   }
 
-  /// Synchronizes incoming Firestore changes into the controller's local instance variables for your own profile.
-  /// Synchronizes incoming Firestore changes into the controller's local instance variables for your own profile.
   void updateMyData(
     DocumentSnapshot<Map<String, dynamic>> snapshot,
     String myUid,
@@ -105,7 +95,6 @@ class TriviaController {
       myGuessesForPartner = [];
       myGlobalWins = 0;
 
-      //  AUTO-INITIALIZE: If document was deleted, create a fresh one instantly!
       _triviaDoc(myUid).set({
         'stage': 'setup',
         'selfAnswers': [],
@@ -122,7 +111,6 @@ class TriviaController {
     myGlobalWins = data['globalWins'] ?? 0;
   }
 
-  /// Synchronizes incoming Firestore changes from your partner's profile to compute matches.
   void updatePartnerData(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     if (!snapshot.exists || snapshot.data() == null) {
       isPartnerSetupComplete = false;
@@ -135,7 +123,6 @@ class TriviaController {
     final data = snapshot.data()!;
     final String partnerStage = data['stage'] ?? 'setup';
 
-    // Partner is ready to be guessed if they have finished their setup stage
     isPartnerSetupComplete =
         (partnerStage == 'waiting' ||
         partnerStage == 'guessing' ||
@@ -145,27 +132,22 @@ class TriviaController {
     partnerGlobalWins = data['globalWins'] ?? 0;
   }
 
-  /// Writes your personal answers to your trivia document subcollection.
   Future<void> submitSelfAnswer(String myUid, List<int> answers) async {
     await _triviaDoc(
       myUid,
     ).set({'selfAnswers': answers}, SetOptions(merge: true));
   }
 
-  /// Writes your mental guesses regarding your partner's preferences to your subcollection.
   Future<void> submitGuessAnswer(String myUid, List<int> guesses) async {
     await _triviaDoc(
       myUid,
     ).set({'guessesForPartner': guesses}, SetOptions(merge: true));
   }
 
-  /// Updates the current interactive state machine block (e.g., 'setup' -> 'waiting').
   Future<void> updateUserStage(String myUid, String stage) async {
     await _triviaDoc(myUid).set({'stage': stage}, SetOptions(merge: true));
   }
 
-  /// Flushes out the previous game state data points inside the user's subcollection
-  /// so you can run a clean session round together later.
   Future<void> evaluateAndPurgeMatch(String myUid) async {
     await _triviaDoc(myUid).set({
       'stage': 'setup',
@@ -174,10 +156,10 @@ class TriviaController {
     }, SetOptions(merge: true));
   }
 
-  /// Increments lifetime global wins for a specific user node
-  Future<void> incrementGlobalWin(String uid) async {
-    await _triviaDoc(
-      uid,
-    ).set({'globalWins': FieldValue.increment(1)}, SetOptions(merge: true));
+  // 🏆 CENTRALIZED SCORE ROUTING METHOD
+  Future<void> rewardTriviaWinner(String winnerUid) async {
+    await _firestore.collection('users').doc(winnerUid).set({
+      'scores': {'trivia': FieldValue.increment(1)},
+    }, SetOptions(merge: true));
   }
 }

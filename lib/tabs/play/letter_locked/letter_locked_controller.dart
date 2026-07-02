@@ -73,12 +73,10 @@ class LetterLockedController {
     String baseWord = '';
 
     if (mode == 'coop') {
-      // 🎲 DYNAMIC CO-OP BOARD: Randomly choose 9 unique letters
       final List<String> alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
       alphabet.shuffle(Random());
       startingBoard = alphabet.take(9).toList();
     } else {
-      // 🎲 DYNAMIC VERSUS WORD: Grab a random valid 4-letter word from your asset dictionary file
       baseWord = DictionaryService.getRandomFourLetterWord();
     }
 
@@ -107,8 +105,6 @@ class LetterLockedController {
     await batch.commit();
   }
 
-  // lib/play/letter_locked/letter_locked_controller.dart
-
   Future<void> submitMove({
     required String myUid,
     required String partnerUid,
@@ -118,6 +114,8 @@ class LetterLockedController {
     required bool isCoopTurn,
   }) async {
     final cleanWord = newWord.toUpperCase();
+
+    // 🛠️ FIX: Use root dot-notation to cleanly merge game data parameters safely
     final Map<String, dynamic> payload = {
       'turn': partnerUid,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -127,13 +125,18 @@ class LetterLockedController {
       'gameData.wordsUsed': FieldValue.arrayUnion([cleanWord]),
     };
 
-    if (!isCoopTurn) {
-      payload['gameData.scores.$myUid'] = FieldValue.increment(1);
-    }
-
     final batch = _firestore.batch();
     batch.set(_gameDoc(myUid), payload, SetOptions(merge: true));
     batch.set(_gameDoc(partnerUid), payload, SetOptions(merge: true));
+
+    // 🏆 CENTRALIZED SCORE ROUTING: Points are pushed out to the main user directory
+    if (!isCoopTurn) {
+      final myUserDoc = _firestore.collection('users').doc(myUid);
+      batch.set(myUserDoc, {
+        'scores': {'letterlocked': FieldValue.increment(1)},
+      }, SetOptions(merge: true));
+    }
+
     await batch.commit();
   }
 }

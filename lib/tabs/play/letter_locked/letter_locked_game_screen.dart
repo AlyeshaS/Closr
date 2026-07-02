@@ -352,7 +352,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 🔄 RESTORED: Standard Expanded view to prevent vertical height collapse
                 Expanded(
                   child: Center(
                     child: finalGameModel.gameMode == 'coop'
@@ -598,13 +597,11 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
   }
 
   Widget _buildVersusLayout(LetterLockedModel game, ColorScheme cs) {
-    // Fallback to 4 empty slots if currentWord hasn't populated yet
     final String displayWord = game.currentWord.isEmpty
         ? "    "
         : game.currentWord;
     final letters = displayWord.split('');
 
-    // If it's truly empty and you want a visual loading cue instead:
     if (game.currentWord.isEmpty) {
       return Center(
         child: Column(
@@ -725,22 +722,45 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
     if (partnerUid.isEmpty) return;
 
+    final batch = FirebaseFirestore.instance.batch();
+
     if (game.gameMode == 'coop') {
-      await _updateMirroredGameDocs({
+      batch.set(_gameDoc(_myUid), {
         'status': 'completed',
         'winnerUid': 'TEAM_LOSS',
         'endReason': 'trapped',
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
+      batch.set(_gameDoc(partnerUid), {
+        'status': 'completed',
+        'winnerUid': 'TEAM_LOSS',
+        'endReason': 'trapped',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } else {
-      await _updateMirroredGameDocs({
+      batch.set(_gameDoc(_myUid), {
         'status': 'completed',
         'winnerUid': partnerUid,
         'endReason': 'trapped',
-        'gameData.scores.$partnerUid': FieldValue.increment(1),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
+      batch.set(_gameDoc(partnerUid), {
+        'status': 'completed',
+        'winnerUid': partnerUid,
+        'endReason': 'trapped',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // 🏆 CENTRALIZED SCORE ROUTING: Reward partner profile on root folder
+      final partnerUserDoc = FirebaseFirestore.instance
+          .collection('users')
+          .doc(partnerUid);
+      batch.set(partnerUserDoc, {
+        'scores': {'letterlocked': FieldValue.increment(1)},
+      }, SetOptions(merge: true));
     }
+
+    await batch.commit();
   }
 
   void _handleManualSurrender(LetterLockedModel game) async {
@@ -773,24 +793,47 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                   orElse: () => '',
                 );
 
+                final batch = FirebaseFirestore.instance.batch();
+
                 if (game.gameMode == 'coop') {
-                  await _updateMirroredGameDocs({
+                  batch.set(_gameDoc(_myUid), {
                     'status': 'completed',
                     'winnerUid': 'TEAM_LOSS',
                     'endReason': 'surrendered',
                     'updatedAt': FieldValue.serverTimestamp(),
-                  });
+                  }, SetOptions(merge: true));
+                  batch.set(_gameDoc(partnerUid), {
+                    'status': 'completed',
+                    'winnerUid': 'TEAM_LOSS',
+                    'endReason': 'surrendered',
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
                 } else {
                   if (partnerUid.isNotEmpty) {
-                    await _updateMirroredGameDocs({
+                    batch.set(_gameDoc(_myUid), {
                       'status': 'completed',
                       'winnerUid': partnerUid,
                       'endReason': 'surrendered',
-                      'gameData.scores.$partnerUid': FieldValue.increment(1),
                       'updatedAt': FieldValue.serverTimestamp(),
-                    });
+                    }, SetOptions(merge: true));
+                    batch.set(_gameDoc(partnerUid), {
+                      'status': 'completed',
+                      'winnerUid': partnerUid,
+                      'endReason': 'surrendered',
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+
+                    // 🏆 CENTRALIZED SCORE ROUTING: Reward partner profile on root folder
+                    final partnerUserDoc = FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(partnerUid);
+                    batch.set(partnerUserDoc, {
+                      'scores': {'letterlocked': FieldValue.increment(1)},
+                    }, SetOptions(merge: true));
                   }
                 }
+
+                await batch.commit();
               },
               child: Text(
                 'Forfeit',
@@ -857,17 +900,37 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       );
 
       if (allLettersUsed) {
-        await _updateMirroredGameDocs({
+        final batch = FirebaseFirestore.instance.batch();
+        final Map<String, dynamic> endPayload = {
           'status': 'completed',
           'winnerUid': 'TEAM_WIN',
           'endReason': 'completed',
           'gameData.currentWord': input,
           'gameData.usedLetters': newUsedLetters,
           'gameData.wordsUsed': FieldValue.arrayUnion([input]),
-          'gameData.scores.$_myUid': FieldValue.increment(1),
-          'gameData.scores.$partnerUid': FieldValue.increment(1),
           'updatedAt': FieldValue.serverTimestamp(),
-        });
+        };
+
+        batch.set(_gameDoc(_myUid), endPayload, SetOptions(merge: true));
+        batch.set(_gameDoc(partnerUid), endPayload, SetOptions(merge: true));
+
+        // 🏆 CENTRALIZED SCORE ROUTING: Reward both user roots on Co-op Victory
+        batch.set(
+          FirebaseFirestore.instance.collection('users').doc(_myUid),
+          {
+            'scores': {'letterlocked': FieldValue.increment(1)},
+          },
+          SetOptions(merge: true),
+        );
+        batch.set(
+          FirebaseFirestore.instance.collection('users').doc(partnerUid),
+          {
+            'scores': {'letterlocked': FieldValue.increment(1)},
+          },
+          SetOptions(merge: true),
+        );
+
+        await batch.commit();
       } else {
         await _controller.submitMove(
           myUid: _myUid,

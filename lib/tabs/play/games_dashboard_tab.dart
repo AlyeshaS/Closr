@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia/trivia_game_screen.dart';
-import 'letter_locked/letter_locked_controller.dart';
 import 'letter_locked/letter_locked_dashboard.dart';
 
 class GamesDashboardTab extends StatefulWidget {
@@ -14,186 +13,166 @@ class GamesDashboardTab extends StatefulWidget {
 }
 
 class _GamesDashboardTabState extends State<GamesDashboardTab> {
-  final LetterLockedController _letterLockedController =
-      LetterLockedController();
-  String _myUid = '';
-  String _partnerUid = '';
-  String _legacyRoomId = '';
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveUserSession();
-  }
-
-  void _resolveUserSession() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        _myUid = user.uid;
-
-        // 1. Fetch your own user document to read the partner email string link
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(_myUid)
-            .get();
-
-        if (userDoc.exists && userDoc.data() != null) {
-          final data = userDoc.data()!;
-          String partnerEmail =
-              data['partnerEmailLower'] ?? data['partnerEmail'] ?? '';
-          partnerEmail = partnerEmail.trim().toLowerCase();
-
-          if (partnerEmail.isNotEmpty) {
-            // 2. Search your users collection to resolve your partner's active account UID
-            final partnerQuery = await FirebaseFirestore.instance
-                .collection('users')
-                .where('emailLower', isEqualTo: partnerEmail)
-                .get();
-
-            if (partnerQuery.docs.isNotEmpty) {
-              _partnerUid = partnerQuery.docs.first.id;
-
-              // 3. Assemble a consistent room string tag by sorting UIDs alphabetically
-              List<String> uids = [_myUid, _partnerUid]..sort();
-              _legacyRoomId = 'letterlocked_${uids[0]}_${uids[1]}';
-
-              await _letterLockedController.migrateLegacyRoomIfNeeded(
-                myUid: _myUid,
-                partnerUid: _partnerUid,
-                legacyRoomId: _legacyRoomId,
-              );
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
-  }
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String _myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+    if (_myUid.isEmpty) {
+      return const Center(child: Text("Please log in."));
     }
 
+    // ⚡ INSTANT ROOT PROFILE STREAM: No async initState delays, maps live data directly
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _partnerUid.isEmpty
-          ? const Stream.empty()
-          : FirebaseFirestore.instance
-                .collection('users')
-                .doc(_myUid)
-                .collection('games')
-                .doc('letterlocked')
-                .snapshots(),
-      builder: (context, snapshot) {
-        int myScore = 0;
-        int partnerScore = 0;
-
-        if (snapshot.hasData && snapshot.data!.exists) {
-          final data = snapshot.data!.data();
-          final gameData = data?['gameData'] as Map<String, dynamic>?;
-          final scores = gameData?['scores'] as Map<String, dynamic>?;
-
-          if (scores != null) {
-            myScore = scores[_myUid] as int? ?? 0;
-            partnerScore = scores[_partnerUid] as int? ?? 0;
-          }
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(_myUid)
+          .snapshots(),
+      builder: (context, mySnapshot) {
+        if (!mySnapshot.hasData || !mySnapshot.data!.exists) {
+          return const Center(child: CircularProgressIndicator());
         }
 
-        return SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Adaptive Premium Split Scoreboard Panel ─────────────────────
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: cs.outlineVariant),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildScoreColumn(
-                      context,
-                      '$myScore',
-                      'Your Wins',
-                      cs.primary,
-                    ),
-                    Container(width: 1, height: 40, color: cs.outlineVariant),
-                    _buildScoreColumn(
-                      context,
-                      '$partnerScore',
-                      "Partner's Wins",
-                      cs.secondary,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+        final myData = mySnapshot.data!.data();
+        final myTotalWins = _scoreTotalFromUserData(myData);
+        final String partnerEmailLower =
+            (myData?['partnerEmailLower'] ?? myData?['partnerEmail'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
 
-              Text('GAMES', style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(height: 12),
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: partnerEmailLower.isEmpty
+              ? const Stream.empty()
+              : _firestore
+                    .collection('users')
+                    .where('emailLower', isEqualTo: partnerEmailLower)
+                    .snapshots(),
+          builder: (context, partnerLookup) {
+            String partnerUid = '';
+            if (partnerLookup.hasData && partnerLookup.data!.docs.isNotEmpty) {
+              partnerUid = partnerLookup.data!.docs.first.id;
+            }
 
-              // 1. LetterLocked Clean Custom Card
-              _buildCleanGameCard(
-                context: context,
-                title: 'LetterLocked',
-                subtitle:
-                    'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        backgroundColor: cs.surface,
-                        appBar: AppBar(
-                          title: const Text('LetterLocked'),
-                          centerTitle: true,
-                          leading: IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 18,
-                            ),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: partnerUid.isEmpty
+                  ? const Stream.empty()
+                  : _firestore.collection('users').doc(partnerUid).snapshots(),
+              builder: (context, partnerSnapshot) {
+                int partnerTotalWins = 0;
+
+                if (partnerSnapshot.hasData && partnerSnapshot.data!.exists) {
+                  partnerTotalWins = _scoreTotalFromUserData(
+                    partnerSnapshot.data!.data(),
+                  );
+                }
+
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: cs.outlineVariant),
                         ),
-                        body:
-                            const LetterLockedDashboard(), // 💡 FIXED: Removed 'const' from here
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildScoreColumn(
+                              context,
+                              '$myTotalWins',
+                              'Your Wins',
+                              cs.primary,
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: cs.outlineVariant,
+                            ),
+                            _buildScoreColumn(
+                              context,
+                              '$partnerTotalWins',
+                              "Partner's Wins",
+                              cs.secondary,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-                cs: cs,
-              ),
-              const SizedBox(height: 10),
-
-              // 2. Our Trivia Clean Custom Card
-              _buildCleanGameCard(
-                context: context,
-                title: 'Our Trivia',
-                subtitle:
-                    'Test your compatibility! Sync matching responses and see who remembers best.',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TriviaGameScreen()),
-                  );
-                },
-                cs: cs,
-              ),
-            ],
-          ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'GAMES',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCleanGameCard(
+                        context: context,
+                        title: 'LetterLocked',
+                        subtitle:
+                            'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => Scaffold(
+                                backgroundColor: cs.surface,
+                                appBar: AppBar(
+                                  title: const Text('LetterLocked'),
+                                  centerTitle: true,
+                                  leading: IconButton(
+                                    icon: const Icon(
+                                      Icons.arrow_back_ios_new_rounded,
+                                      size: 18,
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                  ),
+                                ),
+                                body: const LetterLockedDashboard(),
+                              ),
+                            ),
+                          );
+                        },
+                        cs: cs,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildCleanGameCard(
+                        context: context,
+                        title: 'Our Trivia',
+                        subtitle:
+                            'Test your compatibility! Sync matching responses and see who remembers best.',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TriviaGameScreen(),
+                            ),
+                          );
+                        },
+                        cs: cs,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         );
       },
     );
+  }
+
+  int _scoreTotalFromUserData(Map<String, dynamic>? data) {
+    final scores = data?['scores'] as Map<String, dynamic>?;
+    if (scores == null) return 0;
+
+    final int llWins = scores['letterlocked'] as int? ?? 0;
+    final int triviaWins = scores['trivia'] as int? ?? 0;
+    return llWins + triviaWins;
   }
 
   Widget _buildScoreColumn(
