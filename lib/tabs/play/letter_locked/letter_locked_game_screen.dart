@@ -147,6 +147,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
+  // ✨ REFACTORED: Beautiful Custom Dialog with Theme-compliant Accent Buttons
   void _showGameEndedAlert(LetterLockedModel game, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
@@ -161,43 +162,50 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         game.winnerUid == _myUid ||
         (game.winnerUid.isEmpty && calculatedWinner == _myUid);
 
+    final cs = Theme.of(screenContext).colorScheme;
+
     String title = "";
     String message = "";
     IconData icon;
-    Color iconColor;
+    Color statusColor;
+    Color buttonForegroundColor;
 
     if (isCoop) {
       if (game.winnerUid == 'TEAM_WIN') {
-        title = "🎉 VAULT CRACKED!";
-        icon = Icons.emoji_events_rounded;
-        iconColor = Colors.amber;
+        title = "Vault Cracked!";
+        icon = Icons.key_rounded;
+        statusColor = cs.primary; // Accent Win Theme
+        buttonForegroundColor = cs.onPrimary;
         message =
-            "Brilliant teamwork! You and your partner successfully illuminated the entire letter dial! +1 Point added to both scores.";
+            "Brilliant teamwork! You illuminated the letter dial together and claimed victory.";
       } else {
-        title = "💥 VAULT LOCKED OUT";
-        icon = Icons.disabled_by_default_rounded;
-        iconColor = Colors.redAccent;
+        title = "Vault Locked Out";
+        icon = Icons.lock_reset_rounded;
+        statusColor = cs.primary; // Accent Loss Theme
+        buttonForegroundColor = cs.onPrimary;
         message =
-            "The vault locked down because your team ran out of combinations or surrendered. Better luck next time!";
+            "The combinations ran dry or your team surrendered. Dust off and try another run!";
       }
     } else {
       String reason = game.lockedIndices.isNotEmpty ? 'trapped' : 'surrendered';
       if (game.wordsUsed.length <= 1) reason = 'surrendered';
 
       if (iWon) {
-        title = "🎉 CONGRATULATIONS!";
+        title = "Match Secured";
         icon = Icons.emoji_events_rounded;
-        iconColor = Colors.amber;
+        statusColor = cs.primary;
+        buttonForegroundColor = cs.onPrimary;
         message = reason == 'trapped'
-            ? "Incredible tactical work! You completely trapped your partner with no moves remaining! 🧠"
-            : "You won by surrender! Your partner left the match frame. 🏳️";
+            ? "Incredible tactical work! You successfully cornered your partner into a dead end."
+            : "Your partner left the frame. Match awarded to you by surrender.";
       } else {
-        title = "💥 GAME OVER";
+        title = "Defeat";
         icon = Icons.disabled_by_default_rounded;
-        iconColor = Colors.redAccent;
+        statusColor = cs.primary;
+        buttonForegroundColor = cs.onPrimary;
         message = reason == 'trapped'
-            ? "Ah, you got caught in a corner! Your partner trapped your word positions with zero moves left."
-            : "You forfeited the match by backing out.";
+            ? "Ah, you got caught in a corner! Your partner locked your word positions."
+            : "You forfeited the match frame.";
       }
     }
 
@@ -205,51 +213,98 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       context: screenContext,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        final cs = Theme.of(screenContext).colorScheme;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Icon(icon, color: iconColor, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Highlighted Themed Status Container
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: statusColor, size: 36),
+                ),
+                const SizedBox(height: 20),
+                // Premium Typography
+                Text(
+                  title.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'CormorantGaramond',
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    color: cs.onSurface,
+                    letterSpacing: 0.5,
                   ),
                 ),
-              ),
-            ],
-          ),
-          content: Text(
-            message,
-            style: const TextStyle(fontSize: 14, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                await _updateMirroredGameDocs({'status': 'archived'});
-
-                if (screenContext.mounted) {
-                  Navigator.of(
-                    screenContext,
-                  ).popUntil((route) => route.isFirst);
-                }
-              },
-              child: Text(
-                'Return to Main Menu',
-                style: TextStyle(
-                  color: cs.primary,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 12),
+                // Adaptive Content Text
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 28),
+                // 🛠️ FIX: Clean Full Width Button mapped cleanly to theme accent colors
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      await _updateMirroredGameDocs({'status': 'archived'});
+
+                      if (screenContext.mounted) {
+                        Navigator.of(
+                          screenContext,
+                        ).popUntil((route) => route.isFirst);
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor:
+                          statusColor, // Updated directly to theme accent token
+                      foregroundColor:
+                          buttonForegroundColor, // Dynamic text coloring (onPrimary/onError)
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Return to Dashboard',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -751,7 +806,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // 🏆 CENTRALIZED SCORE ROUTING: Reward partner profile on root folder
       final partnerUserDoc = FirebaseFirestore.instance
           .collection('users')
           .doc(partnerUid);
@@ -823,7 +877,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                       'updatedAt': FieldValue.serverTimestamp(),
                     }, SetOptions(merge: true));
 
-                    // 🏆 CENTRALIZED SCORE ROUTING: Reward partner profile on root folder
                     final partnerUserDoc = FirebaseFirestore.instance
                         .collection('users')
                         .doc(partnerUid);
@@ -914,7 +967,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         batch.set(_gameDoc(_myUid), endPayload, SetOptions(merge: true));
         batch.set(_gameDoc(partnerUid), endPayload, SetOptions(merge: true));
 
-        // 🏆 CENTRALIZED SCORE ROUTING: Reward both user roots on Co-op Victory
         batch.set(
           FirebaseFirestore.instance.collection('users').doc(_myUid),
           {
