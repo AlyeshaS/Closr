@@ -115,8 +115,8 @@ class LetterLockedController {
   }) async {
     final cleanWord = newWord.toUpperCase();
 
-    // 🛠️ FIX: Use root dot-notation to cleanly merge game data parameters safely
-    final Map<String, dynamic> payload = {
+    // 🎯 Dot-notation with batch.update explicitly updates paths safely without erasing adjacent nested map elements
+    final Map<String, dynamic> updates = {
       'turn': partnerUid,
       'updatedAt': FieldValue.serverTimestamp(),
       'gameData.currentWord': cleanWord,
@@ -125,18 +125,13 @@ class LetterLockedController {
       'gameData.wordsUsed': FieldValue.arrayUnion([cleanWord]),
     };
 
-    final batch = _firestore.batch();
-    batch.set(_gameDoc(myUid), payload, SetOptions(merge: true));
-    batch.set(_gameDoc(partnerUid), payload, SetOptions(merge: true));
-
-    // 🏆 CENTRALIZED SCORE ROUTING: Points are pushed out to the main user directory
     if (!isCoopTurn) {
-      final myUserDoc = _firestore.collection('users').doc(myUid);
-      batch.set(myUserDoc, {
-        'scores': {'letterlocked': FieldValue.increment(1)},
-      }, SetOptions(merge: true));
+      updates['gameData.scores.$myUid'] = FieldValue.increment(1);
     }
 
+    final batch = _firestore.batch();
+    batch.update(_gameDoc(myUid), updates);
+    batch.update(_gameDoc(partnerUid), updates);
     await batch.commit();
   }
 }
