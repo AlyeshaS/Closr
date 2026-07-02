@@ -1,14 +1,20 @@
 // lib/play/letter_locked/letter_locked_game_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/dictionary_service.dart';
 import 'letter_locked_controller.dart';
 import 'letter_locked_models.dart';
 
 class LetterLockedGameScreen extends StatefulWidget {
-  final String roomId;
-  const LetterLockedGameScreen({super.key, required this.roomId});
+  final String myUid;
+  final String partnerUid;
+  final String? legacyRoomId;
+  const LetterLockedGameScreen({
+    super.key,
+    required this.myUid,
+    required this.partnerUid,
+    this.legacyRoomId,
+  });
 
   @override
   State<LetterLockedGameScreen> createState() => _LetterLockedGameScreenState();
@@ -17,19 +23,29 @@ class LetterLockedGameScreen extends StatefulWidget {
 class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
   final LetterLockedController _controller = LetterLockedController();
   final TextEditingController _wordInputController = TextEditingController();
-  String _myUid = '';
   bool _endDialogShown = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  }
 
   @override
   void dispose() {
     _wordInputController.dispose();
     super.dispose();
+  }
+
+  String get _myUid => widget.myUid;
+
+  DocumentReference<Map<String, dynamic>> _gameDoc(String uid) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('games')
+        .doc('letterlocked');
+  }
+
+  Future<void> _updateMirroredGameDocs(Map<String, dynamic> updates) async {
+    final batch = FirebaseFirestore.instance.batch();
+    batch.set(_gameDoc(widget.myUid), updates, SetOptions(merge: true));
+    batch.set(_gameDoc(widget.partnerUid), updates, SetOptions(merge: true));
+    await batch.commit();
   }
 
   void _showHowToPlayCoop(BuildContext context) {
@@ -217,10 +233,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             TextButton(
               onPressed: () async {
                 Navigator.pop(dialogContext);
-                await FirebaseFirestore.instance
-                    .collection('games')
-                    .doc(widget.roomId)
-                    .update({'status': 'archived'});
+                await _updateMirroredGameDocs({'status': 'archived'});
 
                 if (screenContext.mounted) {
                   Navigator.of(
@@ -247,7 +260,10 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _controller.listenToGame(widget.roomId),
+      stream: _controller.listenToGame(
+        widget.myUid,
+        legacyRoomId: widget.legacyRoomId,
+      ),
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Scaffold(
@@ -261,18 +277,17 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
 
         final finalGameModel = LetterLockedModel(
           gameId: game.gameId,
-          coupleId: game.coupleId,
           gameType: game.gameType,
           gameMode: game.gameMode,
           status: game.status,
           turn: game.turn,
+          winnerUid: game.winnerUid,
           currentWord: game.currentWord,
           lockedIndices: game.lockedIndices,
           boardLetters: game.boardLetters,
           usedLetters: game.usedLetters,
           wordsUsed: game.wordsUsed,
           scores: game.scores,
-          winnerUid: data['winnerUid'] ?? '',
         );
 
         final bool isMyTurn = finalGameModel.turn == _myUid;
@@ -337,27 +352,12 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // ✨ FIXED: Added comprehensive constraint maps so that contents expand fully
-                // and vertically align perfectly to the dead-center point of the scroll area view.
+                // 🔄 RESTORED: Standard Expanded view to prevent vertical height collapse
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: IntrinsicHeight(
-                            child: Center(
-                              child: finalGameModel.gameMode == 'coop'
-                                  ? _buildCoopLayout(finalGameModel, cs)
-                                  : _buildVersusLayout(finalGameModel, cs),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                  child: Center(
+                    child: finalGameModel.gameMode == 'coop'
+                        ? _buildCoopLayout(finalGameModel, cs)
+                        : _buildVersusLayout(finalGameModel, cs),
                   ),
                 ),
 
@@ -598,7 +598,28 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
   }
 
   Widget _buildVersusLayout(LetterLockedModel game, ColorScheme cs) {
-    final letters = game.currentWord.split('');
+    // Fallback to 4 empty slots if currentWord hasn't populated yet
+    final String displayWord = game.currentWord.isEmpty
+        ? "    "
+        : game.currentWord;
+    final letters = displayWord.split('');
+
+    // If it's truly empty and you want a visual loading cue instead:
+    if (game.currentWord.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: cs.primary),
+            const SizedBox(height: 16),
+            Text(
+              "Generating word trap puzzle...",
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Center(
       child: Padding(
@@ -705,26 +726,20 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     if (partnerUid.isEmpty) return;
 
     if (game.gameMode == 'coop') {
-      await FirebaseFirestore.instance
-          .collection('games')
-          .doc(widget.roomId)
-          .update({
-            'status': 'completed',
-            'winnerUid': 'TEAM_LOSS',
-            'endReason': 'trapped',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      await _updateMirroredGameDocs({
+        'status': 'completed',
+        'winnerUid': 'TEAM_LOSS',
+        'endReason': 'trapped',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     } else {
-      await FirebaseFirestore.instance
-          .collection('games')
-          .doc(widget.roomId)
-          .update({
-            'status': 'completed',
-            'winnerUid': partnerUid,
-            'endReason': 'trapped',
-            'gameData.scores.$partnerUid': FieldValue.increment(1),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      await _updateMirroredGameDocs({
+        'status': 'completed',
+        'winnerUid': partnerUid,
+        'endReason': 'trapped',
+        'gameData.scores.$partnerUid': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     }
   }
 
@@ -759,29 +774,21 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                 );
 
                 if (game.gameMode == 'coop') {
-                  await FirebaseFirestore.instance
-                      .collection('games')
-                      .doc(widget.roomId)
-                      .update({
-                        'status': 'completed',
-                        'winnerUid': 'TEAM_LOSS',
-                        'endReason': 'surrendered',
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
+                  await _updateMirroredGameDocs({
+                    'status': 'completed',
+                    'winnerUid': 'TEAM_LOSS',
+                    'endReason': 'surrendered',
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
                 } else {
                   if (partnerUid.isNotEmpty) {
-                    await FirebaseFirestore.instance
-                        .collection('games')
-                        .doc(widget.roomId)
-                        .update({
-                          'status': 'completed',
-                          'winnerUid': partnerUid,
-                          'endReason': 'surrendered',
-                          'gameData.scores.$partnerUid': FieldValue.increment(
-                            1,
-                          ),
-                          'updatedAt': FieldValue.serverTimestamp(),
-                        });
+                    await _updateMirroredGameDocs({
+                      'status': 'completed',
+                      'winnerUid': partnerUid,
+                      'endReason': 'surrendered',
+                      'gameData.scores.$partnerUid': FieldValue.increment(1),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
                   }
                 }
               },
@@ -850,23 +857,19 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       );
 
       if (allLettersUsed) {
-        await FirebaseFirestore.instance
-            .collection('games')
-            .doc(widget.roomId)
-            .update({
-              'status': 'completed',
-              'winnerUid': 'TEAM_WIN',
-              'endReason': 'completed',
-              'gameData.currentWord': input,
-              'gameData.usedLetters': newUsedLetters,
-              'gameData.wordsUsed': FieldValue.arrayUnion([input]),
-              'gameData.scores.$_myUid': FieldValue.increment(1),
-              'gameData.scores.$partnerUid': FieldValue.increment(1),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+        await _updateMirroredGameDocs({
+          'status': 'completed',
+          'winnerUid': 'TEAM_WIN',
+          'endReason': 'completed',
+          'gameData.currentWord': input,
+          'gameData.usedLetters': newUsedLetters,
+          'gameData.wordsUsed': FieldValue.arrayUnion([input]),
+          'gameData.scores.$_myUid': FieldValue.increment(1),
+          'gameData.scores.$partnerUid': FieldValue.increment(1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       } else {
         await _controller.submitMove(
-          roomId: widget.roomId,
           myUid: _myUid,
           partnerUid: partnerUid,
           newWord: input,
@@ -907,7 +910,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       }
 
       await _controller.submitMove(
-        roomId: widget.roomId,
         myUid: _myUid,
         partnerUid: partnerUid,
         newWord: input,

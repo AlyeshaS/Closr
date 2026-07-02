@@ -2,7 +2,6 @@
 
 class LetterLockedModel {
   final String gameId;
-  final String coupleId;
   final String gameType; // 'letter_locked'
   final String gameMode; // 'coop' or 'versus'
   final String status; // 'active', 'completed', 'archived'
@@ -19,7 +18,6 @@ class LetterLockedModel {
 
   LetterLockedModel({
     required this.gameId,
-    required this.coupleId,
     required this.gameType,
     required this.gameMode,
     required this.status,
@@ -41,8 +39,7 @@ class LetterLockedModel {
     final scoresMap = gameData['scores'] as Map<String, dynamic>? ?? {};
 
     return LetterLockedModel(
-      gameId: id,
-      coupleId: data['coupleId'] ?? '',
+      gameId: data['gameId'] ?? id,
       gameType: data['gameType'] ?? 'letter_locked',
       gameMode: data['gameMode'] ?? 'coop',
       status: data['status'] ?? 'active',

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia/trivia_game_screen.dart';
+import 'letter_locked/letter_locked_controller.dart';
 import 'letter_locked/letter_locked_dashboard.dart';
 
 class GamesDashboardTab extends StatefulWidget {
@@ -13,9 +14,11 @@ class GamesDashboardTab extends StatefulWidget {
 }
 
 class _GamesDashboardTabState extends State<GamesDashboardTab> {
+  final LetterLockedController _letterLockedController =
+      LetterLockedController();
   String _myUid = '';
-  String _roomId = '';
   String _partnerUid = '';
+  String _legacyRoomId = '';
   bool _isLoading = true;
 
   @override
@@ -54,7 +57,13 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
               // 3. Assemble a consistent room string tag by sorting UIDs alphabetically
               List<String> uids = [_myUid, _partnerUid]..sort();
-              _roomId = 'letterlocked_${uids[0]}_${uids[1]}';
+              _legacyRoomId = 'letterlocked_${uids[0]}_${uids[1]}';
+
+              await _letterLockedController.migrateLegacyRoomIfNeeded(
+                myUid: _myUid,
+                partnerUid: _partnerUid,
+                legacyRoomId: _legacyRoomId,
+              );
             }
           }
         }
@@ -74,11 +83,13 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _roomId.isEmpty
+      stream: _partnerUid.isEmpty
           ? const Stream.empty()
           : FirebaseFirestore.instance
+                .collection('users')
+                .doc(_myUid)
                 .collection('games')
-                .doc(_roomId)
+                .doc('letterlocked')
                 .snapshots(),
       builder: (context, snapshot) {
         int myScore = 0;
@@ -134,31 +145,35 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
               const SizedBox(height: 12),
 
               // 1. LetterLocked Clean Custom Card
-              // 1. LetterLocked Clean Custom Card
-_buildCleanGameCard(
-  context: context,
-  title: 'LetterLocked',
-  subtitle: 'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
-  onTap: () {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: cs.surface,
-          appBar: AppBar(
-            title: const Text('LetterLocked'),
-            centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
-          body: const LetterLockedDashboard(), // ✨ FIXED: Removed "coupleId: _coupleId" from here!
-        ),
-      ),
-    );
-  },
-  cs: cs,
-),
+              _buildCleanGameCard(
+                context: context,
+                title: 'LetterLocked',
+                subtitle:
+                    'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        backgroundColor: cs.surface,
+                        appBar: AppBar(
+                          title: const Text('LetterLocked'),
+                          centerTitle: true,
+                          leading: IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 18,
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        body:
+                            const LetterLockedDashboard(), // 💡 FIXED: Removed 'const' from here
+                      ),
+                    ),
+                  );
+                },
+                cs: cs,
+              ),
               const SizedBox(height: 10),
 
               // 2. Our Trivia Clean Custom Card

@@ -6,12 +6,64 @@ import '../../../services/dictionary_service.dart';
 class LetterLockedController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> listenToGame(String roomId) {
-    return _firestore.collection('games').doc(roomId).snapshots();
+  DocumentReference<Map<String, dynamic>> _gameDoc(String uid) {
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('games')
+        .doc('letterlocked');
+  }
+
+  DocumentReference<Map<String, dynamic>> _legacyGameDoc(String roomId) {
+    return _firestore.collection('games').doc(roomId);
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> listenToGame(
+    String myUid, {
+    String? legacyRoomId,
+  }) {
+    final primaryStream = _gameDoc(myUid).snapshots();
+
+    if (legacyRoomId == null || legacyRoomId.isEmpty) {
+      return primaryStream;
+    }
+
+    return primaryStream.asyncExpand((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        return Stream.value(snapshot);
+      }
+
+      return _legacyGameDoc(legacyRoomId).snapshots();
+    });
+  }
+
+  Future<void> migrateLegacyRoomIfNeeded({
+    required String myUid,
+    required String partnerUid,
+    required String legacyRoomId,
+  }) async {
+    if (legacyRoomId.isEmpty || partnerUid.isEmpty) return;
+
+    final primarySnapshot = await _gameDoc(myUid).get();
+    if (primarySnapshot.exists && primarySnapshot.data() != null) {
+      return;
+    }
+
+    final legacySnapshot = await _legacyGameDoc(legacyRoomId).get();
+    if (!legacySnapshot.exists || legacySnapshot.data() == null) {
+      return;
+    }
+
+    final data = Map<String, dynamic>.from(legacySnapshot.data()!);
+    data['gameId'] = 'letterlocked';
+
+    final batch = _firestore.batch();
+    batch.set(_gameDoc(myUid), data, SetOptions(merge: true));
+    batch.set(_gameDoc(partnerUid), data, SetOptions(merge: true));
+    await batch.commit();
   }
 
   Future<void> startNewGame({
-    required String roomId,
     required String myUid,
     required String partnerUid,
     required String mode,
@@ -32,8 +84,8 @@ class LetterLockedController {
 
     Map<String, int> finalScores = existingScores ?? {myUid: 0, partnerUid: 0};
 
-    await _firestore.collection('games').doc(roomId).set({
-      'gameId': roomId,
+    final payload = {
+      'gameId': 'letterlocked',
       'gameType': 'letter_locked',
       'gameMode': mode,
       'status': 'active',
@@ -47,11 +99,17 @@ class LetterLockedController {
         'wordsUsed': baseWord.isNotEmpty ? [baseWord] : [],
         'scores': finalScores,
       },
-    });
+    };
+
+    final batch = _firestore.batch();
+    batch.set(_gameDoc(myUid), payload);
+    batch.set(_gameDoc(partnerUid), payload);
+    await batch.commit();
   }
 
+  // lib/play/letter_locked/letter_locked_controller.dart
+
   Future<void> submitMove({
-    required String roomId,
     required String myUid,
     required String partnerUid,
     required String newWord,
@@ -60,8 +118,7 @@ class LetterLockedController {
     required bool isCoopTurn,
   }) async {
     final cleanWord = newWord.toUpperCase();
-
-    final Map<String, dynamic> updates = {
+    final Map<String, dynamic> payload = {
       'turn': partnerUid,
       'updatedAt': FieldValue.serverTimestamp(),
       'gameData.currentWord': cleanWord,
@@ -71,9 +128,12 @@ class LetterLockedController {
     };
 
     if (!isCoopTurn) {
-      updates['gameData.scores.$myUid'] = FieldValue.increment(1);
+      payload['gameData.scores.$myUid'] = FieldValue.increment(1);
     }
 
-    await _firestore.collection('games').doc(roomId).update(updates);
+    final batch = _firestore.batch();
+    batch.set(_gameDoc(myUid), payload, SetOptions(merge: true));
+    batch.set(_gameDoc(partnerUid), payload, SetOptions(merge: true));
+    await batch.commit();
   }
 }

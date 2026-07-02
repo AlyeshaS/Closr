@@ -16,9 +16,9 @@ class LetterLockedDashboard extends StatefulWidget {
 class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
   final LetterLockedController _controller = LetterLockedController();
   String _myUid = '';
-  String _roomId = '';
   String _partnerUid = '';
   String _partnerEmail = '';
+  String _legacyRoomId = '';
   bool _isLoading = true;
 
   @override
@@ -61,7 +61,13 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
             if (partnerQuery.docs.isNotEmpty) {
               _partnerUid = partnerQuery.docs.first.id;
               List<String> uids = [_myUid, _partnerUid]..sort();
-              _roomId = 'letterlocked_${uids[0]}_${uids[1]}';
+              _legacyRoomId = 'letterlocked_${uids[0]}_${uids[1]}';
+
+              await _controller.migrateLegacyRoomIfNeeded(
+                myUid: _myUid,
+                partnerUid: _partnerUid,
+                legacyRoomId: _legacyRoomId,
+              );
             }
           }
         }
@@ -73,20 +79,26 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
   }
 
   void _handleGameRouting(String mode) async {
-    if (_roomId.isEmpty) return;
+    if (_partnerUid.isEmpty) return;
     setState(() => _isLoading = true);
 
     try {
       final gameDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_myUid)
           .collection('games')
-          .doc(_roomId)
+          .doc('letterlocked')
           .get();
 
       if (mounted) {
         if (gameDoc.exists && gameDoc.data()?['status'] == 'active') {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => LetterLockedGameScreen(roomId: _roomId),
+              builder: (_) => LetterLockedGameScreen(
+                myUid: _myUid,
+                partnerUid: _partnerUid,
+                legacyRoomId: _legacyRoomId,
+              ),
             ),
           );
         } else {
@@ -102,7 +114,6 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
           }
 
           await _controller.startNewGame(
-            roomId: _roomId,
             myUid: _myUid,
             partnerUid: _partnerUid,
             mode: mode,
@@ -112,7 +123,11 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
           if (mounted) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => LetterLockedGameScreen(roomId: _roomId),
+                builder: (_) => LetterLockedGameScreen(
+                  myUid: _myUid,
+                  partnerUid: _partnerUid,
+                  legacyRoomId: _legacyRoomId,
+                ),
               ),
             );
           }
@@ -134,7 +149,7 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (_roomId.isEmpty) {
+    if (_partnerUid.isEmpty) {
       return Scaffold(
         backgroundColor: cs.surface,
         body: Center(
@@ -158,8 +173,10 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
       backgroundColor: cs.surface,
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(_myUid)
             .collection('games')
-            .doc(_roomId)
+            .doc('letterlocked')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data!.exists) {
@@ -172,7 +189,11 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
                   // Check if we are already displaying the game screen to avoid duplicate pushing
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => LetterLockedGameScreen(roomId: _roomId),
+                      builder: (_) => LetterLockedGameScreen(
+                        myUid: _myUid,
+                        partnerUid: _partnerUid,
+                        legacyRoomId: _legacyRoomId,
+                      ),
                     ),
                   );
                 }
