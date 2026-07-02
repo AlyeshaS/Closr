@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia/trivia_game_screen.dart';
 import 'letter_locked/letter_locked_dashboard.dart';
+import 'doodle_clues/doodle_clues_game_screen.dart';
 
 class GamesDashboardTab extends StatefulWidget {
   const GamesDashboardTab({super.key});
@@ -155,6 +156,22 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                         },
                         cs: cs,
                       ),
+                      const SizedBox(height: 10),
+                      // 3. DoodleClues Clean Custom Card
+                      _buildCleanGameCard(
+                        context: context,
+                        title: 'DoodleClues',
+                        subtitle:
+                            'An asymmetric sketching showdown! Translate secret items into line art and see if your partner can crack the hint.',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DoodleCluesGameScreen(),
+                            ),
+                          );
+                        },
+                        cs: cs,
+                      ),
                     ],
                   ),
                 );
@@ -172,7 +189,8 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
     final int llWins = scores['letterlocked'] as int? ?? 0;
     final int triviaWins = scores['trivia'] as int? ?? 0;
-    return llWins + triviaWins;
+    final int doodleWins = scores['doodleclues'] as int? ?? 0;
+    return llWins + triviaWins + doodleWins;
   }
 
   Widget _buildScoreColumn(
