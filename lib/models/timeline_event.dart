@@ -31,11 +31,7 @@ class TimelineEntry {
   static String activityTitleFor(String activity) {
     return switch (activity) {
       'quest_completed' => 'Completed a quest',
-      'deep_talk_generate' => 'Generated Deep Talk topics',
-      'deep_talk_view' => 'Used Deep Talk',
-      'deep_talk_complete' => 'Completed Deep Talk',
-      'date_suggestion_generated' => 'Generated date ideas',
-      'date_ideas_view' => 'Browsed date ideas',
+      'game_completed' => 'Completed a game',
       _ => activity.replaceAll('_', ' '),
     };
   }
@@ -47,11 +43,7 @@ class TimelineEntry {
   ) {
     return switch (activity) {
       'quest_completed' => 'Progress logged for your streak',
-      'deep_talk_generate' => 'Fresh prompts were added to your flow',
-      'deep_talk_view' => 'Conversation notes were opened',
-      'deep_talk_complete' => 'All 10 questions were explored',
-      'date_suggestion_generated' => 'A new idea was saved for later',
-      'date_ideas_view' => 'Ideas were refreshed for the day',
+      'game_completed' => 'A mini-game was finished together',
       _ => 'Streak $currentStreak · Best $bestStreak',
     };
   }
@@ -59,11 +51,7 @@ class TimelineEntry {
   static String activityEmojiFor(String activity) {
     return switch (activity) {
       'quest_completed' => '✅',
-      'deep_talk_generate' => '✨',
-      'deep_talk_view' => '💬',
-      'deep_talk_complete' => '🗣️',
-      'date_suggestion_generated' => '💡',
-      'date_ideas_view' => '🌷',
+      'game_completed' => '🎮',
       _ => '⭐',
     };
   }

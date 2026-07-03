@@ -10,24 +10,24 @@ import '../models/timeline_event.dart';
 class TimelineService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> logDateIdeasGeneratedFromReload({int? ideaCount}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  /// Only these raw `activity` strings (as written to the `timelineEvents`
+  /// collection) are surfaced on the timeline. Everything else written to
+  /// that collection (Deep Talk views/generation, date-idea browsing, etc.)
+  /// is intentionally excluded.
+  ///
+  /// NOTE: confirm 'game_completed' matches whatever string your
+  /// DoodleClues (and future mini-game) completion logging actually writes.
+  static const Set<String> _allowedTimelineActivities = {
+    'quest_completed',
+    'game_completed',
+  };
 
-    await _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('timelineEvents')
-        .add({
-          'activity': 'date_ideas_generated',
-          'title': 'New date ideas created',
-          'subtitle': ideaCount == null
-              ? 'Generated from reload'
-              : 'Generated $ideaCount fresh date ideas from reload',
-          'emoji': '✨',
-          'occurredAt': FieldValue.serverTimestamp(),
-          'isMilestone': false,
-        });
+  /// Date-idea generation is no longer a timeline event — it was cluttering
+  /// the feed. Left as a no-op (rather than deleted) so existing call sites
+  /// don't break; safe to remove the call sites and this method entirely
+  /// once they're cleaned up.
+  Future<void> logDateIdeasGeneratedFromReload({int? ideaCount}) async {
+    return;
   }
 
   Stream<List<TimelineEntry>> streamTimelineEntries() {
@@ -55,8 +55,9 @@ class TimelineService {
             ..._mapWatchEntries(watchItemDocs, watchMatchDocs),
             ...activityDocs
                 .where(
-                  (doc) =>
-                      (doc.data()['activity'] as String?) != 'deep_talk_view',
+                  (doc) => _allowedTimelineActivities.contains(
+                    doc.data()['activity'] as String?,
+                  ),
                 )
                 .map(
                   (doc) => TimelineEntry.fromActivityDoc(doc.id, doc.data()),
@@ -81,7 +82,7 @@ class TimelineService {
             .collection('users')
             .doc(user.uid)
             .collection('scrapbookEntries')
-            .orderBy('entryDate', descending: true)
+            .orderBy('createdAt', descending: true)
             .snapshots()
             .map(
               (snapshot) => snapshot.docs.map(ScrapbookEntry.fromDoc).toList(),
@@ -157,8 +158,8 @@ class TimelineService {
           ? entry.description.trim()
           : 'Scrapbook entry';
       final subtitle = entry.hasImage
-          ? 'Photo logged on ${_monthDayLabel(entry.entryDate)}'
-          : 'Logged on ${_monthDayLabel(entry.entryDate)}';
+          ? 'Photo added on ${_monthDayLabel(entry.createdAt)}'
+          : 'Logged on ${_monthDayLabel(entry.createdAt)}';
 
       return TimelineEntry(
         id: 'scrapbook:${entry.id}',
@@ -166,7 +167,7 @@ class TimelineService {
         title: title,
         subtitle: subtitle,
         emoji: entry.hasImage ? '📷' : '📝',
-        occurredAt: entry.entryDate,
+        occurredAt: entry.createdAt,
         isMilestone: false,
       );
     }).toList();
