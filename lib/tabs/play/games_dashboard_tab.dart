@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia/trivia_game_screen.dart';
 import 'letter_locked/letter_locked_dashboard.dart';
 import 'doodle_clues/doodle_clues_game_screen.dart';
+import 'telepathy/telepathy_game_screen.dart'; // Import your new telepathy screen
 
 class GamesDashboardTab extends StatefulWidget {
   const GamesDashboardTab({super.key});
@@ -157,7 +158,6 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                         cs: cs,
                       ),
                       const SizedBox(height: 10),
-                      // 3. DoodleClues Clean Custom Card
                       _buildCleanGameCard(
                         context: context,
                         title: 'DoodleClues',
@@ -167,6 +167,45 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => const DoodleCluesGameScreen(),
+                            ),
+                          );
+                        },
+                        cs: cs,
+                      ),
+                      const SizedBox(height: 10),
+                      // 🧠 Telepathy Mind Meld Co-op Custom Card
+                      _buildCleanGameCard(
+                        context: context,
+                        title: 'Telepathy',
+                        subtitle:
+                            'Collaborative word chains! Start with a seed phrase and build bridges together until your lines of thinking merge.',
+                        onTap: () {
+                          if (partnerUid.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Waiting to connect with partner...",
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Establish a predictable host room document key
+                          // by sorting alphanumeric user tokens
+                          final List<String> pairIds = [_myUid, partnerUid]
+                            ..sort();
+                          final String functionalHostId = pairIds.first;
+                          const String activeGameSessionId =
+                              "daily_telepathy_session";
+
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => TelepathyGameScreen(
+                                gameId: activeGameSessionId,
+                                hostId: functionalHostId,
+                                currentUserId: _myUid,
+                              ),
                             ),
                           );
                         },
@@ -190,6 +229,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
     final int llWins = scores['letterlocked'] as int? ?? 0;
     final int triviaWins = scores['trivia'] as int? ?? 0;
     final int doodleWins = scores['doodleclues'] as int? ?? 0;
+    // Telepathy is purely cooperative, so it doesn't modify individual win sums
     return llWins + triviaWins + doodleWins;
   }
 

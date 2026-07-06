@@ -91,6 +91,10 @@ class MyApp extends StatelessWidget {
       useMaterial3: true,
       fontFamily: 'DMSans',
       scaffoldBackgroundColor: cs.surface,
+      splashColor: cs.primary.withValues(alpha: 0.16),
+      highlightColor: cs.primary.withValues(alpha: 0.08),
+      hoverColor: cs.primary.withValues(alpha: 0.06),
+      focusColor: cs.primary.withValues(alpha: 0.10),
 
       textTheme: TextTheme(
         displayMedium: TextStyle(
@@ -341,4 +345,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

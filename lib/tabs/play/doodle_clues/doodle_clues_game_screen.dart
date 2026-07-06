@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'doodle_clues_controller.dart';
+import '../../../services/streaks_service.dart';
 
 class DoodleCluesGameScreen extends StatefulWidget {
   const DoodleCluesGameScreen({super.key});
@@ -15,6 +16,7 @@ class DoodleCluesGameScreen extends StatefulWidget {
 
 class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   final DoodleCluesController _controller = DoodleCluesController();
+  final StreaksService _streaksService = StreaksService();
   final TextEditingController _guessInputController = TextEditingController();
   final TextEditingController _wordInputController = TextEditingController();
 
@@ -39,6 +41,12 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   Timer? _countdownTimer;
   Timer? _liveSyncTimer;
   // ---------------------------------------------------------------------
+
+  Future<void> _logGameCompleted() async {
+    try {
+      await _streaksService.recordActivity('game_completed');
+    } catch (_) {}
+  }
 
   final List<String> _poolOfSecretWords = [
     'SUNSET',
@@ -370,6 +378,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   void _showGameEndedAlert(bool isWin, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
+    unawaited(_logGameCompleted());
 
     final cs = Theme.of(screenContext).colorScheme;
     final Color statusColor = isWin ? cs.primary : cs.error;

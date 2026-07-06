@@ -1,7 +1,10 @@
 // lib/play/letter_locked/letter_locked_game_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/dictionary_service.dart';
+import '../../../services/streaks_service.dart';
 import 'letter_locked_controller.dart';
 import 'letter_locked_models.dart';
 
@@ -22,6 +25,7 @@ class LetterLockedGameScreen extends StatefulWidget {
 
 class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
   final LetterLockedController _controller = LetterLockedController();
+  final StreaksService _streaksService = StreaksService();
   final TextEditingController _wordInputController = TextEditingController();
   bool _endDialogShown = false;
 
@@ -147,11 +151,21 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
-  // ✨ REFACTORED: Beautiful Custom Dialog with Theme-compliant Accent Buttons
   void _showGameEndedAlert(LetterLockedModel game, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
 
+    // 1. Define your local tracking function first
+    Future<void> _logGameCompleted() async {
+      try {
+        await _streaksService.recordActivity('game_completed');
+      } catch (_) {}
+    }
+
+    // 2. Fire it off safely
+    unawaited(_logGameCompleted());
+
+    // 3. Define your game state variables (so they are visible below)
     final bool isCoop = game.gameMode == 'coop';
     final String calculatedWinner = game.scores.keys.firstWhere(
       (uid) => uid != game.turn,

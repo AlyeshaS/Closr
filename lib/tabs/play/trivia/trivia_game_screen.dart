@@ -1,8 +1,11 @@
 // lib/screens/activities/trivia/trivia_game_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia_controller.dart';
+import '../../../services/streaks_service.dart';
 
 class TriviaGameScreen extends StatefulWidget {
   const TriviaGameScreen({super.key});
@@ -13,6 +16,7 @@ class TriviaGameScreen extends StatefulWidget {
 
 class _TriviaGameScreenState extends State<TriviaGameScreen> {
   final TriviaController _controller = TriviaController();
+  final StreaksService _streaksService = StreaksService();
   int? _selectedAnswerIndex;
   int _currentQuestionIndex = 0;
 
@@ -189,6 +193,12 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
         await _controller.updateUserStage(_myUid, 'results');
       }
     }
+  }
+
+  Future<void> _logGameCompleted() async {
+    try {
+      await _streaksService.recordActivity('game_completed');
+    } catch (_) {}
   }
 
   @override
@@ -403,6 +413,8 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
               height: 54,
               child: FilledButton(
                 onPressed: () async {
+                  await _logGameCompleted();
+
                   // 🏆 CENTRALIZED SCORE CHECK: Increments winner directly on complete action
                   if (myScore > partnerScore) {
                     await _controller.rewardTriviaWinner(_myUid);

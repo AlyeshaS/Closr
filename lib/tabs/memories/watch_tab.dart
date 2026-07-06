@@ -2046,63 +2046,80 @@ class _FilterPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chips = <Map<String, dynamic>>[
-      {'label': 'All', 'value': _WatchFeedFilter.all},
-      {'label': 'Movies', 'value': _WatchFeedFilter.movies},
-      {'label': 'TV shows', 'value': _WatchFeedFilter.tv},
+    final chips = [
+      ('All', Icons.auto_awesome_rounded, _WatchFeedFilter.all),
+      ('Movies', Icons.movie_rounded, _WatchFeedFilter.movies),
+      ('TV shows', Icons.tv_rounded, _WatchFeedFilter.tv),
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Filter watch picks',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: chips.map((chip) {
-              final value = chip['value'] as _WatchFeedFilter;
-              return ChoiceChip(
-                label: Text(chip['label'] as String),
-                selected: filter == value,
-                onSelected: (_) => onFilterChanged(value),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          Text('Genres', style: Theme.of(context).textTheme.labelSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilterChip(
-                label: const Text('All genres'),
-                selected: selectedGenre == null,
-                onSelected: (_) => onGenreChanged(null),
-              ),
-              ...genres.map(
-                (genre) => FilterChip(
-                  label: Text(genre),
-                  selected: selectedGenre == genre,
-                  onSelected: (_) => onGenreChanged(genre),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Type', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        Row(
+          children: chips.map((chip) {
+            final selected = filter == chip.$3;
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  avatar: Icon(
+                    chip.$2,
+                    size: 18,
+                    color: selected ? cs.onPrimary : cs.primary,
+                  ),
+                  label: Text(chip.$1),
+                  selected: selected,
+                  onSelected: (_) => onFilterChanged(chip.$3),
+                  selectedColor: cs.primary,
+                  labelStyle: TextStyle(
+                    color: selected ? cs.onPrimary : cs.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text('Rating', style: Theme.of(context).textTheme.labelSmall),
-          Slider(
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 24),
+
+        Text('Genres', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilterChip(
+              label: const Text('All genres'),
+              selected: selectedGenre == null,
+              onSelected: (_) => onGenreChanged(null),
+              selectedColor: cs.primaryContainer,
+              checkmarkColor: cs.onPrimaryContainer,
+            ),
+            ...genres.map(
+              (genre) => FilterChip(
+                label: Text(genre),
+                selected: selectedGenre == genre,
+                onSelected: (_) => onGenreChanged(genre),
+                selectedColor: cs.primaryContainer,
+                checkmarkColor: cs.onPrimaryContainer,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        _FilterSliderCard(
+          cs: cs,
+          title: 'Minimum rating',
+          valueLabel: '${minRating.toStringAsFixed(1)}+',
+          child: Slider(
             value: minRating,
             min: 0,
             max: 10,
@@ -2110,8 +2127,15 @@ class _FilterPanel extends StatelessWidget {
             label: minRating.toStringAsFixed(1),
             onChanged: onRatingChanged,
           ),
-          Text('Runtime', style: Theme.of(context).textTheme.labelSmall),
-          Slider(
+        ),
+
+        const SizedBox(height: 14),
+
+        _FilterSliderCard(
+          cs: cs,
+          title: 'Maximum runtime',
+          valueLabel: '${maxRuntime.round()} min',
+          child: Slider(
             value: maxRuntime,
             min: 20,
             max: 240,
@@ -2119,6 +2143,64 @@ class _FilterPanel extends StatelessWidget {
             label: '${maxRuntime.round()} min',
             onChanged: onRuntimeChanged,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterSliderCard extends StatelessWidget {
+  final ColorScheme cs;
+  final String title;
+  final String valueLabel;
+  final Widget child;
+
+  const _FilterSliderCard({
+    required this.cs,
+    required this.title,
+    required this.valueLabel,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  valueLabel,
+                  style: TextStyle(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          child,
         ],
       ),
     );
