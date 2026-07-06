@@ -1,19 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/telepathy_game_model.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class TelepathyFirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // Path Helper: Updated to route through the 'play' document structure
+  // Path Helper: Routes through user's subcollections to target the 'play' document
   DocumentReference _gameRef(String hostId, String gameId) {
     return _db
         .collection('users')
         .doc(hostId)
         .collection('games')
-        .doc('play') // Your specific structural mid-folder layer
-        .collection(
-          'telepathy_sessions',
-        ) // Collection containing specific round instances
+        .doc('play')
+        .collection('telepathy_sessions')
         .doc(gameId);
   }
 
@@ -41,10 +41,42 @@ class TelepathyFirebaseService {
 
   // Real-time updates listener stream
   Stream<TelepathyGame> streamGame(String hostId, String gameId) {
-    return _gameRef(
-      hostId,
-      gameId,
-    ).snapshots().map((doc) => TelepathyGame.fromDocument(doc));
+    return _gameRef(hostId, gameId).snapshots().map((doc) {
+      if (!doc.exists) {
+        throw Exception("Document does not exist");
+      }
+      return TelepathyGame.fromDocument(doc);
+    });
+  }
+
+  // Smart matching helper to handle singular vs plural and basic typos
+  bool _areWordsMatching(String input1, String input2) {
+    // 1. Clean both inputs: lowercase, remove extra spaces, and strip punctuation/apostrophes
+    final String w1 = input1.trim().toLowerCase().replaceAll(
+      RegExp(r"[^\w\s]"),
+      "",
+    );
+    final String w2 = input2.trim().toLowerCase().replaceAll(
+      RegExp(r"[^\w\s]"),
+      "",
+    );
+
+    // 2. Exact match check
+    if (w1 == w2) return true;
+
+    // 3. Handle standard plurals ending in 's' (e.g., "smore" vs "smores")
+    if (w1 + 's' == w2 || w2 + 's' == w1) return true;
+
+    // 4. Handle plurals ending in 'es' (e.g., "box" vs "boxes")
+    if (w1 + 'es' == w2 || w2 + 'es' == w1) return true;
+
+    // 5. Handle common relationship/y-to-ies mutations (e.g., "puppy" vs "puppies")
+    if (w1.endsWith('y') && w1.substring(0, w1.length - 1) + 'ies' == w2)
+      return true;
+    if (w2.endsWith('y') && w2.substring(0, w2.length - 1) + 'ies' == w1)
+      return true;
+
+    return false;
   }
 
   // Lock an input inside the dynamic transaction boundary
@@ -76,8 +108,8 @@ class TelepathyFirebaseService {
         if (game.gameMode == GameMode.emojisOnly) {
           isMatch = p1Input.trim() == p2Input.trim();
         } else {
-          isMatch =
-              p1Input.trim().toLowerCase() == p2Input.trim().toLowerCase();
+          // Evaluates using our smart matching helper rules
+          isMatch = _areWordsMatching(p1Input, p2Input);
         }
 
         if (isMatch) {

@@ -1,7 +1,8 @@
 // lib/features/telepathy/presentation/telepathy_game_screen.dart
 import 'package:flutter/material.dart';
 import '../../../models/telepathy_game_model.dart';
-import "../../../services/telepathy_service.dart";
+import '../../../services/telepathy_service.dart';
+import '../../../services/word_generator_service.dart';
 import 'telepathy_controller.dart';
 
 class TelepathyGameScreen extends StatefulWidget {
@@ -42,7 +43,7 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // If document doesn't exist yet, show an initialization panel
+          // If document doesn't exist yet, show the initialization panel
           if (!snapshot.hasData || snapshot.hasError) {
             return _buildInitScreen();
           }
@@ -60,98 +61,113 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             return _buildVictoryScreen(game);
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'ROUND ${game.currentRoundIndex + 1}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Find a connection word for:',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  currentRound.prompt,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.indigo,
-                  ),
-                ),
-                const SizedBox(height: 48),
-
-                if (!hasIAnswered) ...[
-                  TextField(
-                    controller: _inputController,
-                    decoration: InputDecoration(
-                      hintText: game.gameMode == GameMode.emojisOnly
-                          ? 'Enter an Emoji...'
-                          : 'Type your single link word...',
-                      border: const OutlineInputBorder(),
-                    ),
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            // Calculates native keyboard height in real-time to completely eliminate pixel overlaps
+            padding: EdgeInsets.fromLTRB(
+              24.0,
+              24.0,
+              24.0,
+              MediaQuery.of(context).viewInsets.bottom + 24.0,
+            ),
+            child: SizedBox(
+              // Fits elements structurally into safe bounds above the raised keyboard viewport
+              height:
+                  MediaQuery.of(context).size.height -
+                  AppBar().preferredSize.height -
+                  MediaQuery.of(context).padding.top -
+                  48,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'ROUND ${game.currentRoundIndex + 1}',
                     textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_inputController.text.trim().isEmpty) return;
-                      _controller.submitGuess(
-                        hostId: game.hostId,
-                        gameId: game.gameId,
-                        userId: widget.currentUserId,
-                        input: _inputController.text,
-                        game: game,
-                      );
-                      _inputController.clear();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
                     ),
-                    child: const Text('Lock It In'),
                   ),
-                ] else ...[
-                  const Card(
-                    color: Colors.amberAccent,
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.hourglass_bottom,
-                            size: 48,
-                            color: Colors.amber,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'Answer locked in!',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                  const SizedBox(height: 12),
+                  Text(
+                    'Find a connection word for:',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    currentRound.prompt,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  if (!hasIAnswered) ...[
+                    TextField(
+                      controller: _inputController,
+                      decoration: InputDecoration(
+                        hintText: game.gameMode == GameMode.emojisOnly
+                            ? 'Enter an Emoji...'
+                            : 'Type your single link word...',
+                        border: const OutlineInputBorder(),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_inputController.text.trim().isEmpty) return;
+                        _controller.submitGuess(
+                          hostId: game.hostId,
+                          gameId: game.gameId,
+                          userId: widget.currentUserId,
+                          input: _inputController.text,
+                          game: game,
+                        );
+                        _inputController.clear();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Lock It In'),
+                    ),
+                  ] else ...[
+                    const Card(
+                      color: Colors.amberAccent,
+                      child: Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.hourglass_bottom,
+                              size: 48,
+                              color: Colors.amber,
                             ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Waiting for your partner to pick their bridge word...',
-                          ),
-                        ],
+                            SizedBox(height: 12),
+                            Text(
+                              'Answer locked in!',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Waiting for your partner to pick their bridge word...',
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           );
         },
@@ -185,6 +201,9 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () async {
+                final String dynamicSeed =
+                    await WordGeneratorService.getRandomSeedWord();
+
                 await _service.startNewGame(
                   gameId: widget.gameId,
                   hostId: widget.hostId,
@@ -192,9 +211,9 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                       ? 'partner'
                       : widget.currentUserId,
                   mode: GameMode.wordsOnly,
-                  seedWord: 'Camping', // Your default starter seed word
+                  seedWord: dynamicSeed,
                 );
-                setState(() {});
+                if (mounted) setState(() {});
               },
               child: const Text('Start Game Loop'),
             ),
@@ -230,14 +249,17 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () async {
-                // Instantly resets for a fresh replay
+                final String dynamicSeed =
+                    await WordGeneratorService.getRandomSeedWord();
+
                 await _service.startNewGame(
                   gameId: widget.gameId,
                   hostId: widget.hostId,
                   partnerId: game.partnerId,
                   mode: game.gameMode,
-                  seedWord: 'Coffee', // Mixed secondary starting word
+                  seedWord: dynamicSeed,
                 );
+                if (mounted) setState(() {});
               },
               child: const Text('Play Again'),
             ),
