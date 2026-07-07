@@ -14,6 +14,51 @@ class TelepathyDashboard extends StatefulWidget {
   State<TelepathyDashboard> createState() => _TelepathyDashboardState();
 }
 
+Widget _buildInstructionStep({
+  required BuildContext context,
+  required String stepNumber,
+  required String text,
+  required ColorScheme cs,
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 14.0, left: 4.0, right: 4.0),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          margin: const EdgeInsets.only(top: 2),
+          decoration: BoxDecoration(
+            color: cs.primary.withOpacity(0.08),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              stepNumber,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: cs.primary,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _TelepathyDashboardState extends State<TelepathyDashboard> {
   final TelepathyFirebaseService _service = TelepathyFirebaseService();
   String _myUid = '';
@@ -182,7 +227,7 @@ class _TelepathyDashboardState extends State<TelepathyDashboard> {
                 const SizedBox(height: 16),
                 _buildCleanModeCard(
                   context: context,
-                  title: 'Random AI Word',
+                  title: 'Random Word',
                   subtitle:
                       'The system generates a random seed word to kickstart your matching pool.',
                   icon: Icons.casino_outlined,
@@ -210,6 +255,62 @@ class _TelepathyDashboardState extends State<TelepathyDashboard> {
                   icon: Icons.tune_rounded,
                   iconColor: Colors.orange[700]!,
                   onTap: () => _handleGameRouting(GameMode.customPrompt),
+                  cs: cs,
+                ),
+
+                // 💡 NEW: HOW TO PLAY SECTION
+                const SizedBox(height: 36),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Divider(color: cs.outlineVariant, thickness: 1),
+                ),
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline_rounded,
+                      color: cs.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'HOW TO PLAY',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        letterSpacing: 1.5,
+                        color: cs.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildInstructionStep(
+                  context: context,
+                  stepNumber: '1',
+                  text:
+                      'Start with a core prompt word displayed at the top of your gameplay screen.',
+                  cs: cs,
+                ),
+                _buildInstructionStep(
+                  context: context,
+                  stepNumber: '2',
+                  text:
+                      'Both you and your partner independently type a single word associated with that prompt.',
+                  cs: cs,
+                ),
+                _buildInstructionStep(
+                  context: context,
+                  stepNumber: '3',
+                  text:
+                      'If your entries do not match, your words fuse into a new double-word prompt challenge!',
+                  cs: cs,
+                ),
+                _buildInstructionStep(
+                  context: context,
+                  stepNumber: '4',
+                  text:
+                      'Keep building creative connection bridges until you both submit the exact same matching word to achieve a Mind Meld!',
                   cs: cs,
                 ),
               ],

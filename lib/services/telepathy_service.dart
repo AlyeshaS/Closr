@@ -88,6 +88,10 @@ class TelepathyFirebaseService {
     required String input,
     required TelepathyGame game,
   }) async {
+    if (game.gameMode == GameMode.emojisOnly && !_isOnlyEmojis(input)) {
+      throw ArgumentError('EMOJI_ONLY_VIOLATION');
+    }
+
     final int activeIndex = game.currentRoundIndex;
     List<TelepathyRound> updatedRounds = List.from(game.rounds);
     TelepathyRound currentRound = updatedRounds[activeIndex];
@@ -169,4 +173,22 @@ class TelepathyFirebaseService {
     batch.update(_playerGameRef(game.partnerId), updateData);
     await batch.commit();
   }
+}
+
+/// Checks if a string contains only valid emoji characters
+bool _isOnlyEmojis(String text) {
+  if (text.trim().isEmpty) return false;
+
+  // Regular expression matching standard emojis, symbols, modifiers, and pictographs
+  final RegExp emojiRegex = RegExp(
+    r'^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}'
+    r'\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F0F5}\u{1F004}\u{1F170}-\u{1F19A}'
+    r'\u{1F200}-\u{1F251}\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}'
+    r'\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FAFF}'
+    r'\u{2600}-\u{26FF}\u{2300}-\u{23FF}\u{2B50}\u{2B55}\u{2934}\u{2935}\u{2190}-\u{21FF}]+$',
+    unicode: true,
+  );
+
+  // Remove invisible whitespaces/spaces before checking matching rules
+  return emojiRegex.hasMatch(text.trim().replaceAll(' ', ''));
 }

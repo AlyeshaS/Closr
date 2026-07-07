@@ -190,14 +190,42 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () {
-                        if (_inputController.text.trim().isEmpty) return;
-                        _service.submitInput(
-                          currentUserId: widget.myUid,
-                          input: _inputController.text,
-                          game: game,
-                        );
-                        _inputController.clear();
+                      onPressed: () async {
+                        final String entry = _inputController.text.trim();
+                        if (entry.isEmpty) return;
+
+                        try {
+                          await _service.submitInput(
+                            currentUserId: widget.myUid,
+                            input: entry,
+                            game: game,
+                          );
+                          _inputController.clear();
+                        } catch (e) {
+                          // Catch our explicit emoji rule violation
+                          if (e is ArgumentError &&
+                              e.message == 'EMOJI_ONLY_VIOLATION') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.error,
+                                content: const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Minds must link using Emojis Only! 🔮',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
