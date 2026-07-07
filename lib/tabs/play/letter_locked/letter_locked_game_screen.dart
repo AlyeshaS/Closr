@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/dictionary_service.dart';
 import '../../../services/streaks_service.dart';
 import 'letter_locked_controller.dart';
-import 'letter_locked_models.dart';
+import '../../../models/letter_locked_models.dart';
 
 class LetterLockedGameScreen extends StatefulWidget {
   final String myUid;
