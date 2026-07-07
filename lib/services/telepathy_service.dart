@@ -1,12 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/telepathy_game_model.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class TelepathyFirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // Path Helper: Routes through user's subcollections to target the 'play' document
   DocumentReference _gameRef(String hostId, String gameId) {
     return _db
         .collection('users')
@@ -17,7 +14,6 @@ class TelepathyFirebaseService {
         .doc(gameId);
   }
 
-  // Create a brand new game
   Future<void> startNewGame({
     required String gameId,
     required String hostId,
@@ -36,10 +32,99 @@ class TelepathyFirebaseService {
       rounds: [TelepathyRound(roundNumber: 0, prompt: seedWord)],
     );
 
-    await _gameRef(hostId, gameId).set(newGame.toMap());
+    // Set initial structural keys, preserving active presence tracking if it exists
+    await _gameRef(
+      hostId,
+      gameId,
+    ).set(newGame.toMap(), SetOptions(merge: true));
   }
 
-  // Real-time updates listener stream
+  // Forces a new prompt seed word mid-game
+  Future<void> changeSeedWord({
+    required String hostId,
+    required String gameId,
+    required String newSeed,
+  }) async {
+    final docRef = _gameRef(hostId, gameId);
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (!snapshot.exists) return;
+
+      final game = TelepathyGame.fromDocument(snapshot);
+      final int activeIndex = game.currentRoundIndex;
+      List<TelepathyRound> updatedRounds = List.from(game.rounds);
+
+      // Overwrite the current round's prompt directly
+      updatedRounds[activeIndex] = TelepathyRound(
+        roundNumber: activeIndex,
+        prompt: newSeed,
+        player1Input: null, // Clear inputs so they start fresh on this word
+        player2Input: null,
+        isMatch: false,
+      );
+
+      transaction.update(docRef, {
+        'seedWord': newSeed,
+        'rounds': updatedRounds.map((r) => r.toMap()).toList(),
+      });
+    });
+  }
+
+  // Increments or decrements the presence counter safely
+  Future<void> updatePresence({
+    required String hostId,
+    required String gameId,
+    required int countChange,
+    required String fallbackSeed,
+  }) async {
+    final docRef = _gameRef(hostId, gameId);
+
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+
+      if (!snapshot.exists) {
+        // If room doesn't exist at all, initialize it with 1 player
+        if (countChange > 0) {
+          final newGame = TelepathyGame(
+            gameId: gameId,
+            hostId: hostId,
+            partnerId: 'partner',
+            gameMode: GameMode.wordsOnly,
+            seedWord: fallbackSeed,
+            status: 'active',
+            currentRoundIndex: 0,
+            rounds: [TelepathyRound(roundNumber: 0, prompt: fallbackSeed)],
+          );
+          transaction.set(docRef, newGame.toMap());
+          transaction.update(docRef, {'activePlayers': 1});
+        }
+        return;
+      }
+
+      final data = snapshot.data() as Map<String, dynamic>;
+      int currentPresence = data['activePlayers'] ?? 0;
+      int newPresence = (currentPresence + countChange).clamp(0, 2);
+
+      // CRITICAL RULE: If presence drops to 0, or players enter a dead room (0 players),
+      // we auto-reset the prompt with a brand new word path so it cycles fresh.
+      if (newPresence == 1 && currentPresence == 0) {
+        final game = TelepathyGame.fromDocument(snapshot);
+        List<TelepathyRound> updatedRounds = [
+          TelepathyRound(roundNumber: 0, prompt: fallbackSeed),
+        ];
+        transaction.update(docRef, {
+          'seedWord': fallbackSeed,
+          'status': 'active',
+          'currentRoundIndex': 0,
+          'rounds': updatedRounds.map((r) => r.toMap()).toList(),
+          'activePlayers': 1,
+        });
+      } else {
+        transaction.update(docRef, {'activePlayers': newPresence});
+      }
+    });
+  }
+
   Stream<TelepathyGame> streamGame(String hostId, String gameId) {
     return _gameRef(hostId, gameId).snapshots().map((doc) {
       if (!doc.exists) {
@@ -49,9 +134,7 @@ class TelepathyFirebaseService {
     });
   }
 
-  // Smart matching helper to handle singular vs plural and basic typos
   bool _areWordsMatching(String input1, String input2) {
-    // 1. Clean both inputs: lowercase, remove extra spaces, and strip punctuation/apostrophes
     final String w1 = input1.trim().toLowerCase().replaceAll(
       RegExp(r"[^\w\s]"),
       "",
@@ -60,26 +143,16 @@ class TelepathyFirebaseService {
       RegExp(r"[^\w\s]"),
       "",
     );
-
-    // 2. Exact match check
     if (w1 == w2) return true;
-
-    // 3. Handle standard plurals ending in 's' (e.g., "smore" vs "smores")
     if (w1 + 's' == w2 || w2 + 's' == w1) return true;
-
-    // 4. Handle plurals ending in 'es' (e.g., "box" vs "boxes")
     if (w1 + 'es' == w2 || w2 + 'es' == w1) return true;
-
-    // 5. Handle common relationship/y-to-ies mutations (e.g., "puppy" vs "puppies")
     if (w1.endsWith('y') && w1.substring(0, w1.length - 1) + 'ies' == w2)
       return true;
     if (w2.endsWith('y') && w2.substring(0, w2.length - 1) + 'ies' == w1)
       return true;
-
     return false;
   }
 
-  // Lock an input inside the dynamic transaction boundary
   Future<void> submitInput({
     required String hostId,
     required String gameId,
@@ -99,7 +172,6 @@ class TelepathyFirebaseService {
       TelepathyRound currentRound = updatedRounds[activeIndex];
 
       final bool isHost = userId == game.hostId;
-
       String? p1Input = isHost ? input : currentRound.player1Input;
       String? p2Input = !isHost ? input : currentRound.player2Input;
 
@@ -108,7 +180,6 @@ class TelepathyFirebaseService {
         if (game.gameMode == GameMode.emojisOnly) {
           isMatch = p1Input.trim() == p2Input.trim();
         } else {
-          // Evaluates using our smart matching helper rules
           isMatch = _areWordsMatching(p1Input, p2Input);
         }
 

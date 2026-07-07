@@ -25,9 +25,34 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
   final TelepathyController _controller = TelepathyController();
   final TelepathyFirebaseService _service = TelepathyFirebaseService();
   final TextEditingController _inputController = TextEditingController();
+  bool _isChangingWord = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _enterRoomLifecycle();
+  }
+
+  // Runs on widget entry: Increments presence tracking, rolling fresh if room was abandoned (0 players)
+  Future<void> _enterRoomLifecycle() async {
+    final String initialSeed = await WordGeneratorService.getRandomSeedWord();
+    await _service.updatePresence(
+      hostId: widget.hostId,
+      gameId: widget.gameId,
+      countChange: 1,
+      fallbackSeed: initialSeed,
+    );
+  }
 
   @override
   void dispose() {
+    // Runs on exit: Decrements presence tracking safely
+    _service.updatePresence(
+      hostId: widget.hostId,
+      gameId: widget.gameId,
+      countChange: -1,
+      fallbackSeed: 'Camping',
+    );
     _inputController.dispose();
     super.dispose();
   }
@@ -43,7 +68,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // If document doesn't exist yet, show the initialization panel
           if (!snapshot.hasData || snapshot.hasError) {
             return _buildInitScreen();
           }
@@ -63,7 +87,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            // Calculates native keyboard height in real-time to completely eliminate pixel overlaps
             padding: EdgeInsets.fromLTRB(
               24.0,
               24.0,
@@ -71,7 +94,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
               MediaQuery.of(context).viewInsets.bottom + 24.0,
             ),
             child: SizedBox(
-              // Fits elements structurally into safe bounds above the raised keyboard viewport
               height:
                   MediaQuery.of(context).size.height -
                   AppBar().preferredSize.height -
@@ -97,14 +119,55 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                     style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    currentRound.prompt,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.indigo,
-                    ),
+
+                  // Wrap prompt in a row containing the new Shuffle Change Action Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(width: 40), // This can stay const
+                      Expanded(
+                        child: Text(
+                          currentRound.prompt,
+                          textAlign: TextAlign.center,
+                          // Make sure there is NO 'const' here!
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      _isChangingWord
+                          ? const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Padding(
+                                padding: EdgeInsets.all(10),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : IconButton(
+                              icon: Icon(
+                                Icons.refresh_rounded,
+                                color: Theme.of(context).colorScheme.primary,
+                              ), // Dynamic theme color here too!
+                              tooltip: 'Change Word',
+                              onPressed: () async {
+                                setState(() => _isChangingWord = true);
+                                final String newSeed =
+                                    await WordGeneratorService.getRandomSeedWord();
+                                await _service.changeSeedWord(
+                                  hostId: widget.hostId,
+                                  gameId: widget.gameId,
+                                  newSeed: newSeed,
+                                );
+                                if (mounted)
+                                  setState(() => _isChangingWord = false);
+                              },
+                            ),
+                    ],
                   ),
                   const SizedBox(height: 48),
 
@@ -189,34 +252,11 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'No Active Session Found',
+              'Initializing Mind Meld...',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Ready to test your synchronicity? Start a brand new round!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () async {
-                final String dynamicSeed =
-                    await WordGeneratorService.getRandomSeedWord();
-
-                await _service.startNewGame(
-                  gameId: widget.gameId,
-                  hostId: widget.hostId,
-                  partnerId: widget.currentUserId == widget.hostId
-                      ? 'partner'
-                      : widget.currentUserId,
-                  mode: GameMode.wordsOnly,
-                  seedWord: dynamicSeed,
-                );
-                if (mounted) setState(() {});
-              },
-              child: const Text('Start Game Loop'),
-            ),
+            const CircularProgressIndicator(),
           ],
         ),
       ),
@@ -251,7 +291,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
               onPressed: () async {
                 final String dynamicSeed =
                     await WordGeneratorService.getRandomSeedWord();
-
                 await _service.startNewGame(
                   gameId: widget.gameId,
                   hostId: widget.hostId,
