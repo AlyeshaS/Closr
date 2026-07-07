@@ -19,6 +19,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   final StreaksService _streaksService = StreaksService();
   final TextEditingController _guessInputController = TextEditingController();
   final TextEditingController _wordInputController = TextEditingController();
+  bool _isExiting = false;
 
   // Explicitly isolate the drawing canvas coordinate space
   final GlobalKey _canvasKey = GlobalKey();
@@ -499,6 +500,67 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     );
   }
 
+  Future<void> _requestExitConfirmation(String stage) async {
+    if (stage == 'setup' || stage == 'results') {
+      _stopTimers();
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final bool? dynamicConfirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'End Game?',
+            style: TextStyle(
+              fontFamily: 'CormorantGaramond',
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to end the game? This will abandon the match for both you and your partner.',
+            style: TextStyle(color: cs.onSurfaceVariant, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Resume Play'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+              ),
+              child: const Text(
+                'Yes, End Game',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (dynamicConfirm == true) {
+      setState(() => _isExiting = true); // Lock out the Stream's auto-pop logic
+      _stopTimers();
+
+      if (mounted) Navigator.pop(context); // Cleanly leave back to GameHub
+
+      if (_myUid.isNotEmpty) {
+        await _controller.triggerForcedCancellation(_myUid, _partnerUid);
+        await _controller.purgeMatch(_myUid, _partnerUid);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -543,17 +605,21 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
               guessCount = rawData['guessCount'] ?? 0;
 
               if (rawData['status'] == 'cancelled') {
-                WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Session cancelled because a player backed out.',
+                // ONLY pop if your partner cancelled it.
+                // If YOU cancelled it, _isExiting is true, so we do nothing here.
+                if (!_isExiting) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Session cancelled because a player backed out.',
+                        ),
                       ),
-                    ),
-                  );
-                  Navigator.pop(context);
-                  await _controller.purgeMatch(_myUid, _partnerUid);
-                });
+                    );
+                    if (mounted) Navigator.pop(context);
+                    await _controller.purgeMatch(_myUid, _partnerUid);
+                  });
+                }
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator()),
                 );
@@ -584,11 +650,13 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
               _ensureTimerForStage(stage, rawData, artistUidForDoc);
             });
 
+            // Look for this section inside your existing Widget build block:
             return PopScope(
               canPop: false,
               onPopInvokedWithResult: (didPop, result) {
                 if (didPop) return;
-                _handleLeaveOrCancel();
+                // UPDATED HERE:
+                _requestExitConfirmation(stage);
               },
               child: Scaffold(
                 backgroundColor: cs.surface,
@@ -606,7 +674,8 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                       Icons.arrow_back_ios_new_rounded,
                       size: 18,
                     ),
-                    onPressed: _handleLeaveOrCancel,
+                    // UPDATED HERE:
+                    onPressed: () => _requestExitConfirmation(stage),
                   ),
                   actions: [
                     IconButton(
