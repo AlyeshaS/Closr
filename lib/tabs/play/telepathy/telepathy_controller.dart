@@ -1,6 +1,8 @@
+// lib/features/telepathy/presentation/telepathy_controller.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/telepathy_game_model.dart';
-import "../../../services/telepathy_service.dart";
+import '../../../services/telepathy_service.dart';
 
 class TelepathyController extends ChangeNotifier {
   final TelepathyFirebaseService _service = TelepathyFirebaseService();
@@ -12,13 +14,15 @@ class TelepathyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Stream<TelepathyGame> watchGame(String hostId, String gameId) {
-    return _service.streamGame(hostId, gameId);
+  /// Maps the updated raw DocumentSnapshot stream into a clean TelepathyGame model stream
+  Stream<TelepathyGame> watchGame(String myUid) {
+    return _service
+        .streamGame(myUid)
+        .map((doc) => TelepathyGame.fromDocument(doc));
   }
 
+  /// Submits the single link guess using the updated signature properties
   Future<void> submitGuess({
-    required String hostId,
-    required String gameId,
     required String userId,
     required String input,
     required TelepathyGame game,
@@ -26,11 +30,9 @@ class TelepathyController extends ChangeNotifier {
     setLoading(true);
     try {
       await _service.submitInput(
-        hostId: hostId,
-        gameId: gameId,
-        userId: userId,
+        currentUserId: userId,
         input: input,
-        currentGame: game,
+        game: game,
       );
     } finally {
       setLoading(false);

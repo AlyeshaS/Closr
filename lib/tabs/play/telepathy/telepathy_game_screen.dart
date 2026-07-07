@@ -1,20 +1,18 @@
 // lib/features/telepathy/presentation/telepathy_game_screen.dart
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/telepathy_game_model.dart';
 import '../../../services/telepathy_service.dart';
 import '../../../services/word_generator_service.dart';
-import 'telepathy_controller.dart';
 
 class TelepathyGameScreen extends StatefulWidget {
-  final String gameId;
-  final String hostId;
-  final String currentUserId;
+  final String myUid;
+  final String partnerUid;
 
   const TelepathyGameScreen({
     Key? key,
-    required this.gameId,
-    required this.hostId,
-    required this.currentUserId,
+    required this.myUid,
+    required this.partnerUid,
   }) : super(key: key);
 
   @override
@@ -22,37 +20,12 @@ class TelepathyGameScreen extends StatefulWidget {
 }
 
 class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
-  final TelepathyController _controller = TelepathyController();
   final TelepathyFirebaseService _service = TelepathyFirebaseService();
   final TextEditingController _inputController = TextEditingController();
   bool _isChangingWord = false;
 
   @override
-  void initState() {
-    super.initState();
-    _enterRoomLifecycle();
-  }
-
-  // Runs on widget entry: Increments presence tracking, rolling fresh if room was abandoned (0 players)
-  Future<void> _enterRoomLifecycle() async {
-    final String initialSeed = await WordGeneratorService.getRandomSeedWord();
-    await _service.updatePresence(
-      hostId: widget.hostId,
-      gameId: widget.gameId,
-      countChange: 1,
-      fallbackSeed: initialSeed,
-    );
-  }
-
-  @override
   void dispose() {
-    // Runs on exit: Decrements presence tracking safely
-    _service.updatePresence(
-      hostId: widget.hostId,
-      gameId: widget.gameId,
-      countChange: -1,
-      fallbackSeed: 'Camping',
-    );
     _inputController.dispose();
     super.dispose();
   }
@@ -60,26 +33,42 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mind Meld Telepathy')),
-      body: StreamBuilder<TelepathyGame>(
-        stream: _controller.watchGame(widget.hostId, widget.gameId),
+      appBar: AppBar(
+        title: const Text('Mind Meld Session'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: _service.streamGame(widget.myUid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.hasError) {
-            return _buildInitScreen();
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return const Center(child: Text('Session data not found.'));
           }
 
-          final game = snapshot.data!;
-          final currentRound = game.rounds[game.currentRoundIndex];
+          final game = TelepathyGame.fromDocument(snapshot.data!);
 
-          final bool isHost = widget.currentUserId == game.hostId;
+          if (game.seedWord == 'PENDING_CHOICE') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) Navigator.of(context).pop();
+            });
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final currentRound = game.rounds[game.currentRoundIndex];
+          final bool isHost = widget.myUid == game.hostId;
           final String? myInput = isHost
               ? currentRound.player1Input
               : currentRound.player2Input;
           final bool hasIAnswered = myInput != null;
+          final bool isCustomSetup =
+              game.gameMode == GameMode.customPrompt &&
+              game.currentRoundIndex == 0;
 
           if (game.status == 'completed') {
             return _buildVictoryScreen(game);
@@ -104,7 +93,9 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'ROUND ${game.currentRoundIndex + 1}',
+                    isCustomSetup
+                        ? 'SETUP ROUND'
+                        : 'ROUND ${game.currentRoundIndex}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 14,
@@ -114,69 +105,84 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Find a connection word for:',
+                    isCustomSetup
+                        ? 'Think of any random starting word!'
+                        : 'Find a connection word for:',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 24),
 
-                  // Wrap prompt in a row containing the new Shuffle Change Action Button
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 40), // This can stay const
-                      Expanded(
-                        child: Text(
-                          currentRound.prompt,
-                          textAlign: TextAlign.center,
-                          // Make sure there is NO 'const' here!
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Theme.of(context).colorScheme.primary,
+                  if (!isCustomSetup)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(width: 40),
+                        Expanded(
+                          child: Text(
+                            currentRound.prompt,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
                         ),
-                      ),
-                      _isChangingWord
-                          ? const SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: Padding(
-                                padding: EdgeInsets.all(10),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                        game.gameMode != GameMode.wordsOnly
+                            ? const SizedBox(width: 40)
+                            : _isChangingWord
+                            ? const SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
+                              )
+                            : IconButton(
+                                icon: Icon(
+                                  Icons.refresh_rounded,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                tooltip: 'Change Word',
+                                onPressed: () async {
+                                  setState(() => _isChangingWord = true);
+                                  final String newSeed =
+                                      await WordGeneratorService.getRandomSeedWord();
+                                  await _service.changeSeedWord(
+                                    game: game,
+                                    newSeed: newSeed,
+                                  );
+                                  if (mounted)
+                                    setState(() => _isChangingWord = false);
+                                },
                               ),
-                            )
-                          : IconButton(
-                              icon: Icon(
-                                Icons.refresh_rounded,
-                                color: Theme.of(context).colorScheme.primary,
-                              ), // Dynamic theme color here too!
-                              tooltip: 'Change Word',
-                              onPressed: () async {
-                                setState(() => _isChangingWord = true);
-                                final String newSeed =
-                                    await WordGeneratorService.getRandomSeedWord();
-                                await _service.changeSeedWord(
-                                  hostId: widget.hostId,
-                                  gameId: widget.gameId,
-                                  newSeed: newSeed,
-                                );
-                                if (mounted)
-                                  setState(() => _isChangingWord = false);
-                              },
-                            ),
-                    ],
-                  ),
+                      ],
+                    )
+                  else
+                    Text(
+                      "❓ + ❓",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 44,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.4),
+                      ),
+                    ),
+
                   const SizedBox(height: 48),
 
                   if (!hasIAnswered) ...[
                     TextField(
                       controller: _inputController,
                       decoration: InputDecoration(
-                        hintText: game.gameMode == GameMode.emojisOnly
-                            ? 'Enter an Emoji...'
+                        hintText: isCustomSetup
+                            ? 'Enter starting word...'
                             : 'Type your single link word...',
                         border: const OutlineInputBorder(),
                       ),
@@ -186,10 +192,8 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                     ElevatedButton(
                       onPressed: () {
                         if (_inputController.text.trim().isEmpty) return;
-                        _controller.submitGuess(
-                          hostId: game.hostId,
-                          gameId: game.gameId,
-                          userId: widget.currentUserId,
+                        _service.submitInput(
+                          currentUserId: widget.myUid,
                           input: _inputController.text,
                           game: game,
                         );
@@ -198,31 +202,37 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('Lock It In'),
+                      child: Text(
+                        isCustomSetup ? 'Submit Starting Word' : 'Lock It In',
+                      ),
                     ),
                   ] else ...[
-                    const Card(
-                      color: Colors.amberAccent,
+                    Card(
+                      color: Colors.amberAccent[100],
                       child: Padding(
-                        padding: EdgeInsets.all(24.0),
+                        padding: const EdgeInsets.all(24.0),
                         child: Column(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.hourglass_bottom,
                               size: 48,
                               color: Colors.amber,
                             ),
-                            SizedBox(height: 12),
+                            const SizedBox(height: 12),
                             Text(
-                              'Answer locked in!',
-                              style: TextStyle(
+                              isCustomSetup
+                                  ? 'Starting word locked!'
+                                  : 'Answer locked in!',
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'Waiting for your partner to pick their bridge word...',
+                              isCustomSetup
+                                  ? 'Waiting for partner baseline word...'
+                                  : 'Waiting for partner bridge word...',
                             ),
                           ],
                         ),
@@ -234,31 +244,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildInitScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.psychology_outlined,
-              size: 72,
-              color: Colors.indigo,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Initializing Mind Meld...',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const CircularProgressIndicator(),
-          ],
-        ),
       ),
     );
   }
@@ -281,40 +266,42 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                 color: Colors.green,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'You synchronized in ${game.rounds.length} rounds!',
-              style: const TextStyle(fontSize: 16),
-            ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () async {
-                final String dynamicSeed =
-                    await WordGeneratorService.getRandomSeedWord();
-                await _service.startNewGame(
-                  gameId: widget.gameId,
-                  hostId: widget.hostId,
-                  partnerId: game.partnerId,
-                  mode: game.gameMode,
-                  seedWord: dynamicSeed,
-                );
-                if (mounted) setState(() {});
-              },
+              onPressed: () => _service.startNewGame(
+                gameId: game.gameId,
+                myUid: game.hostId,
+                partnerUid: game.partnerId,
+                mode: game.gameMode,
+                seedWord: 'PENDING_CHOICE',
+              ),
               child: const Text('Play Again'),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Your Chain Path:',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
             Expanded(
               child: ListView.builder(
                 itemCount: game.rounds.length,
                 itemBuilder: (context, index) {
                   final rd = game.rounds[index];
+                  if (game.gameMode == GameMode.customPrompt && index == 0) {
+                    return ListTile(
+                      leading: const CircleAvatar(
+                        child: Icon(Icons.tune, size: 16),
+                      ),
+                      title: const Text('Baseline Custom Setup'),
+                      subtitle: Text(
+                        'Base Words: ${rd.player1Input ?? "?"} + ${rd.player2Input ?? "?"}',
+                      ),
+                    );
+                  }
                   return ListTile(
-                    leading: CircleAvatar(child: Text('${index + 1}')),
+                    leading: CircleAvatar(
+                      child: Text(
+                        game.gameMode == GameMode.customPrompt
+                            ? '$index'
+                            : '${index + 1}',
+                      ),
+                    ),
                     title: Text('Prompt: ${rd.prompt}'),
                     subtitle: Text(
                       'Answers: ${rd.player1Input ?? "?"} | ${rd.player2Input ?? "?"}',

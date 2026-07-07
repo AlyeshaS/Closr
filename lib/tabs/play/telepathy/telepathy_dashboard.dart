@@ -1,37 +1,33 @@
-// lib/tabs/play/letter_locked/letter_locked_dashboard.dart
+// lib/features/telepathy/presentation/telepathy_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../services/dictionary_service.dart';
-import 'letter_locked_controller.dart';
-import 'letter_locked_game_screen.dart';
+import '../../../models/telepathy_game_model.dart';
+import '../../../services/telepathy_service.dart';
+import '../../../services/word_generator_service.dart';
+import 'telepathy_game_screen.dart';
 
-class LetterLockedDashboard extends StatefulWidget {
-  final String myUid;
-  final String partnerUid;
-
-  const LetterLockedDashboard({
-    super.key,
-    required this.myUid,
-    required this.partnerUid,
-  });
+class TelepathyDashboard extends StatefulWidget {
+  const TelepathyDashboard({super.key});
 
   @override
-  State<LetterLockedDashboard> createState() => _LetterLockedDashboardState();
+  State<TelepathyDashboard> createState() => _TelepathyDashboardState();
 }
 
-class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
-  final LetterLockedController _controller = LetterLockedController();
+class _TelepathyDashboardState extends State<TelepathyDashboard> {
+  final TelepathyFirebaseService _service = TelepathyFirebaseService();
   String _myUid = '';
   String _partnerUid = '';
   String _partnerEmail = '';
-  String _legacyRoomId = '';
+  String _gameId = '';
   bool _isLoading = true;
+
+  // 🎯 FIX 1: Track if we are already showing the game screen to prevent loop navigation stacking
+  bool _isScreenPushed = false;
 
   @override
   void initState() {
     super.initState();
-    DictionaryService.initialize();
     _resolveSession();
   }
 
@@ -68,13 +64,7 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
             if (partnerQuery.docs.isNotEmpty) {
               _partnerUid = partnerQuery.docs.first.id;
               List<String> uids = [_myUid, _partnerUid]..sort();
-              _legacyRoomId = 'letterlocked_${uids[0]}_${uids[1]}';
-
-              await _controller.migrateLegacyRoomIfNeeded(
-                myUid: _myUid,
-                partnerUid: _partnerUid,
-                legacyRoomId: _legacyRoomId,
-              );
+              _gameId = 'telepathy_${uids[0]}_${uids[1]}';
             }
           }
         }
@@ -85,61 +75,26 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
     }
   }
 
-  void _handleGameRouting(String mode) async {
+  void _handleGameRouting(GameMode mode) async {
     if (_partnerUid.isEmpty) return;
     setState(() => _isLoading = true);
 
     try {
-      final gameDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_myUid)
-          .collection('games')
-          .doc('letterlocked')
-          .get();
-
-      if (mounted) {
-        if (gameDoc.exists && gameDoc.data()?['status'] == 'active') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => LetterLockedGameScreen(
-                myUid: _myUid,
-                partnerUid: _partnerUid,
-                legacyRoomId: _legacyRoomId,
-              ),
-            ),
-          );
-        } else {
-          // ✨ Dynamic Cumulative Score Capture Check:
-          // Reads old points if they exist so they NEVER reset to 0
-          Map<String, int> existingScores = {_myUid: 0, _partnerUid: 0};
-          if (gameDoc.exists &&
-              gameDoc.data()?['gameData']?['scores'] != null) {
-            final oldScores =
-                gameDoc.data()?['gameData']['scores'] as Map<String, dynamic>;
-            existingScores[_myUid] = oldScores[_myUid] ?? 0;
-            existingScores[_partnerUid] = oldScores[_partnerUid] ?? 0;
-          }
-
-          await _controller.startNewGame(
-            myUid: _myUid,
-            partnerUid: _partnerUid,
-            mode: mode,
-            existingScores: existingScores, // Pass persistent scores through!
-          );
-
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => LetterLockedGameScreen(
-                  myUid: _myUid,
-                  partnerUid: _partnerUid,
-                  legacyRoomId: _legacyRoomId,
-                ),
-              ),
-            );
-          }
-        }
+      String initialSeed = "Custom Session";
+      if (mode == GameMode.wordsOnly) {
+        initialSeed = await WordGeneratorService.getRandomSeedWord();
+      } else if (mode == GameMode.emojisOnly) {
+        initialSeed = "🔮";
       }
+
+      // Simply write the selection data update directly to the shared document trace
+      await _service.startNewGame(
+        gameId: _gameId,
+        myUid: _myUid,
+        partnerUid: _partnerUid,
+        mode: mode,
+        seedWord: initialSeed,
+      );
     } catch (_) {
     } finally {
       if (mounted) {
@@ -178,31 +133,35 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
 
     return Scaffold(
       backgroundColor: cs.surface,
+      appBar: AppBar(title: const Text('Mind Meld Telepathy')),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('users')
             .doc(_myUid)
             .collection('games')
-            .doc('letterlocked')
+            .doc('telepathy')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasData && snapshot.data!.exists) {
             final gameData = snapshot.data!.data();
 
-            // 🕹️ If game is active and we are just sitting on the dashboard, navigate in!
-            if (gameData?['status'] == 'active') {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
+            // 🎯 FIX 1 Cont.: Check state flag to ensure auto-navigation only fires
+            // if the user is not already actively viewing the gameplay screen.
+            if (gameData?['status'] == 'active' &&
+                gameData?['seedWord'] != 'PENDING_CHOICE' &&
+                !_isScreenPushed) {
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
                 if (mounted) {
-                  // Check if we are already displaying the game screen to avoid duplicate pushing
-                  Navigator.of(context).push(
+                  _isScreenPushed = true;
+                  await Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => LetterLockedGameScreen(
+                      builder: (_) => TelepathyGameScreen(
                         myUid: _myUid,
                         partnerUid: _partnerUid,
-                        legacyRoomId: _legacyRoomId,
                       ),
                     ),
                   );
+                  _isScreenPushed = false;
                 }
               });
             }
@@ -223,19 +182,34 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
                 const SizedBox(height: 16),
                 _buildCleanModeCard(
                   context: context,
-                  title: 'Co-op Vault Mode',
+                  title: 'Random AI Word',
                   subtitle:
-                      'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative.',
-                  onTap: () => _handleGameRouting('coop'),
+                      'The system generates a random seed word to kickstart your matching pool.',
+                  icon: Icons.casino_outlined,
+                  iconColor: cs.primary,
+                  onTap: () => _handleGameRouting(GameMode.wordsOnly),
                   cs: cs,
                 ),
                 const SizedBox(height: 12),
                 _buildCleanModeCard(
                   context: context,
-                  title: 'Versus Word Trap',
+                  title: 'Emojis Only',
                   subtitle:
-                      'Change exactly one letter to morph the word. Trap your partner by locking their choices out.',
-                  onTap: () => _handleGameRouting('versus'),
+                      'Link minds and predict connection points strictly using symbols.',
+                  icon: Icons.emoji_emotions_outlined,
+                  iconColor: Colors.purple,
+                  onTap: () => _handleGameRouting(GameMode.emojisOnly),
+                  cs: cs,
+                ),
+                const SizedBox(height: 12),
+                _buildCleanModeCard(
+                  context: context,
+                  title: 'Create Your Own',
+                  subtitle:
+                      'Both enter a hidden baseline word. They merge to build your initial prompt challenge.',
+                  icon: Icons.tune_rounded,
+                  iconColor: Colors.orange[700]!,
+                  onTap: () => _handleGameRouting(GameMode.customPrompt),
                   cs: cs,
                 ),
               ],
@@ -250,6 +224,8 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
     required BuildContext context,
     required String title,
     required String subtitle,
+    required IconData icon,
+    required Color iconColor,
     required VoidCallback onTap,
     required ColorScheme cs,
   }) {
@@ -270,10 +246,10 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: cs.primaryContainer,
+                color: iconColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.layers_rounded, color: cs.primary),
+              child: Icon(icon, color: iconColor),
             ),
             const SizedBox(width: 14),
             Expanded(
