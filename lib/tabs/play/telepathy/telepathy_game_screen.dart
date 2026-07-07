@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/telepathy_game_model.dart';
 import '../../../services/telepathy_service.dart';
 import '../../../services/word_generator_service.dart';
+import 'emoji_pool.dart';
 
 class TelepathyGameScreen extends StatefulWidget {
   final String myUid;
@@ -129,7 +130,7 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                             ),
                           ),
                         ),
-                        game.gameMode != GameMode.wordsOnly
+                        game.gameMode == GameMode.customPrompt
                             ? const SizedBox(width: 40)
                             : _isChangingWord
                             ? const SizedBox(
@@ -147,17 +148,25 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                                   Icons.refresh_rounded,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
-                                tooltip: 'Change Word',
+                                tooltip: game.gameMode == GameMode.emojisOnly
+                                    ? 'Change Emoji'
+                                    : 'Change Word',
                                 onPressed: () async {
                                   setState(() => _isChangingWord = true);
+
+                                  // ✅ FIX: Determine whether to pull a random word or a random emoji
                                   final String newSeed =
-                                      await WordGeneratorService.getRandomSeedWord();
+                                      game.gameMode == GameMode.emojisOnly
+                                      ? EmojiPool.getRandomEmoji()
+                                      : await WordGeneratorService.getRandomSeedWord();
+
                                   await _service.changeSeedWord(
                                     game: game,
                                     newSeed: newSeed,
                                   );
-                                  if (mounted)
+                                  if (mounted) {
                                     setState(() => _isChangingWord = false);
+                                  }
                                 },
                               ),
                       ],

@@ -1,6 +1,5 @@
 // lib/features/telepathy/presentation/telepathy_controller.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/telepathy_game_model.dart';
 import '../../../services/telepathy_service.dart';
 

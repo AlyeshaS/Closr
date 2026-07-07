@@ -6,6 +6,7 @@ import '../../../models/telepathy_game_model.dart';
 import '../../../services/telepathy_service.dart';
 import '../../../services/word_generator_service.dart';
 import 'telepathy_game_screen.dart';
+import "emoji_pool.dart";
 
 class TelepathyDashboard extends StatefulWidget {
   const TelepathyDashboard({super.key});
@@ -129,7 +130,8 @@ class _TelepathyDashboardState extends State<TelepathyDashboard> {
       if (mode == GameMode.wordsOnly) {
         initialSeed = await WordGeneratorService.getRandomSeedWord();
       } else if (mode == GameMode.emojisOnly) {
-        initialSeed = "🔮";
+        // ✅ FIX: Grab a fully randomized emoji for the starting seed
+        initialSeed = EmojiPool.getRandomEmoji();
       }
 
       // Simply write the selection data update directly to the shared document trace
