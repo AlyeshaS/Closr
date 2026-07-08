@@ -9,6 +9,7 @@ import 'auth/auth_gate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme_provider.dart';
 import 'services/notifications_service.dart';
+import 'pet_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -334,7 +335,9 @@ class MyApp extends StatelessWidget {
           theme: _lightTheme(),
           darkTheme: _darkTheme(),
           themeMode: themeProvider.themeMode,
-          home: const AuthGate(),
+          // home: const AuthGate(),
+          home:
+              const MyPetScreen(), // 🚀 This will boot straight to your beaver model now!
           routes: {
             '/welcome': (context) => const WelcomeScreen(),
             '/main': (context) => const MainPage(),
