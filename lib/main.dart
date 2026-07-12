@@ -5,7 +5,6 @@ import 'firebase_options.dart';
 import 'tabs/suggestions/suggestions_screen.dart';
 import 'welcome_screen.dart';
 import 'main_page.dart';
-import 'auth/auth_gate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme_provider.dart';
 import 'services/notifications_service.dart';
@@ -336,8 +335,7 @@ class MyApp extends StatelessWidget {
           darkTheme: _darkTheme(),
           themeMode: themeProvider.themeMode,
           // home: const AuthGate(),
-          home:
-              const MyPetScreen(), // 🚀 This will boot straight to your beaver model now!
+          home: MyPetScreen(),
           routes: {
             '/welcome': (context) => const WelcomeScreen(),
             '/main': (context) => const MainPage(),

@@ -14,21 +14,13 @@ class _MyPetScreenState extends State<MyPetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text("My 3D Pet"), centerTitle: true),
+      appBar: AppBar(title: const Text("My 3D Pet")),
       body: Center(
-        child: Container(
-          width: 320,
-          height: 320,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Flutter3DViewer(
-            controller: _controller,
-            src:
-                'https://firebasestorage.googleapis.com/v0/b/hackhive-2026.firebasestorage.app/o/animals%2Fmodel.glb?alt=media&token=9d287146-8703-4605-b4f0-f59d89d3cf5e',
-          ),
+        child: Flutter3DViewer(
+          controller: _controller,
+          // 💡 Your secure, open-CORS Firebase Storage link:
+          src:
+              'https://firebasestorage.googleapis.com/v0/b/hackhive-2026.firebasestorage.app/o/animals%2Fmodel.glb?alt=media&token=9d287146-8703-4605-b4f0-f59d89d3cf5e',
         ),
       ),
     );
