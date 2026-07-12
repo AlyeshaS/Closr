@@ -197,8 +197,8 @@ class _QuestsTabState extends State<_QuestsTab> {
                   lastUpdated = data?['week_start_date'] as Timestamp?;
                 }
 
-                // Fire off asynchronous generation if required
-                _verifyWeeklyQuests(coupleDocId, quests, lastUpdated);
+                // // Fire off asynchronous generation if required
+                // _verifyWeeklyQuests(coupleDocId, quests, lastUpdated);
 
                 if (quests.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
@@ -346,19 +346,26 @@ class _QuestsTabState extends State<_QuestsTab> {
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
-                                    child: Text(
-                                      quest['title'] ?? '',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            color: done
-                                                ? cs.onSurfaceVariant
-                                                : cs.onSurface,
-                                            decoration: done
-                                                ? TextDecoration.lineThrough
-                                                : TextDecoration.none,
-                                          ),
+                                    child: Padding(
+                                      // 💡 Adds a comfortable gap between the text and the checkmark button
+                                      padding: const EdgeInsets.only(right: 16),
+                                      child: Text(
+                                        quest['title'] ?? '',
+                                        // 💡 Caps it beautifully at 2 lines max
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.copyWith(
+                                              color: done
+                                                  ? cs.onSurfaceVariant
+                                                  : cs.onSurface,
+                                              decoration: done
+                                                  ? TextDecoration.lineThrough
+                                                  : TextDecoration.none,
+                                            ),
+                                      ),
                                     ),
                                   ),
                                   AnimatedContainer(
@@ -392,7 +399,7 @@ class _QuestsTabState extends State<_QuestsTab> {
                       const SizedBox(height: 8),
                       Center(
                         child: Text(
-                          'More quests & bingo challenges coming soon',
+                          'More quests challenges coming soon',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: cs.onSurfaceVariant.withOpacity(0.6),
