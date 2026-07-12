@@ -9,6 +9,7 @@ import 'auth/auth_gate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme_provider.dart';
 import 'services/notifications_service.dart';
+import 'theme/closr_colors.dart'; // Ensure you import your custom colors file!
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +29,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // ── Light theme ──────────────────────────────────────────────────────────────
+  // ── Light Theme (Your Signature Pink, Yellow, & Beige) ────────────────────
   static ThemeData _lightTheme() {
     const cs = ColorScheme(
       brightness: Brightness.light,
@@ -36,7 +37,7 @@ class MyApp extends StatelessWidget {
       onPrimary: Color(0xFFFFFFFF),
       secondary: Color(0xFFD4A0AB),
       onSecondary: Color(0xFFFFFFFF),
-      surface: Color(0xFFFDF6EE),
+      surface: Color(0xFFFDF6EE), // Beautiful warm beige/yellow background
       onSurface: Color(0xFF2A1A1F),
       error: Color(0xFFB94A4A),
       onError: Colors.white,
@@ -53,10 +54,22 @@ class MyApp extends StatelessWidget {
       onInverseSurface: Color(0xFFFDF6EE),
       inversePrimary: Color(0xFFD4A0AB),
     );
-    return _buildTheme(cs);
+
+    return _buildTheme(
+      cs,
+      customExtensions: <ThemeExtension<dynamic>>[
+        const ClosrColors(
+          primaryAccent: Color(0xFFC4737F), // Main pink
+          gradientStart: Color(0xFFFF8EAF), // Warm pastel pink highlight
+          gradientEnd: Color(0xFFC4737F), // Your structural signature pink
+          surfaceCard: Color(0xCCFFFFFF), // Translucent white for glassmorphism
+          innerHighlight: Color(0x33FFFFFF),
+        ),
+      ],
+    );
   }
 
-  // ── Dark theme ───────────────────────────────────────────────────────────────
+  // ── Dark Theme (Moody with Soft Pink Highlights) ───────────────────────────
   static ThemeData _darkTheme() {
     const cs = ColorScheme(
       brightness: Brightness.dark,
@@ -64,7 +77,7 @@ class MyApp extends StatelessWidget {
       onPrimary: Color(0xFF1A0A0F),
       secondary: Color(0xFFB87A88),
       onSecondary: Color(0xFFFDF0F2),
-      surface: Color(0xFF1C1214),
+      surface: Color(0xFF1C1214), // Midnight plum-charcoal background
       onSurface: Color(0xFFF2E0E4),
       error: Color(0xFFCF6679),
       onError: Color(0xFF1A0A0F),
@@ -81,10 +94,26 @@ class MyApp extends StatelessWidget {
       onInverseSurface: Color(0xFF1C1214),
       inversePrimary: Color(0xFFC4737F),
     );
-    return _buildTheme(cs);
+
+    return _buildTheme(
+      cs,
+      customExtensions: <ThemeExtension<dynamic>>[
+        const ClosrColors(
+          primaryAccent: Color(0xFFD4949F),
+          gradientStart: Color(0xFF3D1E25), // Deeper plum gradient start
+          gradientEnd: Color(0xFF1C1214),
+          surfaceCard: Color(0xFF231519), // Solid dark surface card
+          innerHighlight: Color(0x1AFFFFFF), // Minimal clear border ring
+        ),
+      ],
+    );
   }
 
-  static ThemeData _buildTheme(ColorScheme cs) {
+  // ── Unified Theme Builder ──────────────────────────────────────────────────
+  static ThemeData _buildTheme(
+    ColorScheme cs, {
+    required List<ThemeExtension<dynamic>> customExtensions,
+  }) {
     final isDark = cs.brightness == Brightness.dark;
     return ThemeData(
       colorScheme: cs,
@@ -95,6 +124,9 @@ class MyApp extends StatelessWidget {
       highlightColor: cs.primary.withValues(alpha: 0.08),
       hoverColor: cs.primary.withValues(alpha: 0.06),
       focusColor: cs.primary.withValues(alpha: 0.10),
+
+      // Injecting our custom layout system variables into Flutter's extensions engine
+      extensions: customExtensions,
 
       textTheme: TextTheme(
         displayMedium: TextStyle(
@@ -144,7 +176,9 @@ class MyApp extends StatelessWidget {
         color: isDark ? const Color(0xFF231519) : Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(
+            24,
+          ), // Upgraded to smooth 24px modern curves
           side: BorderSide(color: cs.outlineVariant),
         ),
       ),
