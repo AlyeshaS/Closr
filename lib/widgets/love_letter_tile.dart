@@ -4,110 +4,131 @@ import '../tabs/connect/love_letter_detail.dart';
 
 class LoveLetterTile extends StatelessWidget {
   final LoveLetter letter;
-  final VoidCallback? onTap;
   final bool isSent;
+  final VoidCallback onTap;
 
   const LoveLetterTile({
     required this.letter,
-    this.onTap,
-    this.isSent = false,
+    required this.isSent,
+    required this.onTap,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final accentColor = isSent ? cs.secondary : cs.primary;
-    final cardColor = theme.cardTheme.color ?? cs.surface;
+    final cs = Theme.of(context).colorScheme;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap:
-            onTap ??
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => LoveLetterDetailPage(letter: letter),
-              ),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface.withOpacity(0.45),
         borderRadius: BorderRadius.circular(24),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: cs.outlineVariant),
-            boxShadow: [
-              BoxShadow(
-                color: cs.outlineVariant.withOpacity(0.14),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withOpacity(0.015),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Left Accent Indicator Bar
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: 5,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: cs.primaryContainer,
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    child: Icon(
-                      isSent ? Icons.send_rounded : Icons.inbox_rounded,
-                      size: 18,
-                      color: accentColor,
+                      color: cs.primary.withOpacity(0.6),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        bottomLeft: Radius.circular(24),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+
+                  // Card Content
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isSent ? 'Sent letter' : 'Received letter',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _formatDate(letter.createdAt),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onSurfaceVariant,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 20, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: cs.primaryContainer.withOpacity(
+                                        0.4,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isSent
+                                          ? Icons.outbox_rounded
+                                          : Icons.all_inbox_rounded,
+                                      size: 14,
+                                      color: cs.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    _formatDate(letter.createdAt),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                          color: cs.onSurfaceVariant
+                                              .withOpacity(0.8),
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.3,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: cs.onSurfaceVariant.withOpacity(0.35),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          Text(
+                            letter.text,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: cs.onSurface.withOpacity(0.8),
+                                  height: 1.5,
+                                  letterSpacing: 0.1,
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                letter.text,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  static String _formatDate(DateTime dt) {
-    // simple MM/DD or if older show yyyy
-    final now = DateTime.now();
-    if (dt.year == now.year) {
-      return '${dt.month}/${dt.day}';
-    }
+  String _formatDate(DateTime dt) {
     return '${dt.month}/${dt.day}/${dt.year}';
   }
 }

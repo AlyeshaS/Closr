@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/love_letter_service.dart';
-import '../../widgets/love_letter_tile.dart';
 import '../../models/love_letter.dart';
 import 'compose_love_letter.dart';
+import 'love_letter_detail.dart';
 
 class LoveLettersTab extends StatefulWidget {
   const LoveLettersTab({super.key});
@@ -13,8 +13,25 @@ class LoveLettersTab extends StatefulWidget {
   State<LoveLettersTab> createState() => _LoveLettersTabState();
 }
 
-class _LoveLettersTabState extends State<LoveLettersTab> {
+class _LoveLettersTabState extends State<LoveLettersTab>
+    with SingleTickerProviderStateMixin {
   bool _showSent = false;
+  late final AnimationController _bgAnimationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _bgAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _bgAnimationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,12 +39,25 @@ class _LoveLettersTabState extends State<LoveLettersTab> {
 
     return Stack(
       children: [
+        // 1. Full-screen drifting background hearts canvas[cite: 3]
         Positioned.fill(
-          child: IgnorePointer(child: Container(color: cs.surface)),
+          child: IgnorePointer(
+            child: Container(
+              color: cs.surface, // Clean theme background[cite: 3]
+              child: Stack(
+                children: [
+                  for (int i = 0; i < 40; i++)
+                    _buildBackgroundHeart(i, cs, _bgAnimationController),
+                ],
+              ),
+            ),
+          ),
         ),
+
+        // 2. Main content layer[cite: 3]
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 106),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: StreamBuilder<List<LoveLetter>>(
               initialData: const <LoveLetter>[],
               stream: LoveLetterService().streamForCurrentUser(),
@@ -48,79 +78,56 @@ class _LoveLettersTabState extends State<LoveLettersTab> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _LettersToggle(
+                      cs: cs,
+                      showSent: _showSent,
+                      sentCount: sent.length,
+                      receivedCount: received.length,
+                      onChanged: (value) => setState(() => _showSent = value),
+                    ),
+                    const SizedBox(height: 24),
                     Expanded(
-                      child: _SectionShell(
-                        cs: cs,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-                              child: _LettersToggle(
-                                cs: cs,
-                                showSent: _showSent,
-                                sentCount: sent.length,
-                                receivedCount: received.length,
-                                onChanged: (value) =>
-                                    setState(() => _showSent = value),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Expanded(
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 240),
-                                switchInCurve: Curves.easeOut,
-                                switchOutCurve: Curves.easeIn,
-                                transitionBuilder: (child, animation) {
-                                  return FadeTransition(
-                                    opacity: animation,
-                                    child: child,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: listToShow.isEmpty
+                            ? _buildEmptyState(context, cs, isSent: _showSent)
+                            : ListView.separated(
+                                key: ValueKey<bool>(_showSent),
+                                padding: const EdgeInsets.only(bottom: 100),
+                                itemCount: listToShow.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 14),
+                                itemBuilder: (context, idx) {
+                                  final letter = listToShow[idx];
+                                  if (_showSent) {
+                                    return LoveLetterTile(
+                                      letter: letter,
+                                      isSent: true,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ComposeLoveLetterPage(
+                                            editingLetter: letter,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  return LoveLetterTile(
+                                    letter: letter,
+                                    isSent: false,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => LoveLetterDetailPage(
+                                          letter: letter,
+                                        ),
+                                      ),
+                                    ),
                                   );
                                 },
-                                child: listToShow.isEmpty
-                                    ? _buildEmptyState(
-                                        context,
-                                        cs,
-                                        isSent: _showSent,
-                                      )
-                                    : ListView.separated(
-                                        key: ValueKey<bool>(_showSent),
-                                        padding: const EdgeInsets.fromLTRB(
-                                          14,
-                                          0,
-                                          14,
-                                          14,
-                                        ),
-                                        itemCount: listToShow.length,
-                                        separatorBuilder: (_, __) =>
-                                            const SizedBox(height: 12),
-                                        itemBuilder: (context, idx) {
-                                          final letter = listToShow[idx];
-                                          if (_showSent) {
-                                            return LoveLetterTile(
-                                              letter: letter,
-                                              isSent: true,
-                                              onTap: () => Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      ComposeLoveLetterPage(
-                                                        editingLetter: letter,
-                                                      ),
-                                                ),
-                                              ),
-                                            );
-                                          }
-
-                                          return LoveLetterTile(
-                                            letter: letter,
-                                            isSent: false,
-                                          );
-                                        },
-                                      ),
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ],
@@ -129,21 +136,71 @@ class _LoveLettersTabState extends State<LoveLettersTab> {
             ),
           ),
         ),
+
+        // 3. Floating Action Button[cite: 3]
         Positioned(
           right: 20,
           bottom: 24,
           child: FloatingActionButton.extended(
             backgroundColor: cs.primary,
             foregroundColor: cs.onPrimary,
+            elevation: 3,
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => ComposeLoveLetterPage()),
+              MaterialPageRoute(builder: (_) => const ComposeLoveLetterPage()),
             ),
-            icon: const Icon(Icons.edit_rounded),
-            label: const Text('Write'),
+            icon: const Icon(Icons.edit_rounded, size: 18),
+            label: const Text(
+              'Write',
+              style: TextStyle(fontWeight: FontWeight.w400, letterSpacing: 0.5),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildBackgroundHeart(
+    int i,
+    ColorScheme cs,
+    AnimationController controller,
+  ) {
+    final rand = math.Random(i * 4231);
+    final x = (rand.nextDouble() * 2) - 1;
+    final y = (rand.nextDouble() * 2) - 1;
+    final size = 12.0 + rand.nextDouble() * 26;
+    final opacity = 0.03 + rand.nextDouble() * 0.05;
+
+    final hSpeed = 0.8 + rand.nextDouble() * 0.7;
+    final vSpeed = 0.8 + rand.nextDouble() * 0.7;
+    final phase = rand.nextDouble() * math.pi * 2;
+
+    return Align(
+      alignment: Alignment(x, y),
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final t = controller.value * math.pi * 2 + phase;
+          final dx = math.sin(t * hSpeed) * 16.0;
+          final dy = math.cos(t * vSpeed) * 14.0;
+          final rot = math.sin(t * 0.4) * 0.2;
+
+          return Transform.translate(
+            offset: Offset(dx, dy),
+            child: Transform.rotate(
+              angle: rot,
+              child: Opacity(
+                opacity: opacity,
+                child: Icon(
+                  Icons.favorite_rounded,
+                  size: size,
+                  color: cs.primary,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -156,59 +213,34 @@ class _LoveLettersTabState extends State<LoveLettersTab> {
     final message = isSent
         ? 'Letters you send will appear here, ready to reopen later.'
         : 'Letters from your partner will land here like little keepsakes.';
-    final chipText = isSent ? 'Send your first one' : 'Wait for a reply';
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 82,
-              height: 82,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: cs.primaryContainer,
-                border: Border.all(color: cs.outlineVariant),
-              ),
-              child: Icon(
-                isSent ? Icons.send_rounded : Icons.mail_outline_rounded,
-                size: 34,
-                color: cs.primary,
-              ),
+            Icon(
+              isSent ? Icons.send_rounded : Icons.mail_outline_rounded,
+              size: 36,
+              color: cs.primary.withOpacity(0.4),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w400,
+                color: cs.onSurface.withOpacity(0.9),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant.withOpacity(0.6),
+                fontWeight: FontWeight.w300,
+              ),
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(100),
-                border: Border.all(color: cs.outlineVariant),
-              ),
-              child: Text(
-                chipText,
-                style: TextStyle(
-                  fontFamily: 'DMSans',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: cs.primary,
-                ),
-              ),
             ),
           ],
         ),
@@ -235,259 +267,246 @@ class _LettersToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.outlineVariant),
+        color: cs.onSurface.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: cs.onSurface.withOpacity(0.05)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ToggleButton(
-              active: showSent,
-              icon: Icons.send_rounded,
-              label: 'Sent ($sentCount)',
-              onTap: () => onChanged(true),
-              cs: cs,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _ToggleButton(
-              active: !showSent,
-              icon: Icons.inbox_rounded,
-              label: 'Received ($receivedCount)',
-              onTap: () => onChanged(false),
-              cs: cs,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = (constraints.maxWidth - 4) / 2;
+
+          return Stack(
+            children: [
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.fastOutSlowIn,
+                alignment: showSent
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: Container(
+                  width: tabWidth,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: cs.surface,
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SlidingLabelButton(
+                      active: showSent,
+                      icon: Icons.outbox_rounded,
+                      label: 'Sent',
+                      count: sentCount,
+                      onTap: () => onChanged(true),
+                      cs: cs,
+                    ),
+                  ),
+                  Expanded(
+                    child: _SlidingLabelButton(
+                      active: !showSent,
+                      icon: Icons.all_inbox_rounded,
+                      label: 'Received',
+                      count: receivedCount,
+                      onTap: () => onChanged(false),
+                      cs: cs,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _ToggleButton extends StatelessWidget {
+class _SlidingLabelButton extends StatelessWidget {
   final bool active;
   final IconData icon;
   final String label;
+  final int count;
   final VoidCallback onTap;
   final ColorScheme cs;
 
-  const _ToggleButton({
+  const _SlidingLabelButton({
     required this.active,
     required this.icon,
     required this.label,
+    required this.count,
     required this.onTap,
     required this.cs,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedScale(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutBack,
-          scale: active ? 1.0 : 0.985,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: active ? cs.surface : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: active
-                  ? [
-                      BoxShadow(
-                        color: cs.outlineVariant.withOpacity(0.14),
-                        blurRadius: 14,
-                        offset: const Offset(0, 5),
-                      ),
-                    ]
-                  : null,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: 38,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: active ? cs.primary : cs.onSurfaceVariant.withOpacity(0.6),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: active ? cs.primary : cs.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: active ? cs.onSurface : cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w400 : FontWeight.w300,
+                color: active
+                    ? cs.onSurface
+                    : cs.onSurfaceVariant.withOpacity(0.8),
+                letterSpacing: 0.1,
+              ),
             ),
-          ),
+            const SizedBox(width: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: active
+                    ? cs.primaryContainer.withOpacity(0.6)
+                    : cs.onSurface.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: active ? FontWeight.w500 : FontWeight.w300,
+                  color: active
+                      ? cs.primary
+                      : cs.onSurfaceVariant.withOpacity(0.7),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _SectionShell extends StatelessWidget {
-  final ColorScheme cs;
-  final Widget child;
+// Redesigned: Cards featuring rich shadows and primary colored borders
+class LoveLetterTile extends StatelessWidget {
+  final LoveLetter letter;
+  final bool isSent;
+  final VoidCallback onTap;
 
-  const _SectionShell({super.key, required this.cs, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: cs.outlineVariant.withOpacity(0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Generate many floating hearts for a soft background pattern
-          for (int i = 0; i < 50; i++) _buildHeart(i, cs),
-          // Main content
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeart(int i, ColorScheme cs) {
-    // Evenly distribute hearts in a grid, add tiny jitter for natural look
-    const total = 50;
-    final cols = (math.sqrt(total)).ceil();
-    final rows = (total / cols).ceil();
-    final col = i % cols;
-    final row = i ~/ cols;
-
-    final rand = math.Random(i * 7919);
-    final jitterX = (rand.nextDouble() - 0.5) * 0.18; // small horizontal jitter
-    final jitterY = (rand.nextDouble() - 0.5) * 0.14; // small vertical jitter
-
-    double x;
-    if (cols == 1) {
-      x = 0.0;
-    } else {
-      x = (col / (cols - 1)) * 2 - 1; // -1..1
-    }
-
-    double y;
-    if (rows == 1) {
-      y = 0.0;
-    } else {
-      y = (row / (rows - 1)) * 2 - 1; // -1..1
-    }
-
-    x = (x + jitterX).clamp(-1.0, 1.0);
-    y = (y + jitterY).clamp(-1.0, 1.0);
-
-    final size = 10 + rand.nextDouble() * 36; // 10..46
-    final opacity = 0.03 + rand.nextDouble() * 0.06; // 0.03..0.09
-    final durationSeconds = 4 + rand.nextInt(5); // 4..8
-    final hRange = 0.6 + rand.nextDouble() * 1.4; // small movement
-    final vRange = 0.6 + rand.nextDouble() * 1.0; // small movement
-    final rotation = (rand.nextDouble() - 0.5) * 0.4; // subtle tilt
-    final delayMs = rand.nextInt(900);
-
-    return Align(
-      alignment: Alignment(x as double, y as double),
-      child: _FloatingHeart(
-        size: size,
-        color: cs.primary.withOpacity(opacity),
-        duration: Duration(seconds: durationSeconds),
-        horizontalRange: hRange,
-        verticalRange: vRange,
-        rotation: rotation,
-        delay: Duration(milliseconds: delayMs),
-      ),
-    );
-  }
-}
-
-class _FloatingHeart extends StatefulWidget {
-  final double size;
-  final Color color;
-  final Duration duration;
-  final double horizontalRange;
-  final double verticalRange;
-  final double rotation;
-  final Duration delay;
-
-  const _FloatingHeart({
+  const LoveLetterTile({
+    required this.letter,
+    required this.isSent,
+    required this.onTap,
     super.key,
-    required this.size,
-    required this.color,
-    required this.duration,
-    this.horizontalRange = 6,
-    this.verticalRange = 6,
-    this.rotation = 0.0,
-    this.delay = Duration.zero,
   });
 
   @override
-  State<_FloatingHeart> createState() => _FloatingHeartState();
-}
-
-class _FloatingHeartState extends State<_FloatingHeart>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: widget.duration);
-
-    if (widget.delay > Duration.zero) {
-      Future.delayed(widget.delay, () {
-        if (mounted) _ctrl.repeat(reverse: true);
-      });
-    } else {
-      _ctrl.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, child) {
-        final t = _ctrl.value * math.pi * 2;
-        final dx = math.sin(t) * widget.horizontalRange;
-        final dy = math.cos(t) * widget.verticalRange * 0.6;
-        final rot = widget.rotation * math.sin(t * 0.5);
+    final cs = Theme.of(context).colorScheme;
 
-        return Transform.translate(
-          offset: Offset(dx, dy),
-          child: Transform.rotate(angle: rot, child: child),
-        );
-      },
-      child: Icon(
-        Icons.favorite_rounded,
-        size: widget.size,
-        color: widget.color,
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(20),
+        // Softened home page primary border color
+        border: Border.all(color: cs.primary.withOpacity(0.2), width: 1.0),
+        boxShadow: [
+          // Single, incredibly soft ambient drop shadow
+          BoxShadow(
+            color: cs.shadow.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withOpacity(0.06),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isSent
+                                  ? Icons.outbox_rounded
+                                  : Icons.all_inbox_rounded,
+                              size: 13,
+                              color: cs.primary.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatDate(letter.createdAt),
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: cs.onSurface.withOpacity(0.55),
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: 0.2,
+                                ),
+                          ),
+                        ],
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: cs.primary.withOpacity(0.35),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    letter.text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurface.withOpacity(0.85),
+                      fontWeight: FontWeight.w300,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.month}/${dt.day}/${dt.year}';
   }
 }
