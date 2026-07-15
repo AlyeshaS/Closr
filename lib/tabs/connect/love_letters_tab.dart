@@ -406,7 +406,7 @@ class _SlidingLabelButton extends StatelessWidget {
   }
 }
 
-// Solid design: Soft light-pink background with vibrant primary-color borders
+// Solid design: Soft light-pink background with vibrant primary-color borders and title display
 class LoveLetterTile extends StatelessWidget {
   final LoveLetter letter;
   final bool isSent;
@@ -425,16 +425,10 @@ class LoveLetterTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        // Soft, gorgeous light pink container background color
         color: cs.primaryContainer.withOpacity(0.65),
         borderRadius: BorderRadius.circular(20),
-        // Active, solid border matching the Deep Talk standard
-        border: Border.all(
-          color: cs.primary, // Pure solid primary color (No opacity filters!)
-          width: 1.4, // Defined thickness to stand out cleanly
-        ),
+        border: Border.all(color: cs.primary, width: 1.4),
         boxShadow: [
-          // Gentle ambient glow that lifts the card off the screen
           BoxShadow(
             color: cs.primary.withOpacity(0.04),
             blurRadius: 10,
@@ -475,7 +469,7 @@ class LoveLetterTile extends StatelessWidget {
                                   ? Icons.outbox_rounded
                                   : Icons.all_inbox_rounded,
                               size: 13,
-                              color: cs.primary, // Clean solid primary color
+                              color: cs.primary,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -484,8 +478,7 @@ class LoveLetterTile extends StatelessWidget {
                             style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(
                                   color: cs.onSurface.withOpacity(0.55),
-                                  fontWeight:
-                                      FontWeight.w400, // Skinny metadata weight
+                                  fontWeight: FontWeight.w400,
                                   letterSpacing: 0.2,
                                 ),
                           ),
@@ -494,19 +487,20 @@ class LoveLetterTile extends StatelessWidget {
                       Icon(
                         Icons.chevron_right_rounded,
                         size: 18,
-                        color: cs.primary, // Clear clickable indicator color
+                        color: cs.primary,
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // Render the letter TITLE here instead of the raw body content
                   Text(
-                    letter.text,
-                    maxLines: 2,
+                    letter.title,
+                    maxLines: 1, // Kept to 1 line for clean title styling
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withOpacity(0.85),
-                      fontWeight: FontWeight.w300, // Elegant thin body text
-                      height: 1.5,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: cs.onSurface.withOpacity(0.9),
+                      fontWeight: FontWeight.w400, // Medium-thin title text
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ],
