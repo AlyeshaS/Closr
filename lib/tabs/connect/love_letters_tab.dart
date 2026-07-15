@@ -39,11 +39,11 @@ class _LoveLettersTabState extends State<LoveLettersTab>
 
     return Stack(
       children: [
-        // 1. Full-screen drifting background hearts canvas[cite: 3]
+        // 1. Drifting background hearts
         Positioned.fill(
           child: IgnorePointer(
             child: Container(
-              color: cs.surface, // Clean theme background[cite: 3]
+              color: cs.surface,
               child: Stack(
                 children: [
                   for (int i = 0; i < 40; i++)
@@ -54,7 +54,7 @@ class _LoveLettersTabState extends State<LoveLettersTab>
           ),
         ),
 
-        // 2. Main content layer[cite: 3]
+        // 2. Main interactive layer
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -137,7 +137,7 @@ class _LoveLettersTabState extends State<LoveLettersTab>
           ),
         ),
 
-        // 3. Floating Action Button[cite: 3]
+        // 3. Floating Action Button
         Positioned(
           right: 20,
           bottom: 24,
@@ -249,6 +249,7 @@ class _LoveLettersTabState extends State<LoveLettersTab>
   }
 }
 
+// Sliding Toggle Component
 class _LettersToggle extends StatelessWidget {
   final ColorScheme cs;
   final bool showSent;
@@ -405,7 +406,7 @@ class _SlidingLabelButton extends StatelessWidget {
   }
 }
 
-// Redesigned: Cards featuring rich shadows and primary colored borders
+// Solid design: Soft light-pink background with vibrant primary-color borders
 class LoveLetterTile extends StatelessWidget {
   final LoveLetter letter;
   final bool isSent;
@@ -424,14 +425,18 @@ class LoveLetterTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: cs.surface,
+        // Soft, gorgeous light pink container background color
+        color: cs.primaryContainer.withOpacity(0.65),
         borderRadius: BorderRadius.circular(20),
-        // Softened home page primary border color
-        border: Border.all(color: cs.primary.withOpacity(0.2), width: 1.0),
+        // Active, solid border matching the Deep Talk standard
+        border: Border.all(
+          color: cs.primary, // Pure solid primary color (No opacity filters!)
+          width: 1.4, // Defined thickness to stand out cleanly
+        ),
         boxShadow: [
-          // Single, incredibly soft ambient drop shadow
+          // Gentle ambient glow that lifts the card off the screen
           BoxShadow(
-            color: cs.shadow.withOpacity(0.03),
+            color: cs.primary.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -443,6 +448,8 @@ class LoveLetterTile extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
+            splashColor: cs.primary.withOpacity(0.08),
+            highlightColor: cs.primary.withOpacity(0.04),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               child: Column(
@@ -456,15 +463,19 @@ class LoveLetterTile extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: cs.primary.withOpacity(0.06),
+                              color: cs.surface.withOpacity(0.8),
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: cs.primary.withOpacity(0.15),
+                                width: 1.0,
+                              ),
                             ),
                             child: Icon(
                               isSent
                                   ? Icons.outbox_rounded
                                   : Icons.all_inbox_rounded,
                               size: 13,
-                              color: cs.primary.withOpacity(0.7),
+                              color: cs.primary, // Clean solid primary color
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -473,7 +484,8 @@ class LoveLetterTile extends StatelessWidget {
                             style: Theme.of(context).textTheme.labelMedium
                                 ?.copyWith(
                                   color: cs.onSurface.withOpacity(0.55),
-                                  fontWeight: FontWeight.w400,
+                                  fontWeight:
+                                      FontWeight.w400, // Skinny metadata weight
                                   letterSpacing: 0.2,
                                 ),
                           ),
@@ -481,8 +493,8 @@ class LoveLetterTile extends StatelessWidget {
                       ),
                       Icon(
                         Icons.chevron_right_rounded,
-                        size: 16,
-                        color: cs.primary.withOpacity(0.35),
+                        size: 18,
+                        color: cs.primary, // Clear clickable indicator color
                       ),
                     ],
                   ),
@@ -493,7 +505,7 @@ class LoveLetterTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurface.withOpacity(0.85),
-                      fontWeight: FontWeight.w300,
+                      fontWeight: FontWeight.w300, // Elegant thin body text
                       height: 1.5,
                     ),
                   ),
