@@ -28,7 +28,7 @@ class _LoveLettersTabState extends State<LoveLettersTab>
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
 
-    // 3. Tab Dissolve Transition Animation Setup
+    // Tab Dissolve Entrance Animation
     _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -315,7 +315,7 @@ class _LettersToggle extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(
                       0xFFFCFBF7,
-                    ), // Matched to the exact crisp white of your cards
+                    ), // Matching crisp white card background
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: [
                       BoxShadow(
@@ -449,9 +449,9 @@ class LoveLetterTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFCFBF7), // Warm stationery background[cite: 8]
+        color: const Color(0xFFFCFBF7), // Warm stationery feel
         borderRadius: BorderRadius.circular(16),
-        // Added a clean, thin border utilizing the theme's core primary color accent
+        // Thin, sharp primary border as requested
         border: Border.all(color: cs.primary.withOpacity(0.35), width: 0.8),
         boxShadow: [
           BoxShadow(

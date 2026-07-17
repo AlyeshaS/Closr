@@ -22,6 +22,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
   final FocusNode _textFocusNode = FocusNode();
 
   bool _isSaving = false;
+  bool _isDeleting = false;
 
   // Typing background hearts
   late final AnimationController _heartController;
@@ -127,6 +128,67 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     _heartController.dispose();
     _sendAnimController.dispose();
     super.dispose();
+  }
+
+  Future<void> _deleteLetter() async {
+    if (widget.editingLetter == null) return;
+
+    setState(() => _isDeleting = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final uid = user?.uid ?? '';
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (!userDoc.exists || userDoc.data() == null) {
+        throw Exception("User profile not found.");
+      }
+
+      final String myEmail =
+          (userDoc.data()?['emailLower'] ?? user?.email ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+      final String partnerEmail =
+          (userDoc.data()?['partnerEmailLower'] ??
+                  userDoc.data()?['partnerEmail'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+
+      if (myEmail.isEmpty || partnerEmail.isEmpty) {
+        throw Exception("You must be connected by email to delete letters!");
+      }
+
+      final List<String> coupleEmails = [myEmail, partnerEmail]..sort();
+      final String coupleGroupId = '${coupleEmails[0]}_${coupleEmails[1]}';
+
+      await FirebaseFirestore.instance
+          .collection('couples')
+          .doc(coupleGroupId)
+          .collection('love_letters')
+          .doc(widget.editingLetter!.id)
+          .delete();
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Letter deleted successfully.')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isDeleting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to delete letter: $e')));
+      }
+    }
   }
 
   Future<void> _saveLetter() async {
@@ -235,7 +297,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      // Soft, matching base background for a clean, non-glary palette
       backgroundColor: cs.surface,
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -262,12 +323,73 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
             ),
           ],
         ),
+        actions: [
+          if (widget.editingLetter != null)
+            _isDeleting
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: cs.primary,
+                      size: 22,
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text(
+                            'Delete Letter?',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          content: const Text(
+                            'Are you sure you want to permanently delete this keepsake? This cannot be undone.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(color: cs.onSurfaceVariant),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _deleteLetter();
+                              },
+                              child: Text(
+                                'Delete',
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          const SizedBox(width: 8),
+        ],
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          // Typing floating background hearts (softened down to sit gracefully in the back)
+          // Typing floating background hearts
           ..._hearts.map((heart) {
             return Align(
               alignment: Alignment(heart.xOffset, 1.0 - (heart.progress * 1.5)),
@@ -298,7 +420,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                         children: [
                           const SizedBox(height: 12),
 
-                          // 1. Completely Borderless & Background-free Title Input
+                          // Title Input Field
                           TextFormField(
                             controller: _titleController,
                             focusNode: _titleFocusNode,
@@ -314,7 +436,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                 fontSize: 18,
                                 fontWeight: FontWeight.w400,
                               ),
-                              // Removing default backgrounds and borders completely
                               filled: false,
                               border: InputBorder.none,
                               focusedBorder: InputBorder.none,
@@ -331,7 +452,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                           ),
                           const SizedBox(height: 4),
 
-                          // A beautiful, highly reactive subtle line under the title
+                          // Underline Animation
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             height: 1,
@@ -342,7 +463,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                           ),
                           const SizedBox(height: 20),
 
-                          // 2. Open, Floating Text Area with absolutely zero containment styling
+                          // Open Body Text Input
                           Expanded(
                             child: TextFormField(
                               controller: _textController,
@@ -362,7 +483,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                   color: cs.onSurfaceVariant.withOpacity(0.35),
                                   fontWeight: FontWeight.w300,
                                 ),
-                                // Ensure absolutely zero focus borders or filled backgrounds appear
                                 filled: false,
                                 border: InputBorder.none,
                                 focusedBorder: InputBorder.none,
@@ -381,7 +501,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                     ),
                     const SizedBox(height: 16),
 
-                    // Sticky action button at the base
+                    // Seal & Send button with shadow
                     _isSaving
                         ? const SizedBox(
                             height: 52,
@@ -398,11 +518,8 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(100),
                                 ),
-                                elevation:
-                                    3.0, // Increased slightly for a noticeable, elegant lift
-                                shadowColor: cs.primary.withOpacity(
-                                  0.3,
-                                ), // Soft colored shadow
+                                elevation: 3.0,
+                                shadowColor: cs.primary.withOpacity(0.3),
                               ),
                               icon: const Icon(
                                 Icons.favorite_rounded,
