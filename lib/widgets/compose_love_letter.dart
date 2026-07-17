@@ -501,7 +501,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                     ),
                     const SizedBox(height: 16),
 
-                    // Seal & Send button with shadow
+                    // Seal & Send button with soft colored glow shadow
                     _isSaving
                         ? const SizedBox(
                             height: 52,
@@ -518,8 +518,10 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(100),
                                 ),
-                                elevation: 3.0,
-                                shadowColor: cs.primary.withOpacity(0.3),
+                                elevation: 4.0,
+                                shadowColor: cs.primary.withOpacity(
+                                  0.4,
+                                ), // Soft primary ambient glow
                               ),
                               icon: const Icon(
                                 Icons.favorite_rounded,

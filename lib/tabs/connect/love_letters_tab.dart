@@ -315,13 +315,15 @@ class _LettersToggle extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(
                       0xFFFCFBF7,
-                    ), // Matching crisp white card background
+                    ), // Crisp white sliding card background[cite: 8]
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: [
+                      // Smooth primary-colored glow behind the sliding toggle
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        color: cs.primary.withOpacity(0.12),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -449,20 +451,23 @@ class LoveLetterTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFCFBF7), // Warm stationery feel
+        color: const Color(0xFFFCFBF7), // Warm stationery feel[cite: 8]
         borderRadius: BorderRadius.circular(16),
-        // Thin, sharp primary border as requested
+        // Thin, sharp primary border[cite: 8]
         border: Border.all(color: cs.primary.withOpacity(0.35), width: 0.8),
         boxShadow: [
+          // Soft ambient primary color glow[cite: 8]
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: cs.primary.withOpacity(0.08),
+            blurRadius: 14,
+            spreadRadius: 1,
             offset: const Offset(0, 6),
           ),
+          // Directional layout lift shadow[cite: 8]
           BoxShadow(
-            color: cs.primary.withOpacity(0.01),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
+            color: cs.primary.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
