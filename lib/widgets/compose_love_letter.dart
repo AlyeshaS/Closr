@@ -86,12 +86,10 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
       ),
     ]).animate(_sendAnimController);
 
-    // Forces the heart to fly completely past the top of the screen (-1.6)
     _heartYAnimation = Tween<double>(begin: 0.1, end: -1.6).animate(
       CurvedAnimation(parent: _sendAnimController, curve: Curves.easeInCubic),
     );
 
-    // Smoothly dissolves/fades out as it approaches the top
     _heartFadeAnimation = TweenSequence<double>([
       TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.0), weight: 60),
       TweenSequenceItem(
@@ -139,14 +137,12 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
       _showSendAnimation = true;
     });
 
-    // Fire flying heart animation
     await _sendAnimController.forward();
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       final uid = user?.uid ?? '';
 
-      // 1. Fetch current user's profile to retrieve their shared couple group/connection
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
@@ -176,10 +172,8 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
       final List<String> coupleEmails = [myEmail, partnerEmail]..sort();
       final String coupleGroupId = '${coupleEmails[0]}_${coupleEmails[1]}';
 
-      // 2. Determine recipient's actual UID
       String recipientId = widget.editingLetter?.recipientId ?? '';
       if (recipientId.isEmpty && partnerEmail.isNotEmpty) {
-        // Look up the partner's UID based on their email
         final partnerQuery = await FirebaseFirestore.instance
             .collection('users')
             .where('emailLower', isEqualTo: partnerEmail)
@@ -201,7 +195,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
         }
       }
 
-      // 3. Set up the reference nested under the couple's document path
       final CollectionReference lettersRef = FirebaseFirestore.instance
           .collection('couples')
           .doc(coupleGroupId)
@@ -220,7 +213,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
         createdAt: widget.editingLetter?.createdAt ?? DateTime.now(),
       );
 
-      // Write to the nested subcollection path
       await lettersRef
           .doc(docId)
           .set(letterData.toMap(), SetOptions(merge: true));
@@ -243,20 +235,39 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
+      // Soft, matching base background for a clean, non-glary palette
       backgroundColor: cs.surface,
       appBar: AppBar(
-        title: Text(
-          widget.editingLetter != null ? 'Edit Love Letter' : 'Write a Letter',
-          style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 18),
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: cs.primary,
+                size: 18,
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Text(
+                'Return to letters',
+                style: TextStyle(
+                  color: cs.primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
         ),
-        centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: cs.onSurface,
       ),
       body: Stack(
         children: [
-          // Typing floating background hearts
+          // Typing floating background hearts (softened down to sit gracefully in the back)
           ..._hearts.map((heart) {
             return Align(
               alignment: Alignment(heart.xOffset, 1.0 - (heart.progress * 1.5)),
@@ -264,176 +275,113 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                 opacity: (1.0 - heart.progress).clamp(0.0, 1.0),
                 child: Icon(
                   Icons.favorite_rounded,
-                  color: cs.primary.withOpacity(0.25),
+                  color: cs.primary.withOpacity(0.15),
                   size: heart.size,
                 ),
               ),
             );
           }),
 
-          // Main interactive fields card
           SafeArea(
             child: Form(
               key: _formKey,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 8,
+                ),
                 child: Column(
                   children: [
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 20,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.primaryContainer.withOpacity(0.45),
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
-                            color: cs.primary.withOpacity(0.35),
-                            width: 1.2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+
+                          // 1. Completely Borderless & Background-free Title Input
+                          TextFormField(
+                            controller: _titleController,
+                            focusNode: _titleFocusNode,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w500,
+                              color: cs.onSurface,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Give your letter a sweet title...',
+                              hintStyle: TextStyle(
+                                color: cs.onSurfaceVariant.withOpacity(0.35),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              // Removing default backgrounds and borders completely
+                              filled: false,
+                              border: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                              ),
+                            ),
+                            validator: (val) =>
+                                val == null || val.trim().isEmpty
+                                ? 'Please add a title'
+                                : null,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: cs.primary.withOpacity(0.03),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: Icon(
-                                Icons.favorite_rounded,
-                                size: 26,
-                                color: cs.primary.withOpacity(0.85),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
+                          const SizedBox(height: 4),
 
-                            // 1. Title Container (Dynamic focus border)
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: _titleFocusNode.hasFocus
-                                      ? cs.primary
-                                      : cs.primary.withOpacity(0.5),
-                                  width: 1.3,
-                                ),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              child: TextFormField(
-                                controller: _titleController,
-                                focusNode: _titleFocusNode,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: cs.onSurface,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: 'Letter Title',
-                                  labelStyle: TextStyle(
-                                    color: cs.primary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  hintText: 'Give your letter a sweet title...',
-                                  hintStyle: TextStyle(
-                                    color: cs.onSurfaceVariant.withOpacity(0.4),
-                                    fontSize: 14,
-                                  ),
-                                  filled: false,
-                                  fillColor: Colors.transparent,
-                                  border: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  errorBorder: InputBorder.none,
-                                  disabledBorder: InputBorder.none,
-                                  prefixIcon: Padding(
-                                    padding: const EdgeInsets.only(right: 4.0),
-                                    child: Icon(
-                                      Icons.edit_note_rounded,
-                                      color: cs.primary,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                                validator: (val) =>
-                                    val == null || val.trim().isEmpty
-                                    ? 'Please add a title'
-                                    : null,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
+                          // A beautiful, highly reactive subtle line under the title
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            height: 1,
+                            width: double.infinity,
+                            color: _titleFocusNode.hasFocus
+                                ? cs.primary.withOpacity(0.4)
+                                : cs.primary.withOpacity(0.12),
+                          ),
+                          const SizedBox(height: 20),
 
-                            // 2. Open Typing Container (No nesting backgrounds, full height touch support)
-                            Expanded(
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                decoration: BoxDecoration(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: _textFocusNode.hasFocus
-                                        ? cs.primary
-                                        : cs.primary.withOpacity(0.5),
-                                    width: 1.3,
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                child: TextFormField(
-                                  controller: _textController,
-                                  focusNode: _textFocusNode,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    height: 1.6,
-                                    color: cs.onSurface.withOpacity(0.85),
-                                  ),
-                                  maxLines: null,
-                                  expands: true,
-                                  keyboardType: TextInputType.multiline,
-                                  textAlignVertical: TextAlignVertical.top,
-                                  decoration: InputDecoration(
-                                    hintText: 'Pour your heart out here...',
-                                    hintStyle: TextStyle(
-                                      color: cs.onSurfaceVariant.withOpacity(
-                                        0.4,
-                                      ),
-                                      fontWeight: FontWeight.w300,
-                                    ),
-                                    filled: false,
-                                    fillColor: Colors.transparent,
-                                    border: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    errorBorder: InputBorder.none,
-                                    disabledBorder: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                  validator: (val) =>
-                                      val == null || val.trim().isEmpty
-                                      ? 'Write down some sweet thoughts'
-                                      : null,
-                                ),
+                          // 2. Open, Floating Text Area with absolutely zero containment styling
+                          Expanded(
+                            child: TextFormField(
+                              controller: _textController,
+                              focusNode: _textFocusNode,
+                              style: TextStyle(
+                                fontSize: 16,
+                                height: 1.7,
+                                color: cs.onSurface.withOpacity(0.85),
                               ),
+                              maxLines: null,
+                              expands: true,
+                              keyboardType: TextInputType.multiline,
+                              textAlignVertical: TextAlignVertical.top,
+                              decoration: InputDecoration(
+                                hintText: 'Pour your heart out here...',
+                                hintStyle: TextStyle(
+                                  color: cs.onSurfaceVariant.withOpacity(0.35),
+                                  fontWeight: FontWeight.w300,
+                                ),
+                                // Ensure absolutely zero focus borders or filled backgrounds appear
+                                filled: false,
+                                border: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              validator: (val) =>
+                                  val == null || val.trim().isEmpty
+                                  ? 'Write down some sweet thoughts'
+                                  : null,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
 
+                    // Sticky action button at the base
                     _isSaving
                         ? const SizedBox(
                             height: 52,
@@ -450,11 +398,15 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(100),
                                 ),
-                                elevation: 2,
+                                elevation:
+                                    3.0, // Increased slightly for a noticeable, elegant lift
+                                shadowColor: cs.primary.withOpacity(
+                                  0.3,
+                                ), // Soft colored shadow
                               ),
                               icon: const Icon(
                                 Icons.favorite_rounded,
-                                size: 18,
+                                size: 16,
                               ),
                               label: const Text(
                                 'Seal & Send',
@@ -472,7 +424,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
             ),
           ),
 
-          // Flying Heart Dispatch Animation
+          // Sending flying heart layout
           if (_showSendAnimation)
             IgnorePointer(
               child: AnimatedBuilder(
