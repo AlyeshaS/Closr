@@ -2,6 +2,10 @@
 
 A new Flutter project.
 
+## Google Sign-In
+
+This app reads `GOOGLE_WEB_CLIENT_ID` and `GOOGLE_IOS_CLIENT_ID` from `.env` when signing in with Google. Set those values to the OAuth clients you want to keep active in Google Cloud.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

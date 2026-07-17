@@ -1,11 +1,34 @@
 // lib/services/auth_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  GoogleSignIn get _googleSignIn {
+    final webClientId = _envValue('GOOGLE_WEB_CLIENT_ID');
+    final iosClientId = _envValue('GOOGLE_IOS_CLIENT_ID');
+
+    if (kIsWeb) {
+      return GoogleSignIn(clientId: webClientId);
+    }
+
+    return GoogleSignIn(
+      clientId: switch (defaultTargetPlatform) {
+        TargetPlatform.iOS || TargetPlatform.macOS => iosClientId,
+        _ => null,
+      },
+      serverClientId: webClientId,
+    );
+  }
+
+  String? _envValue(String key) {
+    final value = dotenv.env[key]?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
 
   Future<User?> signInWithGoogle({String? partnerEmail}) async {
     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();

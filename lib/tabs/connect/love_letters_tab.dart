@@ -3,8 +3,8 @@ import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/love_letter_service.dart';
 import '../../models/love_letter.dart';
-import 'compose_love_letter.dart';
-import 'love_letter_detail.dart';
+import '../../widgets/compose_love_letter.dart';
+import '../../widgets/love_letter_detail.dart';
 
 class LoveLettersTab extends StatefulWidget {
   const LoveLettersTab({super.key});
@@ -69,6 +69,7 @@ class _LoveLettersTabState extends State<LoveLettersTab>
                 final letters = snapshot.data ?? [];
                 final user = FirebaseAuth.instance.currentUser;
                 final uid = user?.uid ?? '';
+
                 final received = letters
                     .where((l) => l.recipientId == uid)
                     .toList();
@@ -406,7 +407,6 @@ class _SlidingLabelButton extends StatelessWidget {
   }
 }
 
-// Solid design: Soft light-pink background with vibrant primary-color borders and title display
 class LoveLetterTile extends StatelessWidget {
   final LoveLetter letter;
   final bool isSent;
@@ -492,14 +492,13 @@ class LoveLetterTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Render the letter TITLE here instead of the raw body content
                   Text(
                     letter.title,
-                    maxLines: 1, // Kept to 1 line for clean title styling
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: cs.onSurface.withOpacity(0.9),
-                      fontWeight: FontWeight.w400, // Medium-thin title text
+                      fontWeight: FontWeight.w400,
                       letterSpacing: 0.2,
                     ),
                   ),

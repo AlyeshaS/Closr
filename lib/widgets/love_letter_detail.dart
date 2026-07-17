@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/love_letter.dart';
+import '../../../models/love_letter.dart';
 
 class LoveLetterDetailPage extends StatefulWidget {
   final LoveLetter letter;
@@ -11,26 +11,26 @@ class LoveLetterDetailPage extends StatefulWidget {
 
 class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _scaleController;
-  late final Animation<double> _scaleAnimation;
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _scaleController = AnimationController(
+    _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 450),
     );
-    _scaleAnimation = CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.elasticOut,
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
     );
-    _scaleController.forward();
+    _fadeController.forward();
   }
 
   @override
   void dispose() {
-    _scaleController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -53,10 +53,11 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: ScaleTransition(
-            scale: _scaleAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
             child: Container(
               width: double.infinity,
+              height: double.infinity,
               decoration: BoxDecoration(
                 color: cs.primaryContainer.withOpacity(0.45),
                 borderRadius: BorderRadius.circular(28),
@@ -76,7 +77,6 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
                 borderRadius: BorderRadius.circular(28),
                 child: Stack(
                   children: [
-                    // Corner watermark decoration
                     Positioned(
                       right: -24,
                       bottom: -24,
@@ -95,30 +95,14 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'STATIONERY',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: cs.primary,
-                                      letterSpacing: 1.2,
+                              Text(
+                                _formatFullDate(widget.letter.createdAt),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: cs.onSurfaceVariant.withOpacity(
+                                        0.6,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _formatFullDate(widget.letter.createdAt),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: cs.onSurfaceVariant
-                                              .withOpacity(0.6),
-                                        ),
-                                  ),
-                                ],
                               ),
                               Icon(
                                 Icons.favorite_rounded,
@@ -129,7 +113,6 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
                           ),
                           const SizedBox(height: 18),
 
-                          // Dynamic Title Header
                           Text(
                             widget.letter.title,
                             style: Theme.of(context).textTheme.headlineSmall
@@ -146,7 +129,6 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
                           ),
                           const SizedBox(height: 12),
 
-                          // Scrollable body
                           Expanded(
                             child: SingleChildScrollView(
                               physics: const BouncingScrollPhysics(),
