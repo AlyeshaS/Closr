@@ -17,8 +17,6 @@ class _LoveLettersTabState extends State<LoveLettersTab>
     with TickerProviderStateMixin {
   bool _showSent = false;
   late final AnimationController _bgAnimationController;
-  late final AnimationController _entranceController;
-  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -27,23 +25,11 @@ class _LoveLettersTabState extends State<LoveLettersTab>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
-
-    // Tab Dissolve Entrance Animation
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _entranceController,
-      curve: Curves.easeIn,
-    );
-    _entranceController.forward();
   }
 
   @override
   void dispose() {
     _bgAnimationController.dispose();
-    _entranceController.dispose();
     super.dispose();
   }
 
@@ -51,136 +37,147 @@ class _LoveLettersTabState extends State<LoveLettersTab>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Stack(
-        children: [
-          // 1. Drifting background hearts
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                color: cs.surface,
-                child: Stack(
-                  children: [
-                    for (int i = 0; i < 40; i++)
-                      _buildBackgroundHeart(i, cs, _bgAnimationController),
-                  ],
-                ),
+    return Stack(
+      children: [
+        // 1. Drifting background hearts
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              color: cs.surface,
+              child: Stack(
+                children: [
+                  for (int i = 0; i < 40; i++)
+                    _buildBackgroundHeart(i, cs, _bgAnimationController),
+                ],
               ),
             ),
           ),
+        ),
 
-          // 2. Main interactive layer
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: StreamBuilder<List<LoveLetter>>(
-                initialData: const <LoveLetter>[],
-                stream: LoveLetterService().streamForCurrentUser(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+        // 2. Main interactive layer
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: StreamBuilder<List<LoveLetter>>(
+              initialData: const <LoveLetter>[],
+              stream: LoveLetterService().streamForCurrentUser(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-                  final letters = snapshot.data ?? [];
-                  final user = FirebaseAuth.instance.currentUser;
-                  final uid = user?.uid ?? '';
+                final letters = snapshot.data ?? [];
+                final user = FirebaseAuth.instance.currentUser;
+                final uid = user?.uid ?? '';
 
-                  final received = letters
-                      .where((l) => l.recipientId == uid)
-                      .toList();
-                  final sent = letters.where((l) => l.senderId == uid).toList();
-                  final listToShow = _showSent ? sent : received;
+                final received = letters
+                    .where((l) => l.recipientId == uid)
+                    .toList();
+                final sent = letters.where((l) => l.senderId == uid).toList();
+                final listToShow = _showSent ? sent : received;
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _LettersToggle(
-                        cs: cs,
-                        showSent: _showSent,
-                        sentCount: sent.length,
-                        receivedCount: received.length,
-                        onChanged: (value) => setState(() => _showSent = value),
-                      ),
-                      const SizedBox(height: 24),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          child: listToShow.isEmpty
-                              ? _buildEmptyState(context, cs, isSent: _showSent)
-                              : ListView.separated(
-                                  key: ValueKey<bool>(_showSent),
-                                  padding: const EdgeInsets.only(bottom: 100),
-                                  itemCount: listToShow.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 16),
-                                  itemBuilder: (context, idx) {
-                                    final letter = listToShow[idx];
-                                    if (_showSent) {
-                                      return LoveLetterTile(
-                                        letter: letter,
-                                        isSent: true,
-                                        onTap: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                ComposeLoveLetterPage(
-                                                  editingLetter: letter,
-                                                ),
-                                          ),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // The sliding toggle stays outside the animation block to render normally
+                    _LettersToggle(
+                      cs: cs,
+                      showSent: _showSent,
+                      sentCount: sent.length,
+                      receivedCount: received.length,
+                      onChanged: (value) => setState(() => _showSent = value),
+                    ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        // Soft fade and scale dissolve animation exclusively applied to the card containers
+                        transitionBuilder:
+                            (Widget child, Animation<double> animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(begin: 0.96, end: 1.0)
+                                      .animate(
+                                        CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeOutCubic,
                                         ),
-                                      );
-                                    }
-
+                                      ),
+                                  child: child,
+                                ),
+                              );
+                            },
+                        child: listToShow.isEmpty
+                            ? _buildEmptyState(context, cs, isSent: _showSent)
+                            : ListView.separated(
+                                key: ValueKey<String>(
+                                  '${_showSent}_${listToShow.length}',
+                                ),
+                                padding: const EdgeInsets.only(bottom: 100),
+                                itemCount: listToShow.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 16),
+                                itemBuilder: (context, idx) {
+                                  final letter = listToShow[idx];
+                                  if (_showSent) {
                                     return LoveLetterTile(
                                       letter: letter,
-                                      isSent: false,
+                                      isSent: true,
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => LoveLetterDetailPage(
-                                            letter: letter,
+                                          builder: (_) => ComposeLoveLetterPage(
+                                            editingLetter: letter,
                                           ),
                                         ),
                                       ),
                                     );
-                                  },
-                                ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
+                                  }
 
-          // 3. Floating Action Button
-          Positioned(
-            right: 20,
-            bottom: 24,
-            child: FloatingActionButton.extended(
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              elevation: 2,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ComposeLoveLetterPage(),
-                ),
-              ),
-              icon: const Icon(Icons.edit_rounded, size: 18),
-              label: const Text(
-                'Write',
-                style: TextStyle(
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0.5,
-                ),
-              ),
+                                  return LoveLetterTile(
+                                    letter: letter,
+                                    isSent: false,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => LoveLetterDetailPage(
+                                          letter: letter,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-        ],
-      ),
+        ),
+
+        // 3. Floating Action Button
+        Positioned(
+          right: 20,
+          bottom: 24,
+          child: FloatingActionButton.extended(
+            backgroundColor: cs.primary,
+            foregroundColor: cs.onPrimary,
+            elevation: 2,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ComposeLoveLetterPage()),
+            ),
+            icon: const Icon(Icons.edit_rounded, size: 18),
+            label: const Text(
+              'Write',
+              style: TextStyle(fontWeight: FontWeight.w400, letterSpacing: 0.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -313,12 +310,9 @@ class _LettersToggle extends StatelessWidget {
                   width: tabWidth,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(
-                      0xFFFCFBF7,
-                    ), // Crisp white sliding card background[cite: 8]
+                    color: const Color(0xFFFCFBF7),
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: [
-                      // Smooth primary-colored glow behind the sliding toggle
                       BoxShadow(
                         color: cs.primary.withOpacity(0.12),
                         blurRadius: 10,
@@ -451,19 +445,16 @@ class LoveLetterTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFCFBF7), // Warm stationery feel[cite: 8]
+        color: const Color(0xFFFCFBF7),
         borderRadius: BorderRadius.circular(16),
-        // Thin, sharp primary border[cite: 8]
         border: Border.all(color: cs.primary.withOpacity(0.35), width: 0.8),
         boxShadow: [
-          // Soft ambient primary color glow[cite: 8]
           BoxShadow(
             color: cs.primary.withOpacity(0.08),
             blurRadius: 14,
             spreadRadius: 1,
             offset: const Offset(0, 6),
           ),
-          // Directional layout lift shadow[cite: 8]
           BoxShadow(
             color: cs.primary.withOpacity(0.04),
             blurRadius: 4,
