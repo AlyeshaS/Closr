@@ -155,17 +155,14 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     if (_endDialogShown) return;
     _endDialogShown = true;
 
-    // 1. Define your local tracking function first
     Future<void> _logGameCompleted() async {
       try {
         await _streaksService.recordActivity('game_completed');
       } catch (_) {}
     }
 
-    // 2. Fire it off safely
     unawaited(_logGameCompleted());
 
-    // 3. Define your game state variables (so they are visible below)
     final bool isCoop = game.gameMode == 'coop';
     final String calculatedWinner = game.scores.keys.firstWhere(
       (uid) => uid != game.turn,
@@ -188,14 +185,14 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
       if (game.winnerUid == 'TEAM_WIN') {
         title = "Vault Cracked!";
         icon = Icons.key_rounded;
-        statusColor = cs.primary; // Accent Win Theme
+        statusColor = cs.primary;
         buttonForegroundColor = cs.onPrimary;
         message =
             "Brilliant teamwork! You illuminated the letter dial together and claimed victory.";
       } else {
         title = "Vault Locked Out";
         icon = Icons.lock_reset_rounded;
-        statusColor = cs.primary; // Accent Loss Theme
+        statusColor = cs.primary;
         buttonForegroundColor = cs.onPrimary;
         message =
             "The combinations ran dry or your team surrendered. Dust off and try another run!";
@@ -247,7 +244,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Highlighted Themed Status Container
                 Container(
                   width: 72,
                   height: 72,
@@ -258,7 +254,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                   child: Icon(icon, color: statusColor, size: 36),
                 ),
                 const SizedBox(height: 20),
-                // Premium Typography
                 Text(
                   title.toUpperCase(),
                   textAlign: TextAlign.center,
@@ -271,7 +266,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Adaptive Content Text
                 Text(
                   message,
                   textAlign: TextAlign.center,
@@ -282,7 +276,6 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                // 🛠️ FIX: Clean Full Width Button mapped cleanly to theme accent colors
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -298,10 +291,8 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                       }
                     },
                     style: FilledButton.styleFrom(
-                      backgroundColor:
-                          statusColor, // Updated directly to theme accent token
-                      foregroundColor:
-                          buttonForegroundColor, // Dynamic text coloring (onPrimary/onError)
+                      backgroundColor: statusColor,
+                      foregroundColor: buttonForegroundColor,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -783,6 +774,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
+  /// 🌟 FIX 1: Trapped / Forfeit resolution scoring subcollection rewrite
   void _handleTrappedForfeit(LetterLockedModel game) async {
     final pUids = game.scores.keys.toList();
     final String partnerUid = pUids.firstWhere(
@@ -820,17 +812,21 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      final partnerUserDoc = FirebaseFirestore.instance
+      // 🌟 Targets users/partnerUid/scores/letterlocked subcollection doc
+      final partnerScoreDoc = FirebaseFirestore.instance
           .collection('users')
-          .doc(partnerUid);
-      batch.set(partnerUserDoc, {
-        'scores': {'letterlocked': FieldValue.increment(1)},
+          .doc(partnerUid)
+          .collection('scores')
+          .doc('letterlocked');
+      batch.set(partnerScoreDoc, {
+        'wins': FieldValue.increment(1),
       }, SetOptions(merge: true));
     }
 
     await batch.commit();
   }
 
+  /// 🌟 FIX 2: Mid-match back-arrow drop-out surrender scoring subcollection rewrite
   void _handleManualSurrender(LetterLockedModel game) async {
     final cs = Theme.of(context).colorScheme;
 
@@ -891,11 +887,14 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
                       'updatedAt': FieldValue.serverTimestamp(),
                     }, SetOptions(merge: true));
 
-                    final partnerUserDoc = FirebaseFirestore.instance
+                    // 🌟 Targets users/partnerUid/scores/letterlocked subcollection doc
+                    final partnerScoreDoc = FirebaseFirestore.instance
                         .collection('users')
-                        .doc(partnerUid);
-                    batch.set(partnerUserDoc, {
-                      'scores': {'letterlocked': FieldValue.increment(1)},
+                        .doc(partnerUid)
+                        .collection('scores')
+                        .doc('letterlocked');
+                    batch.set(partnerScoreDoc, {
+                      'wins': FieldValue.increment(1),
                     }, SetOptions(merge: true));
                   }
                 }
@@ -913,6 +912,7 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     );
   }
 
+  /// 🌟 FIX 3: Valid move victory state resolution scoring subcollection rewrite
   void _handleMoveSubmission(LetterLockedModel game) async {
     final String input = _wordInputController.text.trim().toUpperCase();
     if (input.isEmpty) return;
@@ -981,20 +981,24 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
         batch.set(_gameDoc(_myUid), endPayload, SetOptions(merge: true));
         batch.set(_gameDoc(partnerUid), endPayload, SetOptions(merge: true));
 
-        batch.set(
-          FirebaseFirestore.instance.collection('users').doc(_myUid),
-          {
-            'scores': {'letterlocked': FieldValue.increment(1)},
-          },
-          SetOptions(merge: true),
-        );
-        batch.set(
-          FirebaseFirestore.instance.collection('users').doc(partnerUid),
-          {
-            'scores': {'letterlocked': FieldValue.increment(1)},
-          },
-          SetOptions(merge: true),
-        );
+        // 🌟 Targets collaborative subcollection folder paths for BOTH linked profiles
+        final myScoreDoc = FirebaseFirestore.instance
+            .collection('users')
+            .doc(_myUid)
+            .collection('scores')
+            .doc('letterlocked');
+        final partnerScoreDoc = FirebaseFirestore.instance
+            .collection('users')
+            .doc(partnerUid)
+            .collection('scores')
+            .doc('letterlocked');
+
+        batch.set(myScoreDoc, {
+          'wins': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+        batch.set(partnerScoreDoc, {
+          'wins': FieldValue.increment(1),
+        }, SetOptions(merge: true));
 
         await batch.commit();
       } else {

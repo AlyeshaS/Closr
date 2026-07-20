@@ -29,9 +29,6 @@ class DoodleCluesController {
   }
 
   /// Establishes the match structure cleanly inside the drawer's own folder.
-  /// [secretWord] is chosen by the artist themselves (not auto-generated).
-  /// `roundStartedAt` is a server timestamp so both devices can derive an
-  /// identical 2-minute countdown regardless of clock drift.
   Future<void> startNewRound({
     required String myUid,
     required String partnerUid,
@@ -56,10 +53,7 @@ class DoodleCluesController {
     await batch.commit();
   }
 
-  /// Pushes the in-progress stroke data so the guesser can watch it appear
-  /// live, point by point, while the artist is still drawing. Call this
-  /// throttled (e.g. every ~300ms) while the pointer is moving, plus once
-  /// immediately when a stroke ends, rather than on every single frame.
+  /// Pushes the in-progress stroke data so the guesser can watch it appear live
   Future<void> updateLiveDrawing(
     String artistUid,
     List<Map<String, double>> livePaths,
@@ -70,22 +64,48 @@ class DoodleCluesController {
     });
   }
 
-  /// Evaluates a guess. Guesses are unlimited — the only things that end
-  /// the round are a correct guess or the timer running out.
+  /// Evaluates a guess.
   Future<void> registerGuessAttempt({
     required String artistUid,
+    required String
+    guesserUid, // 🌟 Added parameter to identify the guesser for scoring
     required bool isCorrect,
     required int currentGuessCount,
   }) async {
     final docRef = _gameDoc(artistUid);
 
     if (isCorrect) {
-      await docRef.update({
+      final batch = _firestore.batch();
+
+      // 1. Update the game loop state machine indicators
+      batch.update(docRef, {
         'stage': 'results',
         'isWin': true,
         'guessCount': currentGuessCount + 1,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // 2. 🏆 Targets the collaborative subcollection score folders for BOTH partners simultaneously
+      final artistScoreDoc = _firestore
+          .collection('users')
+          .doc(artistUid)
+          .collection('scores')
+          .doc('doodleclues');
+
+      final guesserScoreDoc = _firestore
+          .collection('users')
+          .doc(guesserUid)
+          .collection('scores')
+          .doc('doodleclues');
+
+      batch.set(artistScoreDoc, {
+        'wins': FieldValue.increment(1),
+      }, SetOptions(merge: true));
+      batch.set(guesserScoreDoc, {
+        'wins': FieldValue.increment(1),
+      }, SetOptions(merge: true));
+
+      await batch.commit();
     } else {
       // Wrong guess: just log it and keep the round going. No cap.
       await docRef.update({
@@ -96,14 +116,12 @@ class DoodleCluesController {
   }
 
   /// Called by either device once the local 2-minute countdown hits zero
-  /// with no correct guess yet. Guarded against double-resolution so it's
-  /// safe for both the artist and guesser clients to call it.
   Future<void> endRoundTimeout(String artistUid) async {
     final docRef = _gameDoc(artistUid);
     final snap = await docRef.get();
     final data = snap.data();
     if (data == null) return;
-    if (data['stage'] == 'results') return; // already resolved elsewhere
+    if (data['stage'] == 'results') return;
 
     await docRef.update({
       'stage': 'results',

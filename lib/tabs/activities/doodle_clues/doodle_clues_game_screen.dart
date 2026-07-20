@@ -21,7 +21,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   final TextEditingController _wordInputController = TextEditingController();
   bool _isExiting = false;
 
-  // Explicitly isolate the drawing canvas coordinate space
   final GlobalKey _canvasKey = GlobalKey();
 
   String _myUid = '';
@@ -29,10 +28,8 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   bool _initializingAuth = true;
   bool _endDialogShown = false;
 
-  // Local point cache for smooth drawing at 60fps
   List<Offset?> _localArtistPoints = [];
 
-  // --- Live-sync + timer state ---------------------------------------
   String _lastKnownStage = 'setup';
   DateTime? _roundStartedAtLocal;
   int _drawDurationSeconds = DoodleCluesController.drawDurationSeconds;
@@ -41,7 +38,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   bool _pathsDirtySinceLastSync = false;
   Timer? _countdownTimer;
   Timer? _liveSyncTimer;
-  // ---------------------------------------------------------------------
 
   Future<void> _logGameCompleted() async {
     try {
@@ -122,12 +118,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     if (mounted) Navigator.pop(context);
   }
 
-  // --- Timer + live-sync plumbing --------------------------------------
-
-  /// Called on every rebuild with the freshest Firestore data. Detects
-  /// stage transitions and starts/stops the local countdown + live-sync
-  /// timers accordingly. Safe to call repeatedly - it's a no-op unless
-  /// something actually changed.
   void _ensureTimerForStage(
     String stage,
     Map<String, dynamic> data,
@@ -144,9 +134,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
       return;
     }
 
-    // Same stage as last build: if we're mid-drawing but never managed to
-    // lock in the server timestamp yet (it resolves one snapshot after the
-    // optimistic local write), try again once it's actually there.
     if (stage == 'drawing' && _roundStartedAtLocal == null) {
       _startCountdown(data, artistUidForDoc);
     }
@@ -154,7 +141,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
 
   void _startCountdown(Map<String, dynamic> data, String artistUidForDoc) {
     final ts = data['roundStartedAt'];
-    if (ts is! Timestamp) return; // server timestamp still pending
+    if (ts is! Timestamp) return;
 
     _roundStartedAtLocal = ts.toDate();
     _drawDurationSeconds =
@@ -168,9 +155,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
       (_) => _tickCountdown(artistUidForDoc),
     );
 
-    // Only the artist actually pushes drawing updates, but it's cheap to
-    // arm the flush timer unconditionally - it's a no-op when nothing's
-    // dirty or when this device isn't the artist.
     _liveSyncTimer?.cancel();
     _liveSyncTimer = Timer.periodic(
       const Duration(milliseconds: 300),
@@ -203,9 +187,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     _remainingSeconds = _drawDurationSeconds;
   }
 
-  /// Converts the artist's local point cache to percentage coordinates and
-  /// pushes it to Firestore so the guesser's canvas mirrors it live. Only
-  /// fires when something actually changed since the last flush.
   void _flushLiveDrawingIfDirty(String artistUidForDoc) {
     if (!_pathsDirtySinceLastSync) return;
     if (_myUid != artistUidForDoc) return;
@@ -226,8 +207,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     _pathsDirtySinceLastSync = false;
     _controller.updateLiveDrawing(artistUidForDoc, payload);
   }
-
-  // -----------------------------------------------------------------------
 
   Future<void> _promptStartRound() async {
     final word = await _showChooseWordDialog();
@@ -354,6 +333,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
               Text(
                 'How to Play: DoodleClues 🎨',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  // ✨ FIXED
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -453,8 +433,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                     onPressed: () async {
                       Navigator.pop(dialogContext);
                       await _controller.purgeMatch(_myUid, _partnerUid);
-                      // Stay on the game screen so a new round can start
-                      // straight away, instead of leaving.
                     },
                     style: FilledButton.styleFrom(
                       backgroundColor: statusColor,
@@ -549,10 +527,10 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     );
 
     if (dynamicConfirm == true) {
-      setState(() => _isExiting = true); // Lock out the Stream's auto-pop logic
+      setState(() => _isExiting = true);
       _stopTimers();
 
-      if (mounted) Navigator.pop(context); // Cleanly leave back to GameHub
+      if (mounted) Navigator.pop(context);
 
       if (_myUid.isNotEmpty) {
         await _controller.triggerForcedCancellation(_myUid, _partnerUid);
@@ -605,8 +583,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
               guessCount = rawData['guessCount'] ?? 0;
 
               if (rawData['status'] == 'cancelled') {
-                // ONLY pop if your partner cancelled it.
-                // If YOU cancelled it, _isExiting is true, so we do nothing here.
                 if (!_isExiting) {
                   WidgetsBinding.instance.addPostFrameCallback((_) async {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -650,12 +626,10 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
               _ensureTimerForStage(stage, rawData, artistUidForDoc);
             });
 
-            // Look for this section inside your existing Widget build block:
             return PopScope(
               canPop: false,
               onPopInvokedWithResult: (didPop, result) {
                 if (didPop) return;
-                // UPDATED HERE:
                 _requestExitConfirmation(stage);
               },
               child: Scaffold(
@@ -674,7 +648,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                       Icons.arrow_back_ios_new_rounded,
                       size: 18,
                     ),
-                    // UPDATED HERE:
                     onPressed: () => _requestExitConfirmation(stage),
                   ),
                   actions: [
@@ -836,7 +809,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Use Expanded so the canvas dynamically resizes.
             Expanded(
               child: Container(
                 key: _canvasKey,
@@ -888,9 +860,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                           _localArtistPoints.add(null);
                         });
                         _pathsDirtySinceLastSync = true;
-                        // Flush immediately at the end of a stroke so the
-                        // partner sees each completed line without waiting
-                        // for the next throttled tick.
                         _flushLiveDrawingIfDirty(artistUid);
                       },
                       child: CustomPaint(
@@ -933,11 +902,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Stack(
           children: [
-            // Background layer: header + canvas. This never resizes for the
-            // keyboard (the Scaffold no longer shrinks for it), so the
-            // drawing stays exactly the same size whether the keyboard is
-            // open or not. A blank strip is reserved at the bottom so the
-            // floating guess bar below has room to sit without covering it.
             Column(
               children: [
                 Row(
@@ -1023,9 +987,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
               ],
             ),
 
-            // Floating layer: guess count + input, pinned to the bottom and
-            // shifted up by exactly the keyboard's height, so it's always
-            // visible above the keyboard without ever touching the canvas.
             Positioned(
               left: 0,
               right: 0,
@@ -1099,9 +1060,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     }
   }
 
-  /// Pulls the secret word straight from the live snapshot so guess
-  /// checking is always against the freshest value, even if this widget's
-  /// build hasn't caught up yet.
   String secretWordArg(
     AsyncSnapshot<DocumentSnapshot<Map<String, dynamic>>> snapshot,
   ) {
@@ -1124,6 +1082,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     final bool isCorrect = cleanGuess == secretWord.toUpperCase();
     _controller.registerGuessAttempt(
       artistUid: artistUid,
+      guesserUid: _myUid,
       isCorrect: isCorrect,
       currentGuessCount: guessCount,
     );

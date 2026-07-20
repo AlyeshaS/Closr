@@ -156,10 +156,14 @@ class TriviaController {
     }, SetOptions(merge: true));
   }
 
-  // 🏆 CENTRALIZED SCORE ROUTING METHOD
+  // 🏆 Centralized Subcollection Score Router
   Future<void> rewardTriviaWinner(String winnerUid) async {
-    await _firestore.collection('users').doc(winnerUid).set({
-      'scores': {'trivia': FieldValue.increment(1)},
-    }, SetOptions(merge: true));
+    // 🌟 FIX: Saves directly into users/uid/scores/trivia containing a numeric 'wins' key
+    await _firestore
+        .collection('users')
+        .doc(winnerUid)
+        .collection('scores')
+        .doc('trivia')
+        .set({'wins': FieldValue.increment(1)}, SetOptions(merge: true));
   }
 }

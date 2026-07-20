@@ -22,13 +22,46 @@ class TelepathyGameScreen extends StatefulWidget {
 
 class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
   final TelepathyFirebaseService _service = TelepathyFirebaseService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _inputController = TextEditingController();
   bool _isChangingWord = false;
+
+  // 🌟 Track if the win has been awarded for this specific session to avoid duplicate increments
+  String? _awardedGameId;
 
   @override
   void dispose() {
     _inputController.dispose();
     super.dispose();
+  }
+
+  /// 🌟 Centralized Subcollection Score Router for Telepathy Co-op Match
+  Future<void> _rewardTelepathyMeld(String gameId) async {
+    if (_awardedGameId == gameId) return;
+    _awardedGameId = gameId;
+
+    WriteBatch scoreBatch = _firestore.batch();
+
+    // Telepathy is collaborative! Both users receive credit in their subcollections
+    final myScoreRef = _firestore
+        .collection('users')
+        .doc(widget.myUid)
+        .collection('scores')
+        .doc('telepathy');
+    final partnerScoreRef = _firestore
+        .collection('users')
+        .doc(widget.partnerUid)
+        .collection('scores')
+        .doc('telepathy');
+
+    scoreBatch.set(myScoreRef, {
+      'wins': FieldValue.increment(1),
+    }, SetOptions(merge: true));
+    scoreBatch.set(partnerScoreRef, {
+      'wins': FieldValue.increment(1),
+    }, SetOptions(merge: true));
+
+    await scoreBatch.commit();
   }
 
   @override
@@ -71,7 +104,11 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
               game.gameMode == GameMode.customPrompt &&
               game.currentRoundIndex == 0;
 
+          // 🌟 Trigger score updates instantly when the session resolves to a completed match status
           if (game.status == 'completed') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _rewardTelepathyMeld(game.gameId);
+            });
             return _buildVictoryScreen(game);
           }
 
@@ -154,7 +191,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                                 onPressed: () async {
                                   setState(() => _isChangingWord = true);
 
-                                  // ✅ FIX: Determine whether to pull a random word or a random emoji
                                   final String newSeed =
                                       game.gameMode == GameMode.emojisOnly
                                       ? EmojiPool.getRandomEmoji()
@@ -211,7 +247,6 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
                           );
                           _inputController.clear();
                         } catch (e) {
-                          // Catch our explicit emoji rule violation
                           if (e is ArgumentError &&
                               e.message == 'EMOJI_ONLY_VIOLATION') {
                             ScaffoldMessenger.of(context).showSnackBar(
