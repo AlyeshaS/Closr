@@ -214,71 +214,78 @@ class _QuestsTabState extends State<QuestsTab> {
                                   ),
                                   const SizedBox(height: 18),
 
-                                  // Rounded capsule progress bar track
-                                  Container(
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: cs.primary.withOpacity(0.15),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
+                                  // 🌟 1. Sliding Progress Bar Custom Animation
+                                  TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(
+                                      begin: 0,
+                                      end: progressValue,
                                     ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: LinearProgressIndicator(
-                                        value: progressValue,
-                                        backgroundColor: isDark
-                                            ? cs.surfaceContainerHighest
-                                            : cs.primary.withOpacity(0.1),
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              cs.primary,
+                                    duration: const Duration(milliseconds: 400),
+                                    curve: Curves.easeOutCubic,
+                                    builder: (context, animatedValue, child) {
+                                      return Container(
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: cs.primary.withOpacity(
+                                                0.15,
+                                              ),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
                                             ),
-                                        minHeight: 10,
-                                      ),
-                                    ),
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          child: LinearProgressIndicator(
+                                            value: animatedValue,
+                                            backgroundColor: isDark
+                                                ? cs.surfaceContainerHighest
+                                                : cs.primary.withOpacity(0.1),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  cs.primary,
+                                                ),
+                                            minHeight: 10,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 20),
-                            Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 68,
-                                  height: 68,
-                                  child: CircularProgressIndicator(
-                                    value: progressValue,
-                                    strokeWidth: 5,
-                                    backgroundColor: cs.primary.withOpacity(
-                                      0.1,
-                                    ),
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      cs.primary,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '${(progressValue * 100).round()}%',
+                            const SizedBox(width: 24),
+
+                            // 🌟 2. Live Rolling/Counting Percentage Text
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                begin: 0,
+                                end: progressValue,
+                              ),
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, animatedValue, child) {
+                                return Text(
+                                  '${(animatedValue * 100).round()}%',
                                   style: TextStyle(
                                     fontFamily: 'CormorantGaramond',
-                                    fontSize: 22,
+                                    fontSize: 36,
                                     fontWeight: FontWeight.bold,
                                     color: cs.primary,
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 28),
                       Text(
-                        'TODAY\'S QUESTS',
+                        'QUESTS',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           letterSpacing: 1.1,
                           fontWeight: FontWeight.w700,
@@ -330,9 +337,9 @@ class _QuestsTabState extends State<QuestsTab> {
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color: done
-                                      ? cs.primary.withOpacity(0.4)
-                                      : cs.outlineVariant.withOpacity(0.6),
-                                  width: 1.5,
+                                      ? cs.primary.withOpacity(0.6)
+                                      : cs.outlineVariant.withOpacity(0.9),
+                                  width: 2.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -391,19 +398,21 @@ class _QuestsTabState extends State<QuestsTab> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
+
+                                  // Square-shaped checkbox indicator boxes
                                   AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    width: 26,
-                                    height: 26,
+                                    width: 24,
+                                    height: 24,
                                     decoration: BoxDecoration(
                                       color: done
                                           ? cs.primary
                                           : Colors.transparent,
-                                      shape: BoxShape.circle,
+                                      borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
                                         color: done
                                             ? cs.primary
-                                            : cs.outline.withOpacity(0.5),
+                                            : cs.outline.withOpacity(0.6),
                                         width: 2,
                                       ),
                                     ),
@@ -424,7 +433,7 @@ class _QuestsTabState extends State<QuestsTab> {
                       const SizedBox(height: 16),
                       Center(
                         child: Text(
-                          'More challenges coming soon',
+                          'Quests refresh every Sunday at 12:00 AM',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: cs.onSurfaceVariant.withOpacity(0.4),
