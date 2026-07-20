@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/resolve_service.dart';
 
 class ResolveScreen extends StatefulWidget {
   const ResolveScreen({super.key});
@@ -13,11 +14,13 @@ class _ResolveScreenState extends State<ResolveScreen> {
   bool hasStartedQuestions = false;
   String selectedMode = 'Miscommunication';
   final TextEditingController customModeController = TextEditingController();
+  final ResolveService _resolveService = ResolveService();
+  String? _activeSessionId;
+  bool _isSavingSession = false;
 
   late List<String> sessionModes;
   int lastCustomIndex = -1;
   late PageController _introPageController;
-  int _introPageIndex = 0;
 
   final Map<String, List<String>> responses = {
     'Private Reflection': [],
@@ -76,7 +79,38 @@ class _ResolveScreenState extends State<ResolveScreen> {
   bool get isLastStage => currentStage == stageTitles.length - 1;
   bool get isLastPrompt => currentPromptIndex == currentPrompts.length - 1;
 
-  void nextPrompt() {
+  Future<void> _saveProgress({required bool isCompleted}) async {
+    if (_isSavingSession) return;
+
+    setState(() {
+      _isSavingSession = true;
+    });
+
+    try {
+      final sessionId = await _resolveService.saveSession(
+        sessionId: _activeSessionId,
+        selectedMode: selectedMode,
+        responses: responses,
+        currentStage: currentStage,
+        currentPromptIndex: currentPromptIndex,
+        isCompleted: isCompleted,
+      );
+      _activeSessionId = sessionId;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save this response yet: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingSession = false;
+        });
+      }
+    }
+  }
+
+  Future<void> nextPrompt() async {
     final text = responseController.text.trim();
 
     if (text.isNotEmpty) {
@@ -85,6 +119,8 @@ class _ResolveScreenState extends State<ResolveScreen> {
       responses[currentStageTitle]!.add('');
     }
 
+    final finishingSession = isLastPrompt && isLastStage;
+    await _saveProgress(isCompleted: finishingSession);
     responseController.clear();
 
     if (!isLastPrompt) {
@@ -133,6 +169,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
       selectedMode = 'Miscommunication';
       sessionModes = List.from(modes);
       lastCustomIndex = -1;
+      _activeSessionId = null;
       responseController.clear();
       responses.updateAll((key, value) => []);
     });
@@ -145,31 +182,60 @@ class _ResolveScreenState extends State<ResolveScreen> {
   }
 
   Future<void> showCustomModeDialog() async {
+    final cs = Theme.of(context).colorScheme;
     final isBuiltIn = modes.contains(selectedMode);
     customModeController.text = isBuiltIn ? '' : selectedMode;
 
     final customMode = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Custom situation'),
+        backgroundColor: cs.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text(
+          'Custom situation',
+          style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w800),
+        ),
         content: TextField(
           controller: customModeController,
           autofocus: true,
-          decoration: const InputDecoration(
+          style: TextStyle(color: cs.onSurface),
+          decoration: InputDecoration(
             hintText: 'What are you working through?',
+            hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
+            filled: true,
+            fillColor: cs.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+            ),
           ),
           FilledButton(
             onPressed: () {
               final value = customModeController.text.trim();
               Navigator.pop(dialogContext, value.isEmpty ? null : value);
             },
-            child: const Text('Use it'),
+            style: FilledButton.styleFrom(
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
+              elevation: 4,
+              shadowColor: cs.shadow.withOpacity(0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text(
+              'Use it',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -213,195 +279,295 @@ class _ResolveScreenState extends State<ResolveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (currentStage == 3) {
-      return _EndingScreen(onRestart: restartSession);
+      return _ResolveBackdrop(child: _EndingScreen(onRestart: restartSession));
     }
 
     if (!hasStartedQuestions) {
-      // Recreate controller with the desired initial page
-      _introPageController = PageController(initialPage: _introPageIndex);
-
-      return SizedBox(
-        height: MediaQuery.of(context).size.height - 80,
-        child: PageView(
-          controller: _introPageController,
-          physics: const PageScrollPhysics(),
-          onPageChanged: (page) {
-            setState(() {
-              _introPageIndex = page;
-            });
-          },
-          children: [
-            // Landing intro centered with Get started
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height - 160,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _HeroCard(),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: () {
-                          _introPageController.animateToPage(
-                            1,
-                            duration: const Duration(milliseconds: 420),
-                            curve: Curves.easeOutCubic,
-                          );
-                        },
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          minimumSize: const Size(220, 52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
+      return _ResolveBackdrop(
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height - 80,
+          child: PageView(
+            controller: _introPageController,
+            physics: const PageScrollPhysics(),
+            children: [
+              // Landing intro centered with Get started
+              SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height - 160,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _HeroCard(),
+                        const SizedBox(height: 32),
+                        FilledButton(
+                          onPressed: () {
+                            _introPageController.animateToPage(
+                              1,
+                              duration: const Duration(milliseconds: 420),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: cs.primary,
+                            foregroundColor: cs.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            minimumSize: const Size(240, 56),
+                            elevation: 6,
+                            shadowColor: cs.shadow.withOpacity(0.25),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                          child: const Text(
+                            'Get started',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                        child: const Text('Get started'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Mode selector page (swipe-to)
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ModeSelector(
-                    modes: sessionModes,
-                    selectedMode: selectedMode,
-                    onChanged: (mode) {
-                      setState(() {
-                        selectedMode = mode;
-                      });
-                    },
-                    onCustomPressed: showCustomModeDialog,
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: startQuestions,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+              // Mode selector page (swipe-to)
+              SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ModeSelector(
+                      modes: sessionModes,
+                      selectedMode: selectedMode,
+                      onChanged: (mode) {
+                        setState(() {
+                          selectedMode = mode;
+                        });
+                      },
+                      onCustomPressed: showCustomModeDialog,
+                    ),
+                    const SizedBox(height: 32),
+                    FilledButton(
+                      onPressed: startQuestions,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        minimumSize: const Size(double.infinity, 56),
+                        elevation: 6,
+                        shadowColor: cs.shadow.withOpacity(0.25),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      child: const Text(
+                        'Start Questions',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
-                    child: const Text('Start Questions'),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return _ResolveBackdrop(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ProgressHeader(
+              stageTitle: currentStageTitle,
+              currentPromptIndex: currentPromptIndex,
+              totalPrompts: currentPrompts.length,
+              progress: (currentPromptIndex + 1) / currentPrompts.length,
+              selectedMode: selectedMode,
+            ),
+            const SizedBox(height: 20),
+            _PromptCard(
+              prompt: currentPrompts[currentPromptIndex],
+              controller: responseController,
+            ),
+            const SizedBox(height: 24),
+            _NavigationButtons(
+              canGoBack: currentStage > 0 || currentPromptIndex > 0,
+              isLastPrompt: isLastPrompt,
+              isLastStage: isLastStage,
+              onBack: goBack,
+              onNext: nextPrompt,
+              isSavingSession: _isSavingSession,
+              showIntroBack: currentStage == 0 && currentPromptIndex == 0,
+              onIntroBack: () {
+                setState(() {
+                  hasStartedQuestions = false;
+                });
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _introPageController.jumpToPage(1);
+                  }
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 1. Moving Background Circles Implementation via stateful loops
+class _ResolveBackdrop extends StatefulWidget {
+  final Widget child;
+
+  const _ResolveBackdrop({required this.child});
+
+  @override
+  State<_ResolveBackdrop> createState() => _ResolveBackdropState();
+}
+
+class _ResolveBackdropState extends State<_ResolveBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _movementController;
+
+  @override
+  void initState() {
+    super.initState();
+    _movementController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _movementController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      color: cs.surface,
+      child: Stack(
         children: [
-          _ProgressHeader(
-            stageTitle: currentStageTitle,
-            currentPromptIndex: currentPromptIndex,
-            totalPrompts: currentPrompts.length,
-            progress: (currentPromptIndex + 1) / currentPrompts.length,
-            selectedMode: selectedMode,
-          ),
-          const SizedBox(height: 16),
-          _PromptCard(
-            prompt: currentPrompts[currentPromptIndex],
-            controller: responseController,
-          ),
-          const SizedBox(height: 20),
-          _NavigationButtons(
-            canGoBack: currentStage > 0 || currentPromptIndex > 0,
-            isLastPrompt: isLastPrompt,
-            isLastStage: isLastStage,
-            onBack: goBack,
-            onNext: nextPrompt,
-            showIntroBack: currentStage == 0 && currentPromptIndex == 0,
-            onIntroBack: () {
-              _introPageIndex = 1;
-              setState(() {
-                hasStartedQuestions = false;
-              });
+          AnimatedBuilder(
+            animation: _movementController,
+            builder: (context, child) {
+              return Positioned(
+                top: -40 + (_movementController.value * 15),
+                right: -30 - (_movementController.value * 12),
+                child: child!,
+              );
             },
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.07),
+                shape: BoxShape.circle,
+              ),
+            ),
           ),
+          AnimatedBuilder(
+            animation: _movementController,
+            builder: (context, child) {
+              return Positioned(
+                bottom: -60 - (_movementController.value * 12),
+                left: -40 + (_movementController.value * 18),
+                child: child!,
+              );
+            },
+            child: Container(
+              width: 210,
+              height: 210,
+              decoration: BoxDecoration(
+                color: cs.secondary.withOpacity(0.06),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          widget.child,
         ],
       ),
     );
   }
 }
 
+// 2. Beautiful Landing Card Setup with explicitly specified borders and dropshadow structures
 class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [cs.primaryContainer, cs.secondaryContainer],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: cs.primary.withOpacity(0.16)),
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: cs.primary.withOpacity(0.35), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: cs.primary.withOpacity(0.12),
+            color: cs.shadow.withOpacity(0.06),
             blurRadius: 24,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF231519) : Colors.white,
-          borderRadius: BorderRadius.circular(22),
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _LabelPill(text: 'Resolve'),
-            const SizedBox(height: 16),
+            const _LabelPill(text: 'Resolve'),
+            const SizedBox(height: 20),
             Text(
               'Healthy relationships are not built on avoiding conflict, but on learning how to navigate it together.',
               style: textTheme.titleMedium?.copyWith(
-                height: 1.45,
-                fontWeight: FontWeight.w700,
+                height: 1.5,
+                fontWeight: FontWeight.w800,
+                color: cs.primary,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Text(
               'This space helps both of you slow down, reflect, and communicate with intention. The goal is not to win the conversation, but to understand each other and move forward together.',
               style: textTheme.bodyMedium?.copyWith(
                 color: cs.onSurfaceVariant,
-                height: 1.55,
+                height: 1.6,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Text(
               'Take your time. Be honest. Be kind. Remember that you are on the same team.',
               style: textTheme.bodyMedium?.copyWith(
-                color: cs.onSurface,
-                height: 1.55,
-                fontWeight: FontWeight.w500,
+                color: cs.primary,
+                height: 1.6,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -434,17 +600,20 @@ class _ModeSelector extends StatelessWidget {
       children: [
         Text(
           'What are you working through?',
-          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: cs.primary,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'Choose a situation so the session feels more focused.',
           style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 20),
         Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             ...modes.map((mode) {
               final selected = selectedMode == mode;
@@ -453,40 +622,43 @@ class _ModeSelector extends StatelessWidget {
                 label: Text(mode),
                 selected: selected,
                 onSelected: (_) => onChanged(mode),
-                selectedColor: cs.primaryContainer,
-                backgroundColor: Colors.white,
+                selectedColor: cs.secondaryContainer,
+                backgroundColor: cs.surfaceContainerLow,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
+                  horizontal: 16,
+                  vertical: 10,
                 ),
                 labelStyle: TextStyle(
-                  color: selected ? cs.onPrimaryContainer : cs.onSurface,
-                  fontWeight: FontWeight.w600,
+                  color: selected ? cs.primary : cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(24),
                   side: BorderSide(
                     color: selected
-                        ? cs.primary.withOpacity(0.35)
-                        : cs.outlineVariant,
-                    width: 1.0,
+                        ? cs.primary
+                        : cs.outlineVariant.withOpacity(0.6),
+                    width: 1.5,
                   ),
                 ),
               );
             }),
             ActionChip(
-              avatar: const Icon(Icons.add, size: 18),
+              avatar: Icon(Icons.add_rounded, size: 18, color: cs.primary),
               label: const Text('Custom'),
               onPressed: onCustomPressed,
-              backgroundColor: cs.surfaceContainerHighest,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              backgroundColor: cs.surfaceContainerLow,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               labelStyle: TextStyle(
-                color: cs.onSurface,
-                fontWeight: FontWeight.w600,
+                color: cs.primary,
+                fontWeight: FontWeight.w700,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-                side: BorderSide(color: cs.outlineVariant, width: 1.0),
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.6),
+                  width: 1.5,
+                ),
               ),
             ),
           ],
@@ -496,6 +668,7 @@ class _ModeSelector extends StatelessWidget {
   }
 }
 
+// 4. Structural Question Segment Customizing Layouts & Color parameters
 class _ProgressHeader extends StatelessWidget {
   final String stageTitle;
   final int currentPromptIndex;
@@ -518,45 +691,61 @@ class _ProgressHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.7)),
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: cs.primary,
+          width: 1.5,
+        ), // Primary color border
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: cs.primaryContainer.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(999),
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               'Working through: $selectedMode',
               style: textTheme.labelMedium?.copyWith(
                 color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             stageTitle,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Question ${currentPromptIndex + 1} of $totalPrompts',
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           LinearProgressIndicator(
             value: progress,
-            minHeight: 8,
+            minHeight: 10,
             borderRadius: BorderRadius.circular(999),
-            backgroundColor: cs.surfaceContainerHighest,
+            backgroundColor: cs.surface,
             color: cs.primary,
           ),
         ],
@@ -576,7 +765,6 @@ class _PromptCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    // Calculate responsive line counts based on device height
     final screenHeight = MediaQuery.of(context).size.height;
     late int minLines;
     late int maxLines;
@@ -597,51 +785,61 @@ class _PromptCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: cs.primary,
+          width: 1.5,
+        ), // Primary color border
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: cs.shadow.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SoftMessage(text: 'Read to understand, not to respond.'),
-          const SizedBox(height: 18),
+          const _SoftMessage(text: 'Read to understand, not to respond.'),
+          const SizedBox(height: 20),
           Text(
             prompt,
             style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              height: 1.45,
+              fontWeight: FontWeight.w800,
+              height: 1.5,
+              color: cs.onSurface,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           TextField(
             controller: controller,
             minLines: minLines,
             maxLines: maxLines,
+            style: TextStyle(color: cs.onSurface),
             decoration: InputDecoration(
               hintText: 'Write your thoughts here...',
+              hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
               filled: true,
-              fillColor: cs.surfaceContainerHighest.withOpacity(0.45),
+              fillColor: cs.surface,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.8),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.8),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(color: cs.primary, width: 1.4),
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(color: cs.primary, width: 1.6),
               ),
             ),
           ),
@@ -656,7 +854,8 @@ class _NavigationButtons extends StatelessWidget {
   final bool isLastPrompt;
   final bool isLastStage;
   final VoidCallback onBack;
-  final VoidCallback onNext;
+  final Future<void> Function() onNext;
+  final bool isSavingSession;
   final bool showIntroBack;
   final VoidCallback? onIntroBack;
 
@@ -666,6 +865,7 @@ class _NavigationButtons extends StatelessWidget {
     required this.isLastStage,
     required this.onBack,
     required this.onNext,
+    required this.isSavingSession,
     this.showIntroBack = false,
     this.onIntroBack,
   });
@@ -689,28 +889,63 @@ class _NavigationButtons extends StatelessWidget {
             child: OutlinedButton(
               onPressed: canGoBack ? onBack : onIntroBack,
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                side: BorderSide(color: cs.outline),
+                side: BorderSide(color: cs.outlineVariant, width: 1.5),
               ),
-              child: const Text('Back'),
+              child: Text(
+                'Back',
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
-        if (canGoBack || showIntroBack) const SizedBox(width: 12),
+        if (canGoBack || showIntroBack) const SizedBox(width: 14),
         Expanded(
-          child: FilledButton(
-            onPressed: onNext,
-            style: FilledButton.styleFrom(
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            child: Text(buttonText),
+            child: FilledButton(
+              onPressed: isSavingSession ? null : onNext,
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation:
+                    0, // Handled by outer container shadow mapping safely
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: isSavingSession
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(cs.onPrimary),
+                      ),
+                    )
+                  : Text(
+                      buttonText,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+            ),
           ),
         ),
       ],
@@ -738,12 +973,15 @@ class _EndingScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: cs.primary.withOpacity(0.16)),
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: cs.primary.withOpacity(0.4),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: cs.primary.withOpacity(0.10),
+                  color: cs.shadow.withOpacity(0.04),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -752,13 +990,14 @@ class _EndingScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _LabelPill(text: 'Session complete'),
-                const SizedBox(height: 18),
+                const _LabelPill(text: 'Session complete'),
+                const SizedBox(height: 20),
                 Text(
                   'Thank you for taking the time to listen to each other.',
                   style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    height: 1.45,
+                    fontWeight: FontWeight.w800,
+                    height: 1.5,
+                    color: cs.primary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -766,30 +1005,35 @@ class _EndingScreen extends StatelessWidget {
                   'Communication is not always easy, but choosing to understand one another is an important act of care and connection.',
                   style: textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
-                    height: 1.55,
+                    height: 1.6,
                   ),
                 ),
-                const SizedBox(height: 18),
-                _SoftMessage(
+                const SizedBox(height: 20),
+                const _SoftMessage(
                   text:
                       'Your relationship character feels proud of you both for trying.',
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           FilledButton(
             onPressed: onRestart,
             style: FilledButton.styleFrom(
               backgroundColor: cs.primary,
               foregroundColor: cs.onPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              minimumSize: const Size(double.infinity, 52),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              minimumSize: const Size(double.infinity, 56),
+              elevation: 4,
+              shadowColor: cs.shadow.withOpacity(0.25),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(24),
               ),
             ),
-            child: const Text('Start another session'),
+            child: const Text(
+              'Start another session',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            ),
           ),
         ],
       ),
@@ -808,16 +1052,16 @@ class _LabelPill extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         color: cs.primary.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
         text,
         style: textTheme.labelLarge?.copyWith(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -836,17 +1080,17 @@ class _SoftMessage extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.primaryContainer.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(18),
+        color: cs.secondaryContainer.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         text,
-        style: textTheme.bodySmall?.copyWith(
-          color: cs.onPrimaryContainer,
-          height: 1.45,
-          fontWeight: FontWeight.w600,
+        style: textTheme.bodyMedium?.copyWith(
+          color: cs.onSecondaryContainer,
+          height: 1.5,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
