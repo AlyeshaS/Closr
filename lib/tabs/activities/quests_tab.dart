@@ -1,4 +1,5 @@
 // lib/play/quests_tab.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,48 +13,107 @@ class QuestsTab extends StatefulWidget {
   State<QuestsTab> createState() => _QuestsTabState();
 }
 
-class _QuestsTabState extends State<QuestsTab> {
+class _QuestsTabState extends State<QuestsTab>
+    with AutomaticKeepAliveClientMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  String _getCoupleDocId(String uidA, String uidB) {
-    List<String> ids = [uidA, uidB];
-    ids.sort();
-    return ids.join('_');
-  }
+  double _animatedProgressStart = 0.0;
+  double _currentProgressValue = 0.0;
 
-  /// Verifies and rotates quests precisely at Sunday 12:00 AM
-  Future<void> _verifyWeeklyQuests(
-    String coupleDocId,
-    List<dynamic> currentQuests,
-    Timestamp? lastUpdated,
-  ) async {
+  bool _questsVerifiedThisSession = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<void> _verifyWeeklyQuestsOnce({
+    required String myUid,
+    required String partnerUid,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> currentQuestDocs,
+    required Timestamp? lastUpdated,
+  }) async {
+    if (_questsVerifiedThisSession || myUid.isEmpty || partnerUid.isEmpty)
+      return;
+    _questsVerifiedThisSession = true;
+
     final targetSunday = QuestsManager.getMostRecentSundayMidnight();
 
     bool needsNewQuests =
-        currentQuests.isEmpty ||
+        currentQuestDocs.isEmpty ||
         lastUpdated == null ||
         lastUpdated.toDate().isBefore(targetSunday);
 
     if (needsNewQuests) {
-      List<String> oldIds = currentQuests
-          .map((q) => (q['id'] ?? '').toString())
+      List<String> oldIds = currentQuestDocs
+          .map((doc) => (doc.data()['id'] ?? '').toString())
           .toList();
       final freshQuests = QuestsManager.generateWeeklyQuests(
         lastWeekIds: oldIds,
       );
 
-      await _firestore.collection('couples').doc(coupleDocId).set({
-        'week_start_date': Timestamp.fromDate(
-          targetSunday,
-        ), // Lock it exactly to Sunday 12am
-        'quests': freshQuests,
-      }, SetOptions(merge: true));
+      WriteBatch batch = _firestore.batch();
+
+      // 1. Update the tracking timestamp on the root user profiles
+      final timestampData = {
+        'quests_last_updated': Timestamp.fromDate(targetSunday),
+      };
+      batch.set(
+        _firestore.collection('users').doc(myUid),
+        timestampData,
+        SetOptions(merge: true),
+      );
+      batch.set(
+        _firestore.collection('users').doc(partnerUid),
+        timestampData,
+        SetOptions(merge: true),
+      );
+
+      // 2. Clear out the expired documents from previous weeks from the subcollections
+      for (var doc in currentQuestDocs) {
+        batch.delete(
+          _firestore
+              .collection('users')
+              .doc(myUid)
+              .collection('quests')
+              .doc(doc.id),
+        );
+        batch.delete(
+          _firestore
+              .collection('users')
+              .doc(partnerUid)
+              .collection('quests')
+              .doc(doc.id),
+        );
+      }
+
+      // 3. Write each new quest as a separate document inside the subcollection for both users
+      for (var quest in freshQuests) {
+        final questId =
+            quest['id']?.toString() ?? _firestore.collection('users').doc().id;
+
+        final myQuestRef = _firestore
+            .collection('users')
+            .doc(myUid)
+            .collection('quests')
+            .doc(questId);
+        final partnerQuestRef = _firestore
+            .collection('users')
+            .doc(partnerUid)
+            .collection('quests')
+            .doc(questId);
+
+        batch.set(myQuestRef, quest);
+        batch.set(partnerQuestRef, quest);
+      }
+
+      await batch.commit();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -61,16 +121,20 @@ class _QuestsTabState extends State<QuestsTab> {
       return const Center(child: Text("Please log in."));
     }
 
+    // Stream 1: Listens to the core user profile document for partner pairing emails
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _firestore.collection('users').doc(_myUid).snapshots(),
-      builder: (context, mySnapshot) {
-        if (!mySnapshot.hasData || !mySnapshot.data!.exists) {
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Center(child: Text("No profile data found."));
+        }
 
-        final myData = mySnapshot.data!.data();
+        final myData = snapshot.data!.data();
         final String partnerEmailLower =
-            (myData?['partnerEmailLower'] ?? myData?['partnerEmail'] ?? '')
+            ((myData?['partnerEmailLower'] ?? myData?['partnerEmail'] ?? ''))
                 .toString()
                 .trim()
                 .toLowerCase();
@@ -99,6 +163,7 @@ class _QuestsTabState extends State<QuestsTab> {
           );
         }
 
+        // Stream 2: Resolves the partner email into their unique user ID
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _firestore
               .collection('users')
@@ -115,35 +180,47 @@ class _QuestsTabState extends State<QuestsTab> {
             }
 
             final partnerUid = partnerLookup.data!.docs.first.id;
-            final coupleDocId = _getCoupleDocId(_myUid, partnerUid);
+            Timestamp? lastUpdated =
+                myData?['quests_last_updated'] as Timestamp?;
 
-            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            // Stream 3: Real-time listener for separate documents within the subcollection folder structure
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _firestore
-                  .collection('couples')
-                  .doc(coupleDocId)
+                  .collection('users')
+                  .doc(_myUid)
+                  .collection('quests')
                   .snapshots(),
-              builder: (context, questSnapshot) {
-                List<dynamic> quests = [];
-                Timestamp? lastUpdated;
-
-                if (questSnapshot.hasData && questSnapshot.data!.exists) {
-                  final data = questSnapshot.data!.data();
-                  quests = data?['quests'] as List<dynamic>? ?? [];
-                  lastUpdated = data?['week_start_date'] as Timestamp?;
-                }
-
-                _verifyWeeklyQuests(coupleDocId, quests, lastUpdated);
-
-                if (quests.isEmpty) {
+              builder: (context, subcollectionSnapshot) {
+                if (subcollectionSnapshot.connectionState ==
+                    ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                int completedCount = quests
-                    .where((q) => q['done'] == true)
+                final questDocs = subcollectionSnapshot.data?.docs ?? [];
+
+                // Safe handoff for background verification check frames
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _verifyWeeklyQuestsOnce(
+                    myUid: _myUid,
+                    partnerUid: partnerUid,
+                    currentQuestDocs: questDocs,
+                    lastUpdated: lastUpdated,
+                  );
+                });
+
+                if (questDocs.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                int completedCount = questDocs
+                    .where((doc) => doc.data()['done'] == true)
                     .length;
-                double progressValue = quests.isEmpty
-                    ? 0
-                    : (completedCount / quests.length);
+                double targetProgress = (completedCount / questDocs.length);
+
+                if (targetProgress != _currentProgressValue) {
+                  _animatedProgressStart = _currentProgressValue;
+                  _currentProgressValue = targetProgress;
+                }
 
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -151,106 +228,137 @@ class _QuestsTabState extends State<QuestsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // REDESIGNED TOP CARD WIDGET
+                      // Frosted Glass Top Progress Summary Card
                       Container(
-                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isDark
-                                ? [
-                                    cs.surfaceContainerHigh,
-                                    cs.surfaceContainerLowest,
-                                  ]
-                                : [
-                                    cs.primaryContainer.withOpacity(0.9),
-                                    cs.primaryContainer.withOpacity(0.4),
-                                  ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: cs.primary.withOpacity(0.15),
-                            width: 1,
-                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: cs.primary.withOpacity(
-                                isDark ? 0.12 : 0.08,
-                              ),
-                              blurRadius: 24,
+                              color: cs.shadow.withOpacity(0.07),
+                              blurRadius: 26,
+                              offset: const Offset(0, 14),
+                            ),
+                            BoxShadow(
+                              color: cs.primary.withOpacity(0.12),
+                              blurRadius: 18,
+                              offset: const Offset(0, 6),
                               spreadRadius: -4,
-                              offset: const Offset(0, 12),
                             ),
                           ],
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    cs.primaryContainer.withOpacity(0.85),
+                                    cs.secondaryContainer.withOpacity(0.55),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: cs.primary.withOpacity(0.35),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    "THIS WEEK'S QUESTS",
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          letterSpacing: 1.3,
-                                          fontWeight: FontWeight.bold,
-                                          color: cs.primary,
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "THIS WEEK'S QUESTS",
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(
+                                                letterSpacing: 1.3,
+                                                fontWeight: FontWeight.bold,
+                                                color: cs.primary,
+                                              ),
                                         ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '$completedCount of ${quests.length} Completed',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(
-                                          color: cs.onPrimaryContainer,
-                                          fontWeight: FontWeight.w800,
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '$completedCount of ${questDocs.length} Completed',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge
+                                              ?.copyWith(
+                                                color: cs.onSurface,
+                                                fontWeight: FontWeight.w800,
+                                              ),
                                         ),
-                                  ),
-                                  const SizedBox(height: 18),
+                                        const SizedBox(height: 18),
 
-                                  // 🌟 1. Sliding Progress Bar Custom Animation
+                                        TweenAnimationBuilder<double>(
+                                          tween: Tween<double>(
+                                            begin: _animatedProgressStart,
+                                            end: _currentProgressValue,
+                                          ),
+                                          duration: const Duration(
+                                            milliseconds: 350,
+                                          ),
+                                          curve: Curves.easeOutCubic,
+                                          builder: (context, animatedValue, child) {
+                                            return Container(
+                                              height: 10,
+                                              decoration: BoxDecoration(
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: cs.primary
+                                                        .withOpacity(0.05),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                child: LinearProgressIndicator(
+                                                  value: animatedValue,
+                                                  backgroundColor: isDark
+                                                      ? cs.surfaceContainerHighest
+                                                      : cs.primary.withOpacity(
+                                                          0.1,
+                                                        ),
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(cs.primary),
+                                                  minHeight: 10,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 24),
                                   TweenAnimationBuilder<double>(
                                     tween: Tween<double>(
-                                      begin: 0,
-                                      end: progressValue,
+                                      begin: _animatedProgressStart,
+                                      end: _currentProgressValue,
                                     ),
-                                    duration: const Duration(milliseconds: 400),
+                                    duration: const Duration(milliseconds: 350),
                                     curve: Curves.easeOutCubic,
                                     builder: (context, animatedValue, child) {
-                                      return Container(
-                                        height: 10,
-                                        decoration: BoxDecoration(
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: cs.primary.withOpacity(
-                                                0.15,
-                                              ),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                          child: LinearProgressIndicator(
-                                            value: animatedValue,
-                                            backgroundColor: isDark
-                                                ? cs.surfaceContainerHighest
-                                                : cs.primary.withOpacity(0.1),
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  cs.primary,
-                                                ),
-                                            minHeight: 10,
-                                          ),
+                                      return Text(
+                                        '${(animatedValue * 100).round()}%',
+                                        style: TextStyle(
+                                          fontFamily: 'CormorantGaramond',
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.primary,
                                         ),
                                       );
                                     },
@@ -258,34 +366,12 @@ class _QuestsTabState extends State<QuestsTab> {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 24),
-
-                            // 🌟 2. Live Rolling/Counting Percentage Text
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(
-                                begin: 0,
-                                end: progressValue,
-                              ),
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, animatedValue, child) {
-                                return Text(
-                                  '${(animatedValue * 100).round()}%',
-                                  style: TextStyle(
-                                    fontFamily: 'CormorantGaramond',
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    color: cs.primary,
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 28),
                       Text(
-                        'QUESTS',
+                        'TODAY\'S QUESTS',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           letterSpacing: 1.1,
                           fontWeight: FontWeight.w700,
@@ -294,9 +380,10 @@ class _QuestsTabState extends State<QuestsTab> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Interactive Modern Item List
-                      ...List.generate(quests.length, (i) {
-                        final quest = quests[i] as Map<String, dynamic>;
+                      // Interactive list built dynamically from separate collection records
+                      ...List.generate(questDocs.length, (i) {
+                        final doc = questDocs[i];
+                        final quest = doc.data();
                         final done = quest['done'] as bool? ?? false;
 
                         return Padding(
@@ -305,12 +392,27 @@ class _QuestsTabState extends State<QuestsTab> {
                             borderRadius: BorderRadius.circular(20),
                             onTap: () async {
                               bool nextState = !done;
-                              quests[i]['done'] = nextState;
 
-                              await _firestore
-                                  .collection('couples')
-                                  .doc(coupleDocId)
-                                  .update({'quests': quests});
+                              // 🌟 Updates the matching individual document ID in both subcollections simultaneously
+                              WriteBatch updateBatch = _firestore.batch();
+
+                              final myDocRef = _firestore
+                                  .collection('users')
+                                  .doc(_myUid)
+                                  .collection('quests')
+                                  .doc(doc.id);
+                              final partnerDocRef = _firestore
+                                  .collection('users')
+                                  .doc(partnerUid)
+                                  .collection('quests')
+                                  .doc(doc.id);
+
+                              updateBatch.update(myDocRef, {'done': nextState});
+                              updateBatch.update(partnerDocRef, {
+                                'done': nextState,
+                              });
+
+                              await updateBatch.commit();
 
                               try {
                                 if (nextState) {
@@ -399,7 +501,7 @@ class _QuestsTabState extends State<QuestsTab> {
                                   ),
                                   const SizedBox(width: 8),
 
-                                  // Square-shaped checkbox indicator boxes
+                                  // Square Custom Checkbox Container
                                   AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
                                     width: 24,
@@ -433,7 +535,7 @@ class _QuestsTabState extends State<QuestsTab> {
                       const SizedBox(height: 16),
                       Center(
                         child: Text(
-                          'Quests refresh every Sunday at 12:00 AM',
+                          'More challenges coming soon',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: cs.onSurfaceVariant.withOpacity(0.4),
