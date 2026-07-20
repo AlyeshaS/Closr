@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'tabs/home_page.dart';
 import 'tabs/connect/connect_screen.dart';
-import 'tabs/play/activities_screen.dart';
+import 'tabs/activities/activities_screen.dart';
 import 'tabs/memories/memories_screen.dart';
 import 'tabs/settings_page.dart';
 

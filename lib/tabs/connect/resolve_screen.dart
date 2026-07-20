@@ -293,7 +293,6 @@ class _ResolveScreenState extends State<ResolveScreen> {
             controller: _introPageController,
             physics: const PageScrollPhysics(),
             children: [
-              // Landing intro centered with Get started
               SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -303,7 +302,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _HeroCard(),
+                        _HeroCard(isDissolved: false),
                         const SizedBox(height: 32),
                         FilledButton(
                           onPressed: () {
@@ -338,7 +337,6 @@ class _ResolveScreenState extends State<ResolveScreen> {
                 ),
               ),
 
-              // Mode selector page (swipe-to)
               SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -432,7 +430,6 @@ class _ResolveScreenState extends State<ResolveScreen> {
   }
 }
 
-// 1. Moving Background Circles Implementation via stateful loops
 class _ResolveBackdrop extends StatefulWidget {
   final Widget child;
 
@@ -512,65 +509,73 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
   }
 }
 
-// 2. Beautiful Landing Card Setup with explicitly specified borders and dropshadow structures
 class _HeroCard extends StatelessWidget {
+  final bool isDissolved;
+
+  const _HeroCard({required this.isDissolved});
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: cs.primary.withOpacity(0.35), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withOpacity(0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 350),
+      opacity: isDissolved
+          ? 0.0
+          : 1.0, // Clean dissolve animation implementation
       child: Container(
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _LabelPill(text: 'Resolve'),
-            const SizedBox(height: 20),
-            Text(
-              'Healthy relationships are not built on avoiding conflict, but on learning how to navigate it together.',
-              style: textTheme.titleMedium?.copyWith(
-                height: 1.5,
-                fontWeight: FontWeight.w800,
-                color: cs.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'This space helps both of you slow down, reflect, and communicate with intention. The goal is not to win the conversation, but to understand each other and move forward together.',
-              style: textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Take your time. Be honest. Be kind. Remember that you are on the same team.',
-              style: textTheme.bodyMedium?.copyWith(
-                color: cs.primary,
-                height: 1.6,
-                fontWeight: FontWeight.w600,
-              ),
+          color: cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: cs.primary.withOpacity(0.35), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withOpacity(0.06),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Resolve tag / label pill removed completely from here
+              Text(
+                'Healthy relationships are not built on avoiding conflict, but on learning how to navigate it together.',
+                style: textTheme.titleMedium?.copyWith(
+                  height: 1.5,
+                  fontWeight: FontWeight.w800,
+                  color: cs.primary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'This space helps both of you slow down, reflect, and communicate with intention. The goal is not to win the conversation, but to understand each other and move forward together.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Take your time. Be honest. Be kind. Remember that you are on the same team.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: cs.primary,
+                  height: 1.6,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -618,46 +623,73 @@ class _ModeSelector extends StatelessWidget {
             ...modes.map((mode) {
               final selected = selectedMode == mode;
 
-              return ChoiceChip(
-                label: Text(mode),
-                selected: selected,
-                onSelected: (_) => onChanged(mode),
-                selectedColor: cs.secondaryContainer,
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cs.shadow.withOpacity(selected ? 0.08 : 0.03),
+                      blurRadius: selected ? 12 : 6,
+                      offset: Offset(0, selected ? 4 : 2),
+                    ),
+                  ],
+                ),
+                child: ChoiceChip(
+                  label: Text(mode),
+                  selected: selected,
+                  onSelected: (_) => onChanged(mode),
+                  selectedColor: cs.secondaryContainer,
+                  backgroundColor: cs.surfaceContainerLow,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  labelStyle: TextStyle(
+                    color: selected ? cs.primary : cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(
+                      color: selected
+                          ? cs.primary
+                          : cs.outlineVariant.withOpacity(0.6),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.shadow.withOpacity(0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ActionChip(
+                avatar: Icon(Icons.add_rounded, size: 18, color: cs.primary),
+                label: const Text('Custom'),
+                onPressed: onCustomPressed,
                 backgroundColor: cs.surfaceContainerLow,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
                 ),
                 labelStyle: TextStyle(
-                  color: selected ? cs.primary : cs.onSurfaceVariant,
+                  color: cs.primary,
                   fontWeight: FontWeight.w700,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                   side: BorderSide(
-                    color: selected
-                        ? cs.primary
-                        : cs.outlineVariant.withOpacity(0.6),
+                    color: cs.outlineVariant.withOpacity(0.6),
                     width: 1.5,
                   ),
-                ),
-              );
-            }),
-            ActionChip(
-              avatar: Icon(Icons.add_rounded, size: 18, color: cs.primary),
-              label: const Text('Custom'),
-              onPressed: onCustomPressed,
-              backgroundColor: cs.surfaceContainerLow,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              labelStyle: TextStyle(
-                color: cs.primary,
-                fontWeight: FontWeight.w700,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.6),
-                  width: 1.5,
                 ),
               ),
             ),
@@ -668,7 +700,6 @@ class _ModeSelector extends StatelessWidget {
   }
 }
 
-// 4. Structural Question Segment Customizing Layouts & Color parameters
 class _ProgressHeader extends StatelessWidget {
   final String stageTitle;
   final int currentPromptIndex;
@@ -695,10 +726,7 @@ class _ProgressHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: cs.primary,
-          width: 1.5,
-        ), // Primary color border
+        border: Border.all(color: cs.primary, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: cs.shadow.withOpacity(0.04),
@@ -789,10 +817,7 @@ class _PromptCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: cs.primary,
-          width: 1.5,
-        ), // Primary color border
+        border: Border.all(color: cs.primary, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: cs.shadow.withOpacity(0.05),
@@ -804,8 +829,6 @@ class _PromptCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SoftMessage(text: 'Read to understand, not to respond.'),
-          const SizedBox(height: 20),
           Text(
             prompt,
             style: textTheme.titleMedium?.copyWith(
@@ -840,6 +863,19 @@ class _PromptCard extends StatelessWidget {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide(color: cs.primary, width: 1.6),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Cleanly integrated micro-reminder text at the bottom matching the app's structural fonts
+          Align(
+            alignment: Alignment.center,
+            child: Text(
+              'Read to understand, not to respond.',
+              style: textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: cs.primary.withOpacity(0.8),
               ),
             ),
           ),
@@ -923,8 +959,7 @@ class _NavigationButtons extends StatelessWidget {
                 backgroundColor: cs.primary,
                 foregroundColor: cs.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation:
-                    0, // Handled by outer container shadow mapping safely
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
