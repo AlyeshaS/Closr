@@ -193,15 +193,22 @@ class _ResolveScreenState extends State<ResolveScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         title: Text(
           'Custom situation',
-          style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            fontFamily: 'DMSans',
+            color: cs.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         content: TextField(
           controller: customModeController,
           autofocus: true,
-          style: TextStyle(color: cs.onSurface),
+          style: TextStyle(fontFamily: 'DMSans', color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'What are you working through?',
-            hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
+            hintStyle: TextStyle(
+              fontFamily: 'DMSans',
+              color: cs.onSurfaceVariant.withOpacity(0.6),
+            ),
             filled: true,
             fillColor: cs.surface,
             border: OutlineInputBorder(
@@ -215,7 +222,11 @@ class _ResolveScreenState extends State<ResolveScreen> {
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               'Cancel',
-              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontFamily: 'DMSans',
+                color: cs.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           FilledButton(
@@ -227,14 +238,14 @@ class _ResolveScreenState extends State<ResolveScreen> {
               backgroundColor: cs.primary,
               foregroundColor: cs.onPrimary,
               elevation: 4,
-              shadowColor: cs.shadow.withOpacity(0.3),
+              shadowColor: cs.primary.withOpacity(0.3),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
             child: const Text(
               'Use it',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(fontFamily: 'DMSans', fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -326,6 +337,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
                           child: const Text(
                             'Get started',
                             style: TextStyle(
+                              fontFamily: 'DMSans',
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
                             ),
@@ -370,6 +382,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
                       child: const Text(
                         'Start Questions',
                         style: TextStyle(
+                          fontFamily: 'DMSans',
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
                         ),
@@ -518,6 +531,7 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 350),
@@ -530,11 +544,15 @@ class _HeroCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: cs.surfaceContainer,
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: cs.primary.withOpacity(0.35), width: 1.5),
+          border: Border.all(
+            color: cs.primary.withOpacity(isDark ? 0.2 : 0.25),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: cs.shadow.withOpacity(0.06),
-              blurRadius: 24,
+              color: cs.primary.withOpacity(isDark ? 0.04 : 0.07),
+              blurRadius: 32,
+              spreadRadius: 0,
               offset: const Offset(0, 12),
             ),
           ],
@@ -552,8 +570,11 @@ class _HeroCard extends StatelessWidget {
               Text(
                 'Healthy relationships are not built on avoiding conflict, but on learning how to navigate it together.',
                 style: textTheme.titleMedium?.copyWith(
+                  fontFamily: 'CormorantGaramond',
+                  fontStyle: FontStyle.italic,
+                  fontSize: 22,
                   height: 1.5,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w500,
                   color: cs.primary,
                 ),
               ),
@@ -561,6 +582,7 @@ class _HeroCard extends StatelessWidget {
               Text(
                 'This space helps both of you slow down, reflect, and communicate with intention. The goal is not to win the conversation, but to understand each other and move forward together.',
                 style: textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'DMSans',
                   color: cs.onSurfaceVariant,
                   height: 1.6,
                 ),
@@ -569,6 +591,7 @@ class _HeroCard extends StatelessWidget {
               Text(
                 'Take your time. Be honest. Be kind. Remember that you are on the same team.',
                 style: textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'DMSans',
                   color: cs.primary,
                   height: 1.6,
                   fontWeight: FontWeight.w600,
@@ -606,6 +629,7 @@ class _ModeSelector extends StatelessWidget {
         Text(
           'What are you working through?',
           style: textTheme.titleMedium?.copyWith(
+            fontFamily: 'DMSans',
             fontWeight: FontWeight.w800,
             color: cs.primary,
           ),
@@ -613,7 +637,10 @@ class _ModeSelector extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'Choose a situation so the session feels more focused.',
-          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+          style: textTheme.bodyMedium?.copyWith(
+            fontFamily: 'DMSans',
+            color: cs.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -626,25 +653,28 @@ class _ModeSelector extends StatelessWidget {
               return Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: cs.shadow.withOpacity(selected ? 0.08 : 0.03),
-                      blurRadius: selected ? 12 : 6,
-                      offset: Offset(0, selected ? 4 : 2),
-                    ),
-                  ],
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: cs.primary.withOpacity(0.1),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: ChoiceChip(
                   label: Text(mode),
                   selected: selected,
                   onSelected: (_) => onChanged(mode),
-                  selectedColor: cs.secondaryContainer,
+                  selectedColor: cs.primaryContainer.withOpacity(0.9),
                   backgroundColor: cs.surfaceContainerLow,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 10,
                   ),
                   labelStyle: TextStyle(
+                    fontFamily: 'DMSans',
                     color: selected ? cs.primary : cs.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
                   ),
@@ -652,25 +682,15 @@ class _ModeSelector extends StatelessWidget {
                     borderRadius: BorderRadius.circular(24),
                     side: BorderSide(
                       color: selected
-                          ? cs.primary
-                          : cs.outlineVariant.withOpacity(0.6),
-                      width: 1.5,
+                          ? cs.primary.withOpacity(0.3)
+                          : cs.outlineVariant.withOpacity(0.4),
+                      width: 1.2,
                     ),
                   ),
                 ),
               );
             }),
             Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: cs.shadow.withOpacity(0.03),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
               child: ActionChip(
                 avatar: Icon(Icons.add_rounded, size: 18, color: cs.primary),
                 label: const Text('Custom'),
@@ -680,15 +700,15 @@ class _ModeSelector extends StatelessWidget {
                   horizontal: 16,
                   vertical: 10,
                 ),
-                labelStyle: TextStyle(
-                  color: cs.primary,
+                labelStyle: const TextStyle(
+                  fontFamily: 'DMSans',
                   fontWeight: FontWeight.w700,
-                ),
+                ).copyWith(color: cs.primary),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                   side: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.6),
-                    width: 1.5,
+                    color: cs.outlineVariant.withOpacity(0.4),
+                    width: 1.2,
                   ),
                 ),
               ),
@@ -719,6 +739,7 @@ class _ProgressHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
@@ -726,11 +747,14 @@ class _ProgressHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: cs.primary, width: 1.5),
+        border: Border.all(
+          color: cs.primary.withOpacity(isDark ? 0.2 : 0.25),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: cs.shadow.withOpacity(0.04),
-            blurRadius: 16,
+            color: cs.primary.withOpacity(isDark ? 0.03 : 0.05),
+            blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
@@ -738,43 +762,70 @@ class _ProgressHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              'Working through: $selectedMode',
-              style: textTheme.labelMedium?.copyWith(
-                color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.w800,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'Working through: $selectedMode',
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelMedium?.copyWith(
+                      fontFamily: 'DMSans',
+                      color: cs.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Text(
+                '${currentPromptIndex + 1} / $totalPrompts',
+                style: textTheme.labelSmall?.copyWith(
+                  fontFamily: 'DMSans',
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                  color: cs.onSurfaceVariant.withOpacity(0.7),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
             stageTitle,
             style: textTheme.titleMedium?.copyWith(
+              fontFamily: 'DMSans',
               fontWeight: FontWeight.w800,
               color: cs.onSurface,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Question ${currentPromptIndex + 1} of $totalPrompts',
-            style: textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          LinearProgressIndicator(
-            value: progress,
-            minHeight: 10,
-            borderRadius: BorderRadius.circular(999),
-            backgroundColor: cs.surface,
-            color: cs.primary,
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(totalPrompts, (index) {
+              final bool isActive = index <= currentPromptIndex;
+              return Expanded(
+                child: Container(
+                  height: 4,
+                  margin: EdgeInsets.only(
+                    right: index == totalPrompts - 1 ? 0 : 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? cs.primary
+                        : cs.outlineVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              );
+            }),
           ),
         ],
       ),
@@ -792,6 +843,7 @@ class _PromptCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final screenHeight = MediaQuery.of(context).size.height;
     late int minLines;
@@ -813,15 +865,18 @@ class _PromptCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: cs.primary, width: 1.5),
+        border: Border.all(
+          color: cs.primary.withOpacity(isDark ? 0.22 : 0.28),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: cs.shadow.withOpacity(0.05),
-            blurRadius: 20,
+            color: cs.primary.withOpacity(isDark ? 0.04 : 0.06),
+            blurRadius: 32,
             offset: const Offset(0, 10),
           ),
         ],
@@ -831,33 +886,41 @@ class _PromptCard extends StatelessWidget {
         children: [
           Text(
             prompt,
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+            style: textTheme.headlineSmall?.copyWith(
+              fontFamily: 'CormorantGaramond',
+              fontStyle: FontStyle.italic,
+              fontSize: 24,
+              fontWeight: FontWeight.w400,
               height: 1.5,
               color: cs.onSurface,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
           TextField(
             controller: controller,
             minLines: minLines,
             maxLines: maxLines,
-            style: TextStyle(color: cs.onSurface),
+            style: const TextStyle(fontFamily: 'DMSans').copyWith(
+              color: cs.onSurface,
+            ),
             decoration: InputDecoration(
               hintText: 'Write your thoughts here...',
-              hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
+              hintStyle: TextStyle(
+                fontFamily: 'DMSans',
+                color: cs.onSurfaceVariant.withOpacity(0.6),
+              ),
               filled: true,
-              fillColor: cs.surface,
+              fillColor: cs.surface.withOpacity(isDark ? 0.5 : 0.6),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.8),
+                  color: cs.outlineVariant.withOpacity(0.5),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.8),
+                  color: cs.outlineVariant.withOpacity(0.5),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -873,6 +936,7 @@ class _PromptCard extends StatelessWidget {
             child: Text(
               'Read to understand, not to respond.',
               style: textTheme.labelSmall?.copyWith(
+                fontFamily: 'DMSans',
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
                 color: cs.primary.withOpacity(0.8),
@@ -929,11 +993,15 @@ class _NavigationButtons extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                 ),
-                side: BorderSide(color: cs.outlineVariant, width: 1.5),
+                side: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.7),
+                  width: 1.4,
+                ),
               ),
               child: Text(
                 'Back',
                 style: TextStyle(
+                  fontFamily: 'DMSans',
                   color: cs.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
@@ -947,8 +1015,8 @@ class _NavigationButtons extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: cs.shadow.withOpacity(0.2),
-                  blurRadius: 12,
+                  color: cs.primary.withOpacity(0.22),
+                  blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
               ],
@@ -976,6 +1044,7 @@ class _NavigationButtons extends StatelessWidget {
                   : Text(
                       buttonText,
                       style: const TextStyle(
+                        fontFamily: 'DMSans',
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
                       ),
@@ -997,6 +1066,7 @@ class _EndingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -1011,13 +1081,13 @@ class _EndingScreen extends StatelessWidget {
               color: cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: cs.primary.withOpacity(0.4),
-                width: 1.5,
+                color: cs.primary.withOpacity(isDark ? 0.22 : 0.28),
+                width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: cs.shadow.withOpacity(0.04),
-                  blurRadius: 24,
+                  color: cs.primary.withOpacity(isDark ? 0.04 : 0.06),
+                  blurRadius: 28,
                   offset: const Offset(0, 10),
                 ),
               ],
@@ -1029,8 +1099,11 @@ class _EndingScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 Text(
                   'Thank you for taking the time to listen to each other.',
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontFamily: 'CormorantGaramond',
+                    fontStyle: FontStyle.italic,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w400,
                     height: 1.5,
                     color: cs.primary,
                   ),
@@ -1039,6 +1112,7 @@ class _EndingScreen extends StatelessWidget {
                 Text(
                   'Communication is not always easy, but choosing to understand one another is an important act of care and connection.',
                   style: textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'DMSans',
                     color: cs.onSurfaceVariant,
                     height: 1.6,
                   ),
@@ -1060,14 +1134,18 @@ class _EndingScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 16),
               minimumSize: const Size(double.infinity, 56),
               elevation: 4,
-              shadowColor: cs.shadow.withOpacity(0.25),
+              shadowColor: cs.primary.withOpacity(0.28),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
             ),
             child: const Text(
               'Start another session',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              style: TextStyle(
+                fontFamily: 'DMSans',
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
             ),
           ),
         ],
@@ -1095,6 +1173,7 @@ class _LabelPill extends StatelessWidget {
       child: Text(
         text,
         style: textTheme.labelLarge?.copyWith(
+          fontFamily: 'DMSans',
           color: cs.primary,
           fontWeight: FontWeight.w800,
         ),
@@ -1117,12 +1196,13 @@ class _SoftMessage extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.secondaryContainer.withOpacity(0.7),
+        color: cs.secondaryContainer.withOpacity(0.6),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         text,
         style: textTheme.bodyMedium?.copyWith(
+          fontFamily: 'DMSans',
           color: cs.onSecondaryContainer,
           height: 1.5,
           fontWeight: FontWeight.w700,
