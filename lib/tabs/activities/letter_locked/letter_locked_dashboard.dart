@@ -109,8 +109,6 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
             ),
           );
         } else {
-          // ✨ Dynamic Cumulative Score Capture Check:
-          // Reads old points if they exist so they NEVER reset to 0
           Map<String, int> existingScores = {_myUid: 0, _partnerUid: 0};
           if (gameDoc.exists &&
               gameDoc.data()?['gameData']?['scores'] != null) {
@@ -124,7 +122,7 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
             myUid: _myUid,
             partnerUid: _partnerUid,
             mode: mode,
-            existingScores: existingScores, // Pass persistent scores through!
+            existingScores: existingScores,
           );
 
           if (mounted) {
@@ -153,23 +151,28 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
     final cs = Theme.of(context).colorScheme;
 
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_partnerUid.isEmpty) {
       return Scaffold(
         backgroundColor: cs.surface,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Text(
-              _partnerEmail.isEmpty
-                  ? 'Link accounts with your partner in settings to start playing together!'
-                  : 'Waiting for your partner to register an account with $_partnerEmail...',
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                _partnerEmail.isEmpty
+                    ? 'Link accounts with your partner in settings to start playing together!'
+                    : 'Waiting for your partner to register an account with $_partnerEmail...',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
             ),
           ),
         ),
@@ -178,70 +181,105 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
 
     return Scaffold(
       backgroundColor: cs.surface,
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(_myUid)
-            .collection('games')
-            .doc('letterlocked')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final gameData = snapshot.data!.data();
+      body: SafeArea(
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(_myUid)
+              .collection('games')
+              .doc('letterlocked')
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final gameData = snapshot.data!.data();
 
-            // 🕹️ If game is active and we are just sitting on the dashboard, navigate in!
-            if (gameData?['status'] == 'active') {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  // Check if we are already displaying the game screen to avoid duplicate pushing
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => LetterLockedGameScreen(
-                        myUid: _myUid,
-                        partnerUid: _partnerUid,
-                        legacyRoomId: _legacyRoomId,
+              if (gameData?['status'] == 'active') {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => LetterLockedGameScreen(
+                          myUid: _myUid,
+                          partnerUid: _partnerUid,
+                          legacyRoomId: _legacyRoomId,
+                        ),
+                      ),
+                    );
+                  }
+                });
+              }
+            }
+
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🔙 Simple text back button with no container box or glow
+                  InkWell(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 15,
+                            color: cs.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Return to game options',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                }
-              });
-            }
-          }
-
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CHOOSE YOUR MODE',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
-                ),
-                const SizedBox(height: 16),
-                _buildCleanModeCard(
-                  context: context,
-                  title: 'Co-op Vault Mode',
-                  subtitle:
-                      'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative.',
-                  onTap: () => _handleGameRouting('coop'),
-                  cs: cs,
-                ),
-                const SizedBox(height: 12),
-                _buildCleanModeCard(
-                  context: context,
-                  title: 'Versus Word Trap',
-                  subtitle:
-                      'Change exactly one letter to morph the word. Trap your partner by locking their choices out.',
-                  onTap: () => _handleGameRouting('versus'),
-                  cs: cs,
-                ),
-              ],
-            ),
-          );
-        },
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'CHOOSE YOUR MODE',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurfaceVariant.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCleanModeCard(
+                    context: context,
+                    title: 'Co-op Vault Mode',
+                    subtitle:
+                        'Work together using a shared letter dial to unlock the safe vault. Cozy and collaborative.',
+                    icon: Icons.lock_reset_rounded,
+                    onTap: () => _handleGameRouting('coop'),
+                    cs: cs,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildCleanModeCard(
+                    context: context,
+                    title: 'Versus Word Trap',
+                    subtitle:
+                        'Change exactly one letter to morph the word. Trap your partner by locking their choices out.',
+                    icon: Icons.published_with_changes_rounded,
+                    onTap: () => _handleGameRouting('versus'),
+                    cs: cs,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -250,32 +288,50 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
     required BuildContext context,
     required String title,
     required String subtitle,
+    required IconData icon,
     required VoidCallback onTap,
     required ColorScheme cs,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF231519) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cs.primary.withOpacity(0.3), width: 1.5),
+          color: isDark ? const Color(0xFF1C1B1F) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: cs.outlineVariant.withOpacity(0.9),
+            width: 2.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
+                color: cs.primaryContainer.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(Icons.layers_rounded, color: cs.primary),
+              child: Center(child: Icon(icon, color: cs.primary, size: 22)),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,21 +339,27 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       color: cs.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurfaceVariant,
+                      fontSize: 13,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: cs.onSurfaceVariant.withOpacity(0.5),
+            ),
           ],
         ),
       ),

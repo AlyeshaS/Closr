@@ -22,7 +22,6 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_myUid.isEmpty) {
       return const Center(child: Text("Please log in."));
@@ -182,15 +181,9 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => Scaffold(
-                                    backgroundColor: cs.surface,
-                                    appBar: AppBar(
-                                      title: const Text('LetterLocked'),
-                                    ),
-                                    body: LetterLockedDashboard(
-                                      myUid: _myUid,
-                                      partnerUid: partnerUid,
-                                    ),
+                                  builder: (_) => LetterLockedDashboard(
+                                    myUid: _myUid,
+                                    partnerUid: partnerUid,
                                   ),
                                 ),
                               );
@@ -353,7 +346,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
           ],
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 44,
@@ -389,12 +382,9 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
               ),
             ),
             const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Icon(
-                Icons.chevron_right_rounded,
-                color: cs.onSurfaceVariant.withOpacity(0.5),
-              ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: cs.onSurfaceVariant.withOpacity(0.5),
             ),
           ],
         ),
