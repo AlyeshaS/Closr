@@ -183,26 +183,29 @@ class _ResolveScreenState extends State<ResolveScreen> {
 
   Future<void> showCustomModeDialog() async {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isBuiltIn = modes.contains(selectedMode);
     customModeController.text = isBuiltIn ? '' : selectedMode;
 
     final customMode = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: cs.surfaceContainerHigh,
+        backgroundColor: isDark
+            ? cs.surfaceContainerHigh
+            : const Color(0xFFFCFBF7),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         title: Text(
           'Custom situation',
           style: TextStyle(
             fontFamily: 'DMSans',
-            color: cs.onSurface,
+            color: cs.onSurfaceVariant,
             fontWeight: FontWeight.w800,
           ),
         ),
         content: TextField(
           controller: customModeController,
           autofocus: true,
-          style: TextStyle(fontFamily: 'DMSans', color: cs.onSurface),
+          style: TextStyle(fontFamily: 'DMSans', color: cs.onSurfaceVariant),
           decoration: InputDecoration(
             hintText: 'What are you working through?',
             hintStyle: TextStyle(
@@ -213,7 +216,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
             fillColor: cs.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.3)),
             ),
           ),
         ),
@@ -229,23 +232,37 @@ class _ResolveScreenState extends State<ResolveScreen> {
               ),
             ),
           ),
-          FilledButton(
-            onPressed: () {
-              final value = customModeController.text.trim();
-              Navigator.pop(dialogContext, value.isEmpty ? null : value);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              elevation: 4,
-              shadowColor: cs.primary.withOpacity(0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withOpacity(isDark ? 0.3 : 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: const Text(
-              'Use it',
-              style: TextStyle(fontFamily: 'DMSans', fontWeight: FontWeight.w700),
+            child: FilledButton(
+              onPressed: () {
+                final value = customModeController.text.trim();
+                Navigator.pop(dialogContext, value.isEmpty ? null : value);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Use it',
+                style: TextStyle(
+                  fontFamily: 'DMSans',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],
@@ -291,6 +308,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (currentStage == 3) {
       return _ResolveBackdrop(child: _EndingScreen(onRestart: restartSession));
@@ -313,33 +331,46 @@ class _ResolveScreenState extends State<ResolveScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _HeroCard(isDissolved: false),
+                        const _HeroCard(isDissolved: false),
                         const SizedBox(height: 32),
-                        FilledButton(
-                          onPressed: () {
-                            _introPageController.animateToPage(
-                              1,
-                              duration: const Duration(milliseconds: 420),
-                              curve: Curves.easeOutCubic,
-                            );
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: cs.primary,
-                            foregroundColor: cs.onPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            minimumSize: const Size(240, 56),
-                            elevation: 6,
-                            shadowColor: cs.shadow.withOpacity(0.25),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: cs.shadow.withOpacity(
+                                  isDark ? 0.35 : 0.18,
+                                ),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
-                          child: const Text(
-                            'Get started',
-                            style: TextStyle(
-                              fontFamily: 'DMSans',
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
+                          child: FilledButton(
+                            onPressed: () {
+                              _introPageController.animateToPage(
+                                1,
+                                duration: const Duration(milliseconds: 420),
+                                curve: Curves.easeOutCubic,
+                              );
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: cs.primary,
+                              foregroundColor: cs.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              minimumSize: const Size(240, 56),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
+                            child: const Text(
+                              'Get started',
+                              style: TextStyle(
+                                fontFamily: 'DMSans',
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ),
@@ -366,25 +397,36 @@ class _ResolveScreenState extends State<ResolveScreen> {
                       onCustomPressed: showCustomModeDialog,
                     ),
                     const SizedBox(height: 32),
-                    FilledButton(
-                      onPressed: startQuestions,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        minimumSize: const Size(double.infinity, 56),
-                        elevation: 6,
-                        shadowColor: cs.shadow.withOpacity(0.25),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: cs.shadow.withOpacity(isDark ? 0.35 : 0.18),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'Start Questions',
-                        style: TextStyle(
-                          fontFamily: 'DMSans',
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                      child: FilledButton(
+                        onPressed: startQuestions,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: cs.primary,
+                          foregroundColor: cs.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          minimumSize: const Size(double.infinity, 56),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text(
+                          'Start Questions',
+                          style: TextStyle(
+                            fontFamily: 'DMSans',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -474,6 +516,7 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       color: cs.surface,
@@ -492,7 +535,7 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
               width: 180,
               height: 180,
               decoration: BoxDecoration(
-                color: cs.primary.withOpacity(0.07),
+                color: cs.primary.withOpacity(isDark ? 0.12 : 0.07),
                 shape: BoxShape.circle,
               ),
             ),
@@ -510,7 +553,7 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
               width: 210,
               height: 210,
               decoration: BoxDecoration(
-                color: cs.secondary.withOpacity(0.06),
+                color: cs.secondary.withOpacity(isDark ? 0.10 : 0.06),
                 shape: BoxShape.circle,
               ),
             ),
@@ -535,70 +578,60 @@ class _HeroCard extends StatelessWidget {
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 350),
-      opacity: isDissolved
-          ? 0.0
-          : 1.0, // Clean dissolve animation implementation
+      opacity: isDissolved ? 0.0 : 1.0,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: cs.surfaceContainer,
+          color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
           borderRadius: BorderRadius.circular(32),
           border: Border.all(
-            color: cs.primary.withOpacity(isDark ? 0.2 : 0.25),
+            color: cs.primary.withOpacity(isDark ? 0.3 : 0.25),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: cs.primary.withOpacity(isDark ? 0.04 : 0.07),
+              color: cs.shadow.withOpacity(isDark ? 0.25 : 0.07),
               blurRadius: 32,
               spreadRadius: 0,
               offset: const Offset(0, 12),
             ),
           ],
         ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Resolve tag / label pill removed completely from here
-              Text(
-                'Healthy relationships are not built on avoiding conflict, but on learning how to navigate it together.',
-                style: textTheme.titleMedium?.copyWith(
-                  fontFamily: 'CormorantGaramond',
-                  fontStyle: FontStyle.italic,
-                  fontSize: 22,
-                  height: 1.5,
-                  fontWeight: FontWeight.w500,
-                  color: cs.primary,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Healthy relationships are not built on avoiding conflict, but on learning how to navigate it together.',
+              style: textTheme.titleMedium?.copyWith(
+                fontFamily: 'CormorantGaramond',
+                fontStyle: FontStyle.italic,
+                fontSize: 22,
+                height: 1.5,
+                fontWeight: FontWeight.w500,
+                color: cs.primary,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'This space helps both of you slow down, reflect, and communicate with intention. The goal is not to win the conversation, but to understand each other and move forward together.',
-                style: textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'DMSans',
-                  color: cs.onSurfaceVariant,
-                  height: 1.6,
-                ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'This space helps both of you slow down, reflect, and communicate with intention. The goal is not to win the conversation, but to understand each other and move forward together.',
+              style: textTheme.bodyMedium?.copyWith(
+                fontFamily: 'DMSans',
+                color: cs.onSurfaceVariant,
+                height: 1.6,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Take your time. Be honest. Be kind. Remember that you are on the same team.',
-                style: textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'DMSans',
-                  color: cs.primary,
-                  height: 1.6,
-                  fontWeight: FontWeight.w600,
-                ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Take your time. Be honest. Be kind. Remember that you are on the same team.',
+              style: textTheme.bodyMedium?.copyWith(
+                fontFamily: 'DMSans',
+                color: cs.primary,
+                height: 1.6,
+                fontWeight: FontWeight.w600,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -622,6 +655,7 @@ class _ModeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,37 +687,41 @@ class _ModeSelector extends StatelessWidget {
               return Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: selected
-                      ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(0.1),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: selected
+                          ? cs.primary.withOpacity(isDark ? 0.25 : 0.18)
+                          : cs.shadow.withOpacity(isDark ? 0.15 : 0.04),
+                      blurRadius: selected ? 12 : 6,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: ChoiceChip(
                   label: Text(mode),
                   selected: selected,
                   onSelected: (_) => onChanged(mode),
-                  selectedColor: cs.primaryContainer.withOpacity(0.9),
-                  backgroundColor: cs.surfaceContainerLow,
+                  selectedColor: cs.primaryContainer,
+                  backgroundColor: isDark
+                      ? cs.surfaceContainerLow
+                      : const Color(0xFFFCFBF7),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 10,
                   ),
                   labelStyle: TextStyle(
                     fontFamily: 'DMSans',
-                    color: selected ? cs.primary : cs.onSurfaceVariant,
+                    color: selected
+                        ? cs.onPrimaryContainer
+                        : cs.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                     side: BorderSide(
                       color: selected
-                          ? cs.primary.withOpacity(0.3)
-                          : cs.outlineVariant.withOpacity(0.4),
+                          ? cs.primary.withOpacity(0.5)
+                          : cs.outlineVariant.withOpacity(isDark ? 0.3 : 0.4),
                       width: 1.2,
                     ),
                   ),
@@ -691,11 +729,23 @@ class _ModeSelector extends StatelessWidget {
               );
             }),
             Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.shadow.withOpacity(isDark ? 0.15 : 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: ActionChip(
                 avatar: Icon(Icons.add_rounded, size: 18, color: cs.primary),
                 label: const Text('Custom'),
                 onPressed: onCustomPressed,
-                backgroundColor: cs.surfaceContainerLow,
+                backgroundColor: isDark
+                    ? cs.surfaceContainerLow
+                    : const Color(0xFFFCFBF7),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
@@ -707,7 +757,7 @@ class _ModeSelector extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
                   side: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withOpacity(isDark ? 0.3 : 0.4),
                     width: 1.2,
                   ),
                 ),
@@ -745,15 +795,15 @@ class _ProgressHeader extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
+        color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: cs.primary.withOpacity(isDark ? 0.2 : 0.25),
+          color: cs.primary.withOpacity(isDark ? 0.3 : 0.25),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: cs.primary.withOpacity(isDark ? 0.03 : 0.05),
+            color: cs.shadow.withOpacity(isDark ? 0.2 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -772,7 +822,7 @@ class _ProgressHeader extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.1),
+                    color: cs.primary.withOpacity(isDark ? 0.18 : 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
@@ -793,7 +843,7 @@ class _ProgressHeader extends StatelessWidget {
                   fontFamily: 'DMSans',
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.8,
-                  color: cs.onSurfaceVariant.withOpacity(0.7),
+                  color: cs.onSurfaceVariant.withOpacity(0.8),
                 ),
               ),
             ],
@@ -804,7 +854,7 @@ class _ProgressHeader extends StatelessWidget {
             style: textTheme.titleMedium?.copyWith(
               fontFamily: 'DMSans',
               fontWeight: FontWeight.w800,
-              color: cs.onSurface,
+              color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 14),
@@ -820,7 +870,7 @@ class _ProgressHeader extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isActive
                         ? cs.primary
-                        : cs.outlineVariant.withOpacity(0.3),
+                        : cs.outlineVariant.withOpacity(isDark ? 0.2 : 0.3),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -867,15 +917,15 @@ class _PromptCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
+        color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: cs.primary.withOpacity(isDark ? 0.22 : 0.28),
+          color: cs.primary.withOpacity(isDark ? 0.3 : 0.28),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: cs.primary.withOpacity(isDark ? 0.04 : 0.06),
+            color: cs.shadow.withOpacity(isDark ? 0.25 : 0.06),
             blurRadius: 32,
             offset: const Offset(0, 10),
           ),
@@ -889,10 +939,10 @@ class _PromptCard extends StatelessWidget {
             style: textTheme.headlineSmall?.copyWith(
               fontFamily: 'CormorantGaramond',
               fontStyle: FontStyle.italic,
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.w400,
               height: 1.5,
-              color: cs.onSurface,
+              color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 22),
@@ -900,9 +950,9 @@ class _PromptCard extends StatelessWidget {
             controller: controller,
             minLines: minLines,
             maxLines: maxLines,
-            style: const TextStyle(fontFamily: 'DMSans').copyWith(
-              color: cs.onSurface,
-            ),
+            style: const TextStyle(
+              fontFamily: 'DMSans',
+            ).copyWith(color: cs.onSurfaceVariant),
             decoration: InputDecoration(
               hintText: 'Write your thoughts here...',
               hintStyle: TextStyle(
@@ -910,17 +960,17 @@ class _PromptCard extends StatelessWidget {
                 color: cs.onSurfaceVariant.withOpacity(0.6),
               ),
               filled: true,
-              fillColor: cs.surface.withOpacity(isDark ? 0.5 : 0.6),
+              fillColor: cs.surface.withOpacity(isDark ? 0.3 : 0.6),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.5),
+                  color: cs.outlineVariant.withOpacity(isDark ? 0.3 : 0.5),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.5),
+                  color: cs.outlineVariant.withOpacity(isDark ? 0.3 : 0.5),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -930,7 +980,6 @@ class _PromptCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          // Cleanly integrated micro-reminder text at the bottom matching the app's structural fonts
           Align(
             alignment: Alignment.center,
             child: Text(
@@ -939,7 +988,7 @@ class _PromptCard extends StatelessWidget {
                 fontFamily: 'DMSans',
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
-                color: cs.primary.withOpacity(0.8),
+                color: cs.primary.withOpacity(0.9),
               ),
             ),
           ),
@@ -973,6 +1022,7 @@ class _NavigationButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     String buttonText = 'Next';
 
@@ -986,24 +1036,39 @@ class _NavigationButtons extends StatelessWidget {
       children: [
         if (canGoBack || showIntroBack)
           Expanded(
-            child: OutlinedButton(
-              onPressed: canGoBack ? onBack : onIntroBack,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                side: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.7),
-                  width: 1.4,
-                ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.shadow.withOpacity(isDark ? 0.15 : 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Text(
-                'Back',
-                style: TextStyle(
-                  fontFamily: 'DMSans',
-                  color: cs.onSurface,
-                  fontWeight: FontWeight.w700,
+              child: OutlinedButton(
+                onPressed: canGoBack ? onBack : onIntroBack,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: isDark
+                      ? cs.surfaceContainerLow
+                      : const Color(0xFFFCFBF7),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  side: BorderSide(
+                    color: cs.outlineVariant.withOpacity(isDark ? 0.4 : 0.7),
+                    width: 1.4,
+                  ),
+                ),
+                child: Text(
+                  'Back',
+                  style: TextStyle(
+                    fontFamily: 'DMSans',
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -1015,7 +1080,7 @@ class _NavigationButtons extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: cs.primary.withOpacity(0.22),
+                  color: cs.shadow.withOpacity(isDark ? 0.35 : 0.18),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -1078,15 +1143,15 @@ class _EndingScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
+              color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
               borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: cs.primary.withOpacity(isDark ? 0.22 : 0.28),
+                color: cs.primary.withOpacity(isDark ? 0.3 : 0.28),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: cs.primary.withOpacity(isDark ? 0.04 : 0.06),
+                  color: cs.shadow.withOpacity(isDark ? 0.25 : 0.06),
                   blurRadius: 28,
                   offset: const Offset(0, 10),
                 ),
@@ -1126,25 +1191,36 @@ class _EndingScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          FilledButton(
-            onPressed: onRestart,
-            style: FilledButton.styleFrom(
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              minimumSize: const Size(double.infinity, 56),
-              elevation: 4,
-              shadowColor: cs.primary.withOpacity(0.28),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withOpacity(isDark ? 0.35 : 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            child: const Text(
-              'Start another session',
-              style: TextStyle(
-                fontFamily: 'DMSans',
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
+            child: FilledButton(
+              onPressed: onRestart,
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                minimumSize: const Size(double.infinity, 56),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: const Text(
+                'Start another session',
+                style: TextStyle(
+                  fontFamily: 'DMSans',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
@@ -1163,11 +1239,12 @@ class _LabelPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.12),
+        color: cs.primary.withOpacity(isDark ? 0.2 : 0.12),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
@@ -1191,12 +1268,13 @@ class _SoftMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.secondaryContainer.withOpacity(0.6),
+        color: cs.secondaryContainer.withOpacity(isDark ? 0.35 : 0.6),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
