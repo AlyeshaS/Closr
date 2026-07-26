@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import '../suggestions/suggestions_screen.dart';
 import 'games_dashboard_tab.dart'
-    hide QuestsTab; // 👈 Hidden to resolve naming conflict
-import 'quests_tab.dart'; // 👈 Clean modular import for your updated UI
+    hide QuestsTab; 
+import 'quests_tab.dart'; 
 
 class ActivitiesScreen extends StatefulWidget {
   const ActivitiesScreen({super.key});
@@ -48,14 +48,6 @@ class _ActivitiesScreenState extends State<ActivitiesScreen>
                   indicatorWeight: 2,
                   isScrollable: true,
                   tabAlignment: TabAlignment.center,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.normal,
-                    fontSize: 14,
-                  ),
                   tabs: const [
                     Tab(text: 'Quests'),
                     Tab(text: 'Games'),
@@ -70,7 +62,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                const QuestsTab(), // Instantiated cleanly here
+                const QuestsTab(),
                 const GamesDashboardTab(),
                 _ComingSoonTab(
                   icon: Icons.explore_outlined,
