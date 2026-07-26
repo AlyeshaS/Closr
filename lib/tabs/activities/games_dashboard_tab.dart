@@ -328,7 +328,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1B1F) : Colors.white,
+          color: isDark ? cs.surfaceContainerLow : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: cs.outlineVariant.withOpacity(0.9),

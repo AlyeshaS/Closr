@@ -93,6 +93,7 @@ class MyApp extends StatelessWidget {
       inverseSurface: Color(0xFFF2E0E4),
       onInverseSurface: Color(0xFF1C1214),
       inversePrimary: Color(0xFFC4737F),
+      surfaceContainerLow: Color(0xFF26181C),
     );
 
     return _buildTheme(

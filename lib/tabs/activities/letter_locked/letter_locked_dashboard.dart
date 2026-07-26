@@ -302,7 +302,8 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1B1F) : Colors.white,
+          // 🎨 Dynamically uses surfaceContainerLow (0xFF26181C) from your dark theme!
+          color: isDark ? cs.surfaceContainerLow : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: cs.outlineVariant.withOpacity(0.9),

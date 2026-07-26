@@ -434,7 +434,7 @@ class _QuestsTabState extends State<QuestsTab>
                                               0.35,
                                             ))
                                     : (isDark
-                                          ? const Color(0xFF1C1B1F)
+                                          ? cs.surfaceContainerLow
                                           : Colors.white),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
