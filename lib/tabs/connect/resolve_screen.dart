@@ -198,14 +198,14 @@ class _ResolveScreenState extends State<ResolveScreen> {
           'Custom situation',
           style: TextStyle(
             fontFamily: 'DMSans',
-            color: cs.onSurfaceVariant,
+            color: cs.onSurface,
             fontWeight: FontWeight.w800,
           ),
         ),
         content: TextField(
           controller: customModeController,
           autofocus: true,
-          style: TextStyle(fontFamily: 'DMSans', color: cs.onSurfaceVariant),
+          style: TextStyle(fontFamily: 'DMSans', color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'What are you working through?',
             hintStyle: TextStyle(
@@ -854,7 +854,7 @@ class _ProgressHeader extends StatelessWidget {
             style: textTheme.titleMedium?.copyWith(
               fontFamily: 'DMSans',
               fontWeight: FontWeight.w800,
-              color: cs.onSurfaceVariant,
+              color: cs.onSurface, // Changed to onSurface
             ),
           ),
           const SizedBox(height: 14),
@@ -942,7 +942,7 @@ class _PromptCard extends StatelessWidget {
               fontSize: 20,
               fontWeight: FontWeight.w400,
               height: 1.5,
-              color: cs.onSurfaceVariant,
+              color: cs.onSurface, // Changed to onSurface
             ),
           ),
           const SizedBox(height: 22),
@@ -1066,7 +1066,7 @@ class _NavigationButtons extends StatelessWidget {
                   'Back',
                   style: TextStyle(
                     fontFamily: 'DMSans',
-                    color: cs.onSurfaceVariant,
+                    color: cs.onSurface, // Changed to onSurface
                     fontWeight: FontWeight.w700,
                   ),
                 ),
