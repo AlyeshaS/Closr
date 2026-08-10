@@ -7,6 +7,7 @@ import 'trivia/trivia_game_screen.dart';
 import 'letter_locked/letter_locked_dashboard.dart';
 import 'doodle_clues/doodle_clues_game_screen.dart';
 import 'telepathy/telepathy_dashboard.dart';
+import 'better_together/better_together_dashboard.dart';
 
 class GamesDashboardTab extends StatefulWidget {
   const GamesDashboardTab({super.key});
@@ -166,6 +167,25 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                                   fontWeight: FontWeight.w700,
                                   color: cs.onSurfaceVariant.withOpacity(0.8),
                                 ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Better Together Game Card
+                          _buildCleanGameCard(
+                            context: context,
+                            title: 'Better Together',
+                            subtitle:
+                                'A memory-card pairing game! Match iconic partners like 🍿 + 🎬 across themed decks.',
+                            icon: Icons.style_rounded,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const BetterTogetherDashboard(),
+                                ),
+                              );
+                            },
+                            cs: cs,
                           ),
                           const SizedBox(height: 14),
 
