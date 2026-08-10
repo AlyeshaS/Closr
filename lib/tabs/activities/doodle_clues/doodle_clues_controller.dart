@@ -123,11 +123,19 @@ class DoodleCluesController {
     if (data == null) return;
     if (data['stage'] == 'results') return;
 
-    await docRef.update({
+    final String guesserUid = (data['guesserUid'] as String?) ?? '';
+    final timeoutPayload = {
       'stage': 'results',
       'isWin': false,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+
+    final batch = _firestore.batch();
+    batch.update(docRef, timeoutPayload);
+    if (guesserUid.isNotEmpty && guesserUid != artistUid) {
+      batch.update(_gameDoc(guesserUid), timeoutPayload);
+    }
+    await batch.commit();
   }
 
   /// Alerts the partner via cancellation parameters

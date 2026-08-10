@@ -323,14 +323,14 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     );
   }
 
+  // 🌟 END GAME POP-UP: All headings, description texts, and button text explicitly centered
   void _showGameEndedAlert(bool isWin, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
     unawaited(_logGameCompleted());
 
     final cs = Theme.of(screenContext).colorScheme;
-    final Color statusColor = isWin ? cs.primary : cs.error;
-    final Color buttonForegroundColor = isWin ? cs.onPrimary : cs.onError;
+    final Color statusColor = cs.primary;
 
     showDialog(
       context: screenContext,
@@ -355,6 +355,8 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment.center, // 🌟 Centered Column contents
               children: [
                 Container(
                   width: 72,
@@ -364,7 +366,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isWin ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    isWin ? Icons.check_circle_rounded : Icons.timer_rounded,
                     color: statusColor,
                     size: 36,
                   ),
@@ -372,7 +374,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                 const SizedBox(height: 20),
                 Text(
                   isWin ? "ROUND WON!" : "TIME'S UP",
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.center, // 🌟 Centered text
                   style: TextStyle(
                     fontFamily: 'CormorantGaramond',
                     fontSize: 26,
@@ -385,7 +387,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                   isWin
                       ? "Fantastic connection! The word was solved successfully."
                       : "The 2-minute timer ran out before the word was guessed. Better luck next round!",
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.center, // 🌟 Centered text
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.5,
@@ -402,14 +404,16 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                       await _controller.purgeMatch(_myUid, _partnerUid);
                     },
                     style: FilledButton.styleFrom(
-                      backgroundColor: statusColor,
-                      foregroundColor: buttonForegroundColor,
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      alignment: Alignment.center, // 🌟 Centered button text
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     child: const Text(
                       'Play Again',
+                      textAlign: TextAlign.center,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -426,6 +430,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: cs.onSurfaceVariant,
+                      alignment: Alignment.center, // 🌟 Centered button text
                       side: BorderSide(color: cs.outlineVariant),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -433,6 +438,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                     ),
                     child: const Text(
                       'Return to Dashboard',
+                      textAlign: TextAlign.center,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -456,40 +462,106 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
     final bool? dynamicConfirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: cs.primary, width: 1.5),
-          ),
-          title: const Text(
-            'End Game?',
-            style: TextStyle(
-              fontFamily: 'CormorantGaramond',
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: cs.primary, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.primary.withOpacity(0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer.withOpacity(0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: cs.error,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'END GAME?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'CormorantGaramond',
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Are you sure you want to end the game? This will abandon the match for both you and your partner.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      alignment: Alignment.center,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Resume Play',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: cs.error,
+                      alignment: Alignment.center,
+                      side: BorderSide(color: cs.error.withOpacity(0.6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Yes, End Game',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          content: Text(
-            'Are you sure you want to end the game? This will abandon the match for both you and your partner.',
-            style: TextStyle(color: cs.onSurfaceVariant, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Resume Play'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
-              ),
-              child: const Text(
-                'Yes, End Game',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
         );
       },
     );
@@ -631,7 +703,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                         ],
                       ),
                 body: SafeArea(
-                  // 🌟 SWIPE RIGHT TRANSITION: Smoothly slides in from the right when moving to drawing mode
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 350),
                     switchInCurve: Curves.easeOutCubic,
@@ -641,7 +712,6 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
                           child.key ==
                           ValueKey('stage_$stage\_artist_$iAmArtist');
 
-                      // Incoming widget slides in from right (1.0 -> 0.0), outgoing slides left (-1.0 <- 0.0)
                       final offsetAnimation = Tween<Offset>(
                         begin: isIncoming
                             ? const Offset(1.0, 0.0)
