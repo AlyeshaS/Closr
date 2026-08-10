@@ -47,7 +47,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen>
                   tabs: const [
                     Tab(text: 'Quests'),
                     Tab(text: 'Games'),
-                    Tab(text: 'Date Generator'),
+                    Tab(text: 'Generator'),
                   ],
                 ),
               ),
