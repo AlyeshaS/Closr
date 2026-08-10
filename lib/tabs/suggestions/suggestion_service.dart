@@ -25,7 +25,6 @@ class SuggestionService {
   Stream<QuerySnapshot> getSuggestionsStream() {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
-      // Return an empty stream if not signed in
       return const Stream.empty();
     }
     return _firestore
@@ -38,13 +37,16 @@ class SuggestionService {
   Future<void> swipeSuggestion(String suggestionId, String action) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) throw Exception('Not signed in');
-    // Store the swipe directly in the suggestion doc
+
     await _firestore
         .collection('users')
         .doc(currentUser.uid)
         .collection('suggestions')
         .doc(suggestionId)
-        .set({'swipe': action}, SetOptions(merge: true));
+        .set({
+          'swipe': action,
+          'swipedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
   Future<void> saveMatchedSuggestion(
@@ -58,6 +60,6 @@ class SuggestionService {
         .doc(currentUser.uid)
         .collection('matched_suggestions')
         .doc(suggestionId)
-        .set(data);
+        .set(data, SetOptions(merge: true));
   }
 }

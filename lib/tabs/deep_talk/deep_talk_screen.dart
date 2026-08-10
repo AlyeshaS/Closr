@@ -15,8 +15,7 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
   int _currentIndex = 0;
   bool _loading = false;
   bool _loggedCompletedRun = false;
-  bool _isMovingForward =
-      true; // Tracks navigation direction for the card slide[cite: 1]
+  bool _isMovingForward = true;
 
   final List<String> _depthLabels = [
     'Light',
@@ -55,8 +54,7 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
 
   Future<void> _goToIndex(int nextIndex) async {
     setState(() {
-      _isMovingForward =
-          nextIndex > _currentIndex; // Dynamic transition direction[cite: 1]
+      _isMovingForward = nextIndex > _currentIndex;
       _currentIndex = nextIndex;
     });
     if (_topics.isEmpty) return;
@@ -88,7 +86,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         children: [
-          // Action Bar Description & Labeled Button[cite: 1]
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -102,7 +99,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Shadow Container Layer ONLY (No border here)[cite: 1]
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(100),
@@ -152,7 +148,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Main Interactive View[cite: 1]
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
@@ -171,7 +166,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                   : Column(
                       key: const ValueKey('content_deck'),
                       children: [
-                        // Status Tracking Subheader[cite: 1]
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -224,16 +218,13 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Segmented Story-Style Progress Ticks[cite: 1]
                         _buildSegmentedProgress(cs, totalCardCount),
                         const SizedBox(height: 24),
 
-                        // Card Stack[cite: 1]
                         Expanded(
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              // Keep deck layers completely static so they stay visible behind[cite: 1]
                               if (_currentIndex < totalCardCount - 2)
                                 _buildCardDeckLayer(
                                   cs,
@@ -255,7 +246,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Navigation Elements[cite: 1]
                         _buildNavigationRow(cs, totalCardCount, isDark),
                       ],
                     ),
@@ -304,16 +294,13 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
       switchInCurve: Curves.linear,
       switchOutCurve: Curves.linear,
       layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-        // We dynamically adjust stack order based on direction so the correct card is physically on top
         return Stack(
           alignment: Alignment.center,
           children: <Widget>[
             if (_isMovingForward) ...[
-              // Going Forward: Current card (underneath) sits at the bottom, swiping card (previousChildren) sits on top
               if (currentChild != null) currentChild,
               ...previousChildren,
             ] else ...[
-              // Going Backward: Exiting card (previousChildren) remains at bottom, returning card (currentChild) slides on top
               ...previousChildren,
               if (currentChild != null) currentChild,
             ],
@@ -327,10 +314,8 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
 
         if (isEntering) {
           if (_isMovingForward) {
-            // Going Forward: Simply reveal the next card static behind the swipe
             return child;
           } else {
-            // Going Backward: The previous card slides smoothly on top from off-screen right
             final slideIn =
                 Tween<Offset>(
                   begin: const Offset(1.5, 0.0),
@@ -346,7 +331,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
           }
         } else {
           if (_isMovingForward) {
-            // Going Forward: Top active card slides off-screen right
             final slideOut =
                 Tween<Offset>(
                   begin: const Offset(1.5, 0.0),
@@ -360,8 +344,6 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
 
             return SlideTransition(position: slideOut, child: child);
           } else {
-            // Going Backward: The old card stays perfectly static and solid in the center
-            // while the previous card slides directly over it (no empty/dissolving gaps)
             return child;
           }
         }

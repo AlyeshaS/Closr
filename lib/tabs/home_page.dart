@@ -14,11 +14,11 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-// FIXED: Now correctly references State<HomePage> instead of State<_HomePageState>
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late final AnimationController _entrance;
   late final AnimationController _pulse;
   late final AnimationController _flicker;
+  final GeminiService _geminiService = GeminiService();
 
   @override
   void initState() {
@@ -45,7 +45,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  /// A slice of the entrance timeline, eased.
   Animation<double> _seg(double start, double end) {
     return CurvedAnimation(
       parent: _entrance,
@@ -99,7 +98,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 30),
 
-                // ── Character orb ─────────────────────────────────────────
+                // ── Character Orb ─────────────────────────────────────────
                 Center(
                   child: Column(
                     children: [
@@ -125,7 +124,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 30),
 
-                // ── Stat row ──────────────────────────────────────────────
+                // ── Stat Row ──────────────────────────────────────────────
                 _Reveal(
                   animation: _seg(0.2, 0.7),
                   beginOffset: const Offset(0, 0.08),
@@ -164,7 +163,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 30),
 
-                // ── Tip of the day ────────────────────────────────────────
+                // ── Tip of the Day ────────────────────────────────────────
                 _Reveal(
                   animation: _seg(0.32, 0.8),
                   child: Column(
@@ -180,7 +179,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           cs.secondaryContainer.withOpacity(0.55),
                         ],
                         child: FutureBuilder<String>(
-                          future: GeminiService().fetchQuoteOfTheDay(),
+                          future: _geminiService.fetchQuoteOfTheDay(),
                           builder: (context, snapshot) {
                             final loading =
                                 snapshot.connectionState ==
@@ -417,7 +416,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ── Companion orb ────────────────────────────────────────────────────────
+// ── Companion Orb ────────────────────────────────────────────────────────
 
 class _CharacterOrb extends StatelessWidget {
   final ColorScheme cs;
@@ -466,7 +465,7 @@ class _CharacterOrb extends StatelessWidget {
   }
 }
 
-// ── Tip of the day states ────────────────────────────────────────────────
+// ── Tip of the Day States ────────────────────────────────────────────────
 
 class _TipLoading extends StatelessWidget {
   final ColorScheme cs;
@@ -493,16 +492,14 @@ class _TipLoading extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            Navigator.canPop(context)
-                ? const SizedBox()
-                : SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: cs.primary,
-                    ),
-                  ),
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: cs.primary,
+              ),
+            ),
             const SizedBox(width: 12),
             Text(
               'Fetching your tip...',
@@ -586,7 +583,7 @@ class _TipLoaded extends StatelessWidget {
   }
 }
 
-// ── Recent matches ───────────────────────────────────────────────────────
+// ── Recent Matches ───────────────────────────────────────────────────────
 
 class _RecentMatchesSection extends StatefulWidget {
   final User? user;
@@ -665,7 +662,6 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Feed Content List
                   AnimatedSize(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
@@ -687,7 +683,6 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
                     ),
                   ),
 
-                  // Show More / Show Less Control
                   if (docs.length > 2) ...[
                     const SizedBox(height: 14),
                     const Divider(height: 1, color: Colors.white24),
@@ -732,7 +727,7 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
   }
 }
 
-// ── Stat + streak cards ──────────────────────────────────────────────────
+// ── Stat + Streak Cards ──────────────────────────────────────────────────
 
 class _MatchedDatesCard extends StatelessWidget {
   final ColorScheme cs;
@@ -1003,7 +998,6 @@ class _FlameBadge extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // 1. Cute Wooden Log Base Platform
               Positioned(
                 bottom: 2,
                 child: Container(
@@ -1022,8 +1016,6 @@ class _FlameBadge extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // 2. Main Beautiful Background Fire Backdrop Layer
               Positioned(
                 bottom: 6,
                 child: Transform.scale(
@@ -1047,8 +1039,6 @@ class _FlameBadge extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // 3. Centered Counter Text embedded right over the primary fire core layer
               Positioned(
                 bottom: 20,
                 child: _MirrorCount(
