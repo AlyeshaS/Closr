@@ -88,17 +88,36 @@ class TelepathyFirebaseService {
     required String input,
     required TelepathyGame game,
   }) async {
+    final cleanInput = input.trim().toUpperCase();
+    final currentRound = game.rounds[game.currentRoundIndex];
+
+    if (cleanInput == currentRound.prompt.trim().toUpperCase()) {
+      throw ArgumentError('PROMPT_MATCH_VIOLATION');
+    }
+
+    for (final round in game.rounds) {
+      if (round.prompt.trim().toUpperCase() == cleanInput ||
+          round.player1Input?.trim().toUpperCase() == cleanInput ||
+          round.player2Input?.trim().toUpperCase() == cleanInput) {
+        throw ArgumentError('DUPLICATE_ENTRY_VIOLATION');
+      }
+    }
+
     if (game.gameMode == GameMode.emojisOnly && !_isOnlyEmojis(input)) {
       throw ArgumentError('EMOJI_ONLY_VIOLATION');
     }
 
+    if (game.gameMode != GameMode.emojisOnly && _containsEmoji(input)) {
+      throw ArgumentError('WORD_MODE_NO_EMOJI_VIOLATION');
+    }
+
     final int activeIndex = game.currentRoundIndex;
     List<TelepathyRound> updatedRounds = List.from(game.rounds);
-    TelepathyRound currentRound = updatedRounds[activeIndex];
+    TelepathyRound activeRound = updatedRounds[activeIndex];
 
     final bool isHost = currentUserId == game.hostId;
-    String? p1Input = isHost ? input : currentRound.player1Input;
-    String? p2Input = !isHost ? input : currentRound.player2Input;
+    String? p1Input = isHost ? input : activeRound.player1Input;
+    String? p2Input = !isHost ? input : activeRound.player2Input;
 
     Map<String, dynamic> updateData = {};
 
@@ -107,7 +126,7 @@ class TelepathyFirebaseService {
         final String mergedPrompt = "${p1Input.trim()} + ${p2Input.trim()}";
         updatedRounds[activeIndex] = TelepathyRound(
           roundNumber: activeIndex,
-          prompt: currentRound.prompt,
+          prompt: activeRound.prompt,
           player1Input: p1Input,
           player2Input: p2Input,
           isMatch: false,
@@ -131,7 +150,7 @@ class TelepathyFirebaseService {
 
         updatedRounds[activeIndex] = TelepathyRound(
           roundNumber: activeIndex,
-          prompt: currentRound.prompt,
+          prompt: activeRound.prompt,
           player1Input: p1Input,
           player2Input: p2Input,
           isMatch: isMatch,
@@ -160,7 +179,7 @@ class TelepathyFirebaseService {
     } else {
       updatedRounds[activeIndex] = TelepathyRound(
         roundNumber: activeIndex,
-        prompt: currentRound.prompt,
+        prompt: activeRound.prompt,
         player1Input: p1Input,
         player2Input: p2Input,
         isMatch: false,
@@ -191,4 +210,18 @@ bool _isOnlyEmojis(String text) {
 
   // Remove invisible whitespaces/spaces before checking matching rules
   return emojiRegex.hasMatch(text.trim().replaceAll(' ', ''));
+}
+
+bool _containsEmoji(String text) {
+  if (text.trim().isEmpty) return false;
+
+  for (final rune in text.runes) {
+    if ((rune >= 0x1F300 && rune <= 0x1FAFF) ||
+        (rune >= 0x2600 && rune <= 0x27BF) ||
+        (rune >= 0x1F1E6 && rune <= 0x1F1FF)) {
+      return true;
+    }
+  }
+
+  return false;
 }
