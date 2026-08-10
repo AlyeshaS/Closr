@@ -68,7 +68,7 @@ class _TelepathyDashboardState extends State<TelepathyDashboard> {
   String _gameId = '';
   bool _isLoading = true;
 
-  // 🎯 FIX 1: Track if we are already showing the game screen to prevent loop navigation stacking
+  // Track if we are already showing the game screen to prevent loop navigation stacking
   bool _isScreenPushed = false;
 
   @override
@@ -130,11 +130,9 @@ class _TelepathyDashboardState extends State<TelepathyDashboard> {
       if (mode == GameMode.wordsOnly) {
         initialSeed = await WordGeneratorService.getRandomSeedWord();
       } else if (mode == GameMode.emojisOnly) {
-        // ✅ FIX: Grab a fully randomized emoji for the starting seed
         initialSeed = EmojiPool.getRandomEmoji();
       }
 
-      // Simply write the selection data update directly to the shared document trace
       await _service.startNewGame(
         gameId: _gameId,
         myUid: _myUid,
@@ -180,145 +178,175 @@ class _TelepathyDashboardState extends State<TelepathyDashboard> {
 
     return Scaffold(
       backgroundColor: cs.surface,
-      appBar: AppBar(title: const Text('Mind Meld Telepathy')),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(_myUid)
-            .collection('games')
-            .doc('telepathy')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final gameData = snapshot.data!.data();
+      body: SafeArea(
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(_myUid)
+              .collection('games')
+              .doc('telepathy')
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final gameData = snapshot.data!.data();
 
-            // 🎯 FIX 1 Cont.: Check state flag to ensure auto-navigation only fires
-            // if the user is not already actively viewing the gameplay screen.
-            if (gameData?['status'] == 'active' &&
-                gameData?['seedWord'] != 'PENDING_CHOICE' &&
-                !_isScreenPushed) {
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                if (mounted) {
-                  _isScreenPushed = true;
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TelepathyGameScreen(
-                        myUid: _myUid,
-                        partnerUid: _partnerUid,
+              if (gameData?['status'] == 'active' &&
+                  gameData?['seedWord'] != 'PENDING_CHOICE' &&
+                  !_isScreenPushed) {
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (mounted) {
+                    _isScreenPushed = true;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TelepathyGameScreen(
+                          myUid: _myUid,
+                          partnerUid: _partnerUid,
+                        ),
                       ),
-                    ),
-                  );
-                  _isScreenPushed = false;
-                }
-              });
+                    );
+                    _isScreenPushed = false;
+                  }
+                });
+              }
             }
-          }
 
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CHOOSE YOUR MODE',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
-                ),
-                const SizedBox(height: 16),
-                _buildCleanModeCard(
-                  context: context,
-                  title: 'Random Word',
-                  subtitle:
-                      'The system generates a random seed word to kickstart your matching pool.',
-                  icon: Icons.casino_outlined,
-                  iconColor: cs.primary,
-                  onTap: () => _handleGameRouting(GameMode.wordsOnly),
-                  cs: cs,
-                ),
-                const SizedBox(height: 12),
-                _buildCleanModeCard(
-                  context: context,
-                  title: 'Emojis Only',
-                  subtitle:
-                      'Link minds and predict connection points strictly using symbols.',
-                  icon: Icons.emoji_emotions_outlined,
-                  iconColor: Colors.purple,
-                  onTap: () => _handleGameRouting(GameMode.emojisOnly),
-                  cs: cs,
-                ),
-                const SizedBox(height: 12),
-                _buildCleanModeCard(
-                  context: context,
-                  title: 'Create Your Own',
-                  subtitle:
-                      'Both enter a hidden baseline word. They merge to build your initial prompt challenge.',
-                  icon: Icons.tune_rounded,
-                  iconColor: Colors.orange[700]!,
-                  onTap: () => _handleGameRouting(GameMode.customPrompt),
-                  cs: cs,
-                ),
-
-                // 💡 NEW: HOW TO PLAY SECTION
-                const SizedBox(height: 36),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Divider(color: cs.outlineVariant, thickness: 1),
-                ),
-                const SizedBox(height: 24),
-
-                Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb_outline_rounded,
-                      color: cs.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'HOW TO PLAY',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        letterSpacing: 1.5,
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Back option button matching dashboard pattern
+                  InkWell(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 15,
+                            color: cs.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Return to game options',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildInstructionStep(
-                  context: context,
-                  stepNumber: '1',
-                  text:
-                      'Start with a core prompt word displayed at the top of your gameplay screen.',
-                  cs: cs,
-                ),
-                _buildInstructionStep(
-                  context: context,
-                  stepNumber: '2',
-                  text:
-                      'Both you and your partner independently type a single word associated with that prompt.',
-                  cs: cs,
-                ),
-                _buildInstructionStep(
-                  context: context,
-                  stepNumber: '3',
-                  text:
-                      'If your entries do not match, your words fuse into a new double-word prompt challenge!',
-                  cs: cs,
-                ),
-                _buildInstructionStep(
-                  context: context,
-                  stepNumber: '4',
-                  text:
-                      'Keep building creative connection bridges until you both submit the exact same matching word to achieve a Mind Meld!',
-                  cs: cs,
-                ),
-              ],
-            ),
-          );
-        },
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'CHOOSE YOUR MODE',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCleanModeCard(
+                    context: context,
+                    title: 'Random Word',
+                    subtitle:
+                        'The system generates a random seed word to kickstart your matching pool.',
+                    icon: Icons.casino_outlined,
+                    iconColor: cs.primary,
+                    onTap: () => _handleGameRouting(GameMode.wordsOnly),
+                    cs: cs,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCleanModeCard(
+                    context: context,
+                    title: 'Emojis Only',
+                    subtitle:
+                        'Link minds and predict connection points strictly using symbols.',
+                    icon: Icons.emoji_emotions_outlined,
+                    iconColor: Colors.purple,
+                    onTap: () => _handleGameRouting(GameMode.emojisOnly),
+                    cs: cs,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCleanModeCard(
+                    context: context,
+                    title: 'Create Your Own',
+                    subtitle:
+                        'Both enter a hidden baseline word. They merge to build your initial prompt challenge.',
+                    icon: Icons.tune_rounded,
+                    iconColor: Colors.orange[700]!,
+                    onTap: () => _handleGameRouting(GameMode.customPrompt),
+                    cs: cs,
+                  ),
+
+                  // HOW TO PLAY SECTION
+                  const SizedBox(height: 36),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: Divider(color: cs.outlineVariant, thickness: 1),
+                  ),
+                  const SizedBox(height: 24),
+
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        color: cs.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'HOW TO PLAY',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          letterSpacing: 1.5,
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInstructionStep(
+                    context: context,
+                    stepNumber: '1',
+                    text:
+                        'Start with a core prompt word displayed at the top of your gameplay screen.',
+                    cs: cs,
+                  ),
+                  _buildInstructionStep(
+                    context: context,
+                    stepNumber: '2',
+                    text:
+                        'Both you and your partner independently type a single word associated with that prompt.',
+                    cs: cs,
+                  ),
+                  _buildInstructionStep(
+                    context: context,
+                    stepNumber: '3',
+                    text:
+                        'If your entries do not match, your words fuse into a new double-word prompt challenge!',
+                    cs: cs,
+                  ),
+                  _buildInstructionStep(
+                    context: context,
+                    stepNumber: '4',
+                    text:
+                        'Keep building creative connection bridges until you both submit the exact same matching word to achieve a Mind Meld!',
+                    cs: cs,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,4 +1,3 @@
-// lib/tabs/play/letter_locked/letter_locked_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -97,8 +96,41 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
           .doc('letterlocked')
           .get();
 
-      if (mounted) {
-        if (gameDoc.exists && gameDoc.data()?['status'] == 'active') {
+      if (!mounted) return;
+
+      final isGameActive =
+          gameDoc.exists && gameDoc.data()?['status'] == 'active';
+      final currentMode = gameDoc.data()?['gameMode'];
+
+      // If an active game exists in the selected mode, resume it directly
+      if (isGameActive && currentMode == mode) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => LetterLockedGameScreen(
+              myUid: _myUid,
+              partnerUid: _partnerUid,
+              legacyRoomId: _legacyRoomId,
+            ),
+          ),
+        );
+      } else {
+        // Start new game if no game active or mode changed
+        Map<String, int> existingScores = {_myUid: 0, _partnerUid: 0};
+        if (gameDoc.exists && gameDoc.data()?['gameData']?['scores'] != null) {
+          final oldScores =
+              gameDoc.data()?['gameData']['scores'] as Map<String, dynamic>;
+          existingScores[_myUid] = oldScores[_myUid] ?? 0;
+          existingScores[_partnerUid] = oldScores[_partnerUid] ?? 0;
+        }
+
+        await _controller.startNewGame(
+          myUid: _myUid,
+          partnerUid: _partnerUid,
+          mode: mode,
+          existingScores: existingScores,
+        );
+
+        if (mounted) {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => LetterLockedGameScreen(
@@ -108,34 +140,6 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
               ),
             ),
           );
-        } else {
-          Map<String, int> existingScores = {_myUid: 0, _partnerUid: 0};
-          if (gameDoc.exists &&
-              gameDoc.data()?['gameData']?['scores'] != null) {
-            final oldScores =
-                gameDoc.data()?['gameData']['scores'] as Map<String, dynamic>;
-            existingScores[_myUid] = oldScores[_myUid] ?? 0;
-            existingScores[_partnerUid] = oldScores[_partnerUid] ?? 0;
-          }
-
-          await _controller.startNewGame(
-            myUid: _myUid,
-            partnerUid: _partnerUid,
-            mode: mode,
-            existingScores: existingScores,
-          );
-
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => LetterLockedGameScreen(
-                  myUid: _myUid,
-                  partnerUid: _partnerUid,
-                  legacyRoomId: _legacyRoomId,
-                ),
-              ),
-            );
-          }
         }
       }
     } catch (_) {
@@ -190,25 +194,9 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
               .doc('letterlocked')
               .snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data!.exists) {
-              final gameData = snapshot.data!.data();
-
-              if (gameData?['status'] == 'active') {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => LetterLockedGameScreen(
-                          myUid: _myUid,
-                          partnerUid: _partnerUid,
-                          legacyRoomId: _legacyRoomId,
-                        ),
-                      ),
-                    );
-                  }
-                });
-              }
-            }
+            final gameData = snapshot.data?.data();
+            final bool hasActiveGame = gameData?['status'] == 'active';
+            final String activeMode = gameData?['gameMode'] ?? '';
 
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -216,7 +204,6 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🔙 Simple text back button with no container box or glow
                   InkWell(
                     onTap: () => Navigator.of(context).maybePop(),
                     borderRadius: BorderRadius.circular(8),
@@ -247,6 +234,67 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
                     ),
                   ),
                   const SizedBox(height: 24),
+
+                  if (hasActiveGame) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: cs.primary.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.play_circle_fill_rounded,
+                            color: cs.primary,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Game In Progress',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  activeMode == 'coop'
+                                      ? 'Co-op Vault match active'
+                                      : 'Versus Word Trap match active',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => LetterLockedGameScreen(
+                                    myUid: _myUid,
+                                    partnerUid: _partnerUid,
+                                    legacyRoomId: _legacyRoomId,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Resume'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   Text(
                     'CHOOSE YOUR MODE',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -302,7 +350,6 @@ class _LetterLockedDashboardState extends State<LetterLockedDashboard> {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          // 🎨 Dynamically uses surfaceContainerLow (0xFF26181C) from your dark theme!
           color: isDark ? cs.surfaceContainerLow : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
