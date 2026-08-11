@@ -1,3 +1,5 @@
+// resolve_screen.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../services/resolve_service.dart';
 
@@ -8,7 +10,8 @@ class ResolveScreen extends StatefulWidget {
   State<ResolveScreen> createState() => _ResolveScreenState();
 }
 
-class _ResolveScreenState extends State<ResolveScreen> {
+class _ResolveScreenState extends State<ResolveScreen>
+    with SingleTickerProviderStateMixin {
   int currentStage = 0;
   int currentPromptIndex = 0;
   bool hasStartedQuestions = false;
@@ -21,6 +24,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
   late List<String> sessionModes;
   int lastCustomIndex = -1;
   late PageController _introPageController;
+  late final AnimationController _entranceController;
 
   final Map<String, List<String>> responses = {
     'Private Reflection': [],
@@ -78,6 +82,28 @@ class _ResolveScreenState extends State<ResolveScreen> {
 
   bool get isLastStage => currentStage == stageTitles.length - 1;
   bool get isLastPrompt => currentPromptIndex == currentPrompts.length - 1;
+
+  Widget _wrapReveal({required Widget child, double delay = 0.0}) {
+    final animation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+    );
+
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final t = animation.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, 60 * 0.06 * (1 - t)),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _saveProgress({required bool isCompleted}) async {
     if (_isSavingSession) return;
@@ -295,6 +321,10 @@ class _ResolveScreenState extends State<ResolveScreen> {
     super.initState();
     sessionModes = List.from(modes);
     _introPageController = PageController();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
   }
 
   @override
@@ -302,6 +332,7 @@ class _ResolveScreenState extends State<ResolveScreen> {
     responseController.dispose();
     customModeController.dispose();
     _introPageController.dispose();
+    _entranceController.dispose();
     super.dispose();
   }
 
@@ -331,45 +362,53 @@ class _ResolveScreenState extends State<ResolveScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const _HeroCard(isDissolved: false),
+                        _wrapReveal(
+                          delay: 0.0,
+                          child: const _HeroCard(isDissolved: false),
+                        ),
                         const SizedBox(height: 32),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: cs.shadow.withOpacity(
-                                  isDark ? 0.35 : 0.18,
+                        _wrapReveal(
+                          delay: 0.15,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: cs.shadow.withOpacity(
+                                    isDark ? 0.35 : 0.18,
+                                  ),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
                                 ),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: FilledButton(
-                            onPressed: () {
-                              _introPageController.animateToPage(
-                                1,
-                                duration: const Duration(milliseconds: 420),
-                                curve: Curves.easeOutCubic,
-                              );
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: cs.primary,
-                              foregroundColor: cs.onPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              minimumSize: const Size(240, 56),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
+                              ],
                             ),
-                            child: const Text(
-                              'Get started',
-                              style: TextStyle(
-                                fontFamily: 'DMSans',
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
+                            child: FilledButton(
+                              onPressed: () {
+                                _introPageController.animateToPage(
+                                  1,
+                                  duration: const Duration(milliseconds: 420),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: cs.primary,
+                                foregroundColor: cs.onPrimary,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                minimumSize: const Size(240, 56),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                              ),
+                              child: const Text(
+                                'Get started',
+                                style: TextStyle(
+                                  fontFamily: 'DMSans',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
@@ -446,37 +485,46 @@ class _ResolveScreenState extends State<ResolveScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ProgressHeader(
-              stageTitle: currentStageTitle,
-              currentPromptIndex: currentPromptIndex,
-              totalPrompts: currentPrompts.length,
-              progress: (currentPromptIndex + 1) / currentPrompts.length,
-              selectedMode: selectedMode,
+            _wrapReveal(
+              delay: 0.0,
+              child: _ProgressHeader(
+                stageTitle: currentStageTitle,
+                currentPromptIndex: currentPromptIndex,
+                totalPrompts: currentPrompts.length,
+                progress: (currentPromptIndex + 1) / currentPrompts.length,
+                selectedMode: selectedMode,
+              ),
             ),
             const SizedBox(height: 20),
-            _PromptCard(
-              prompt: currentPrompts[currentPromptIndex],
-              controller: responseController,
+            _wrapReveal(
+              delay: 0.1,
+              child: _PromptCard(
+                prompt: currentPrompts[currentPromptIndex],
+                controller: responseController,
+              ),
             ),
             const SizedBox(height: 24),
-            _NavigationButtons(
-              canGoBack: currentStage > 0 || currentPromptIndex > 0,
-              isLastPrompt: isLastPrompt,
-              isLastStage: isLastStage,
-              onBack: goBack,
-              onNext: nextPrompt,
-              isSavingSession: _isSavingSession,
-              showIntroBack: currentStage == 0 && currentPromptIndex == 0,
-              onIntroBack: () {
-                setState(() {
-                  hasStartedQuestions = false;
-                });
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    _introPageController.jumpToPage(1);
-                  }
-                });
-              },
+            _wrapReveal(
+              delay: 0.2,
+              child: _NavigationButtons(
+                canGoBack: currentStage > 0 || currentPromptIndex > 0,
+                isLastPrompt: isLastPrompt,
+                isLastStage: isLastStage,
+                onBack: goBack,
+                onNext: nextPrompt,
+                isSavingSession: _isSavingSession,
+                showIntroBack: currentStage == 0 && currentPromptIndex == 0,
+                onIntroBack: () {
+                  setState(() {
+                    hasStartedQuestions = false;
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      _introPageController.jumpToPage(1);
+                    }
+                  });
+                },
+              ),
             ),
           ],
         ),
@@ -565,6 +613,68 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
   }
 }
 
+class _GlassCard extends StatelessWidget {
+  final Widget child;
+  final ColorScheme cs;
+  final EdgeInsetsGeometry padding;
+  final double borderRadius;
+  final List<Color>? gradientColors;
+
+  const _GlassCard({
+    required this.child,
+    required this.cs,
+    this.padding = const EdgeInsets.all(20),
+    this.borderRadius = 24,
+    this.gradientColors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withOpacity(0.07),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: cs.primary.withOpacity(0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+            spreadRadius: -4,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors:
+                    gradientColors ??
+                    [
+                      cs.primaryContainer.withOpacity(0.85),
+                      cs.secondaryContainer.withOpacity(0.55),
+                    ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(borderRadius),
+              border: Border.all(color: cs.primary.withOpacity(0.35), width: 1),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroCard extends StatelessWidget {
   final bool isDissolved;
 
@@ -574,30 +684,14 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 350),
       opacity: isDissolved ? 0.0 : 1.0,
-      child: Container(
-        width: double.infinity,
+      child: _GlassCard(
+        cs: cs,
         padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(
-            color: cs.primary.withOpacity(isDark ? 0.3 : 0.25),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: cs.shadow.withOpacity(isDark ? 0.25 : 0.07),
-              blurRadius: 32,
-              spreadRadius: 0,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
+        borderRadius: 32,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -791,24 +885,10 @@ class _ProgressHeader extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      width: double.infinity,
+    return _GlassCard(
+      cs: cs,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: cs.primary.withOpacity(isDark ? 0.3 : 0.25),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withOpacity(isDark ? 0.2 : 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      borderRadius: 28,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -822,7 +902,7 @@ class _ProgressHeader extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(isDark ? 0.18 : 0.1),
+                    color: cs.surface.withOpacity(0.7),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
@@ -854,7 +934,7 @@ class _ProgressHeader extends StatelessWidget {
             style: textTheme.titleMedium?.copyWith(
               fontFamily: 'DMSans',
               fontWeight: FontWeight.w800,
-              color: cs.onSurface, // Changed to onSurface
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 14),
@@ -913,24 +993,10 @@ class _PromptCard extends StatelessWidget {
       maxLines = 7;
     }
 
-    return Container(
-      width: double.infinity,
+    return _GlassCard(
+      cs: cs,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: cs.primary.withOpacity(isDark ? 0.3 : 0.28),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withOpacity(isDark ? 0.25 : 0.06),
-            blurRadius: 32,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+      borderRadius: 32,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -942,7 +1008,7 @@ class _PromptCard extends StatelessWidget {
               fontSize: 20,
               fontWeight: FontWeight.w400,
               height: 1.5,
-              color: cs.onSurface, // Changed to onSurface
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 22),
@@ -1066,7 +1132,7 @@ class _NavigationButtons extends StatelessWidget {
                   'Back',
                   style: TextStyle(
                     fontFamily: 'DMSans',
-                    color: cs.onSurface, // Changed to onSurface
+                    color: cs.onSurface,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1139,24 +1205,10 @@ class _EndingScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
+          _GlassCard(
+            cs: cs,
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: isDark ? cs.surfaceContainerHigh : const Color(0xFFFCFBF7),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: cs.primary.withOpacity(isDark ? 0.3 : 0.28),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: cs.shadow.withOpacity(isDark ? 0.25 : 0.06),
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
+            borderRadius: 32,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1239,12 +1291,11 @@ class _LabelPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(isDark ? 0.2 : 0.12),
+        color: cs.surface.withOpacity(0.7),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(

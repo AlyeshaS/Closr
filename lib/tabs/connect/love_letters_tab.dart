@@ -1,3 +1,5 @@
+// love_letters_tab.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,6 +19,7 @@ class _LoveLettersTabState extends State<LoveLettersTab>
     with TickerProviderStateMixin {
   bool _showSent = false;
   late final AnimationController _bgAnimationController;
+  late final AnimationController _entranceController;
 
   @override
   void initState() {
@@ -25,12 +28,40 @@ class _LoveLettersTabState extends State<LoveLettersTab>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
+
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
   }
 
   @override
   void dispose() {
     _bgAnimationController.dispose();
+    _entranceController.dispose();
     super.dispose();
+  }
+
+  Widget _wrapReveal({required Widget child, double delay = 0.0}) {
+    final animation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+    );
+
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final t = animation.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, 60 * 0.06 * (1 - t)),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -79,76 +110,81 @@ class _LoveLettersTabState extends State<LoveLettersTab>
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // The sliding toggle stays outside the animation block to render normally
-                    _LettersToggle(
-                      cs: cs,
-                      showSent: _showSent,
-                      sentCount: sent.length,
-                      receivedCount: received.length,
-                      onChanged: (value) => setState(() => _showSent = value),
+                    _wrapReveal(
+                      delay: 0.0,
+                      child: _LettersToggle(
+                        cs: cs,
+                        showSent: _showSent,
+                        sentCount: sent.length,
+                        receivedCount: received.length,
+                        onChanged: (value) => setState(() => _showSent = value),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        // Soft fade and scale dissolve animation exclusively applied to the card containers
-                        transitionBuilder:
-                            (Widget child, Animation<double> animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: ScaleTransition(
-                                  scale: Tween<double>(begin: 0.96, end: 1.0)
-                                      .animate(
-                                        CurvedAnimation(
-                                          parent: animation,
-                                          curve: Curves.easeOutCubic,
+                      child: _wrapReveal(
+                        delay: 0.15,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 400),
+                          transitionBuilder:
+                              (Widget child, Animation<double> animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: ScaleTransition(
+                                    scale: Tween<double>(begin: 0.96, end: 1.0)
+                                        .animate(
+                                          CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeOutCubic,
+                                          ),
                                         ),
-                                      ),
-                                  child: child,
-                                ),
-                              );
-                            },
-                        child: listToShow.isEmpty
-                            ? _buildEmptyState(context, cs, isSent: _showSent)
-                            : ListView.separated(
-                                key: ValueKey<String>(
-                                  '${_showSent}_${listToShow.length}',
-                                ),
-                                padding: const EdgeInsets.only(bottom: 100),
-                                itemCount: listToShow.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 16),
-                                itemBuilder: (context, idx) {
-                                  final letter = listToShow[idx];
-                                  if (_showSent) {
+                                    child: child,
+                                  ),
+                                );
+                              },
+                          child: listToShow.isEmpty
+                              ? _buildEmptyState(context, cs, isSent: _showSent)
+                              : ListView.separated(
+                                  key: ValueKey<String>(
+                                    '${_showSent}_${listToShow.length}',
+                                  ),
+                                  padding: const EdgeInsets.only(bottom: 100),
+                                  itemCount: listToShow.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 16),
+                                  itemBuilder: (context, idx) {
+                                    final letter = listToShow[idx];
+                                    if (_showSent) {
+                                      return LoveLetterTile(
+                                        letter: letter,
+                                        isSent: true,
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                ComposeLoveLetterPage(
+                                                  editingLetter: letter,
+                                                ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+
                                     return LoveLetterTile(
                                       letter: letter,
-                                      isSent: true,
+                                      isSent: false,
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => ComposeLoveLetterPage(
-                                            editingLetter: letter,
+                                          builder: (_) => LoveLetterDetailPage(
+                                            letter: letter,
                                           ),
                                         ),
                                       ),
                                     );
-                                  }
-
-                                  return LoveLetterTile(
-                                    letter: letter,
-                                    isSent: false,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => LoveLetterDetailPage(
-                                          letter: letter,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                                  },
+                                ),
+                        ),
                       ),
                     ),
                   ],
@@ -162,18 +198,26 @@ class _LoveLettersTabState extends State<LoveLettersTab>
         Positioned(
           right: 20,
           bottom: 24,
-          child: FloatingActionButton.extended(
-            backgroundColor: cs.primary,
-            foregroundColor: cs.onPrimary,
-            elevation: 2,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ComposeLoveLetterPage()),
-            ),
-            icon: const Icon(Icons.edit_rounded, size: 18),
-            label: const Text(
-              'Write',
-              style: TextStyle(fontWeight: FontWeight.w400, letterSpacing: 0.5),
+          child: _wrapReveal(
+            delay: 0.25,
+            child: FloatingActionButton.extended(
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
+              elevation: 2,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ComposeLoveLetterPage(),
+                ),
+              ),
+              icon: const Icon(Icons.edit_rounded, size: 18),
+              label: const Text(
+                'Write',
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
           ),
         ),
@@ -310,7 +354,7 @@ class _LettersToggle extends StatelessWidget {
                   width: tabWidth,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFCFBF7),
+                    color: cs.surface,
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: [
                       BoxShadow(
@@ -445,84 +489,99 @@ class LoveLetterTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFCFBF7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.primary.withOpacity(0.35), width: 0.8),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: cs.primary.withOpacity(0.08),
-            blurRadius: 14,
-            spreadRadius: 1,
-            offset: const Offset(0, 6),
+            color: cs.shadow.withOpacity(0.07),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
           ),
           BoxShadow(
-            color: cs.primary.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: cs.primary.withOpacity(0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+            spreadRadius: -4,
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            splashColor: cs.primary.withOpacity(0.05),
-            highlightColor: cs.primary.withOpacity(0.02),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      isSent
-                          ? Icons.outgoing_mail
-                          : Icons.mark_email_read_outlined,
-                      size: 20,
-                      color: cs.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          letter.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.85),
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _formatDate(letter.createdAt),
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: cs.onSurfaceVariant.withOpacity(0.45),
-                                fontWeight: FontWeight.w400,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: cs.primary.withOpacity(0.4),
-                  ),
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  cs.primaryContainer.withOpacity(0.85),
+                  cs.secondaryContainer.withOpacity(0.55),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: cs.primary.withOpacity(0.35), width: 1),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                splashColor: cs.primary.withOpacity(0.05),
+                highlightColor: cs.primary.withOpacity(0.02),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: cs.surface.withOpacity(0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isSent
+                              ? Icons.outgoing_mail
+                              : Icons.mark_email_read_outlined,
+                          size: 20,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              letter.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _formatDate(letter.createdAt),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: cs.primary,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

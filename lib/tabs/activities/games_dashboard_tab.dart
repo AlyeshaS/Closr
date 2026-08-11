@@ -9,6 +9,37 @@ import 'doodle_clues/doodle_clues_game_screen.dart';
 import 'telepathy/telepathy_dashboard.dart';
 import 'better_together/better_together_dashboard.dart';
 
+// ── Section Label Helper ──────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final ColorScheme cs;
+  const _SectionLabel({required this.text, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+        ),
+        Text(
+          text.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            letterSpacing: 1.1,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Games Dashboard Tab ───────────────────────────────────────────────────────
+
 class GamesDashboardTab extends StatefulWidget {
   const GamesDashboardTab({super.key});
 
@@ -159,15 +190,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                             ),
                           ),
                           const SizedBox(height: 28),
-                          Text(
-                            'AVAILABLE GAMES',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  letterSpacing: 1.1,
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.onSurfaceVariant.withOpacity(0.8),
-                                ),
-                          ),
+                          _SectionLabel(text: 'Available Games', cs: cs),
                           const SizedBox(height: 14),
 
                           // Better Together Game Card
@@ -175,7 +198,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                             context: context,
                             title: 'Better Together',
                             subtitle:
-                                'A memory-card pairing game! Match iconic partners like 🍿 + 🎬 across themed decks.',
+                                'A memory-card pairing game! Match iconic partners like 🍷 + 🧀 across themed decks.',
                             icon: Icons.style_rounded,
                             onTap: () {
                               Navigator.of(context).push(
@@ -288,7 +311,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
     );
   }
 
-  /// 🌟 Migrated: Loops through individual document records inside the score subcollection to pull totals
+  /// 🔍 Migrated: Loops through individual document records inside the score subcollection to pull totals
   int _sumScoresFromDocuments(
     List<QueryDocumentSnapshot<Map<String, dynamic>>>? docs,
   ) {

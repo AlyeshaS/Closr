@@ -57,10 +57,10 @@ class _ConnectScreenState extends State<ConnectScreen>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                const DeepTalkScreen(),
-                const LoveLettersTab(),
-                const ResolveScreen(),
+              children: const [
+                DeepTalkScreen(),
+                LoveLettersTab(),
+                ResolveScreen(),
               ],
             ),
           ),

@@ -9,13 +9,16 @@ class DeepTalkScreen extends StatefulWidget {
   State<DeepTalkScreen> createState() => _DeepTalkScreenState();
 }
 
-class _DeepTalkScreenState extends State<DeepTalkScreen> {
+class _DeepTalkScreenState extends State<DeepTalkScreen>
+    with SingleTickerProviderStateMixin {
   final DeepTalkService _service = DeepTalkService();
   List<Map<String, dynamic>> _topics = [];
   int _currentIndex = 0;
   bool _loading = false;
   bool _loggedCompletedRun = false;
   bool _isMovingForward = true;
+
+  late final AnimationController _entranceController;
 
   final List<String> _depthLabels = [
     'Light',
@@ -28,7 +31,39 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
   @override
   void initState() {
     super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..forward();
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+  Widget _wrapReveal({required Widget child, double delay = 0.0}) {
+    final animation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+    );
+
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final t = animation.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, 60 * 0.06 * (1 - t)),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _generateMoreTopics() async {
@@ -86,65 +121,70 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Spark real connection — take turns or explore together.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'DMSans',
-                    color: cs.onSurfaceVariant.withOpacity(0.7),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: !_loading
-                      ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(isDark ? 0.06 : 0.12),
-                            blurRadius: 10,
-                            spreadRadius: 0,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: TextButton.icon(
-                  onPressed: _loading ? null : _generateMoreTopics,
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 14),
-                  label: const Text(
-                    'New Deck',
-                    style: TextStyle(
+          _wrapReveal(
+            delay: 0.0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Spark real connection — take turns or explore together.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontFamily: 'DMSans',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
+                      color: cs.onSurfaceVariant.withOpacity(0.7),
                     ),
                   ),
-                  style: TextButton.styleFrom(
-                    backgroundColor: cs.primaryContainer.withOpacity(0.9),
-                    foregroundColor: cs.primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: !_loading
+                        ? [
+                            BoxShadow(
+                              color: cs.primary.withOpacity(
+                                isDark ? 0.06 : 0.12,
+                              ),
+                              blurRadius: 10,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: TextButton.icon(
+                    onPressed: _loading ? null : _generateMoreTopics,
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 14),
+                    label: const Text(
+                      'New Deck',
+                      style: TextStyle(
+                        fontFamily: 'DMSans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(100),
-                      side: BorderSide(
-                        color: _loading
-                            ? cs.outlineVariant.withOpacity(0.1)
-                            : cs.primary.withOpacity(isDark ? 0.25 : 0.3),
-                        width: 1.2,
+                    style: TextButton.styleFrom(
+                      backgroundColor: cs.primaryContainer.withOpacity(0.9),
+                      foregroundColor: cs.primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                        side: BorderSide(
+                          color: _loading
+                              ? cs.outlineVariant.withOpacity(0.1)
+                              : cs.primary.withOpacity(isDark ? 0.25 : 0.3),
+                          width: 1.2,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 24),
 
@@ -166,87 +206,113 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
                   : Column(
                       key: const ValueKey('content_deck'),
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'CARD ${_currentIndex + 1} OF $totalCardCount',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    fontFamily: 'DMSans',
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                    color: cs.onSurfaceVariant.withOpacity(0.7),
-                                  ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: cs.primary.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: cs.primary,
-                                      shape: BoxShape.circle,
+                        _wrapReveal(
+                          delay: 0.1,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'CARD ${_currentIndex + 1} OF $totalCardCount',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontFamily: 'DMSans',
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                      color: cs.onSurfaceVariant.withOpacity(
+                                        0.7,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _depthLabelFor(_currentIndex).toUpperCase(),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          fontFamily: 'DMSans',
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                          color: cs.primary,
-                                        ),
-                                  ),
-                                ],
                               ),
-                            ),
-                          ],
+                              // Static badge without any transition animation
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: cs.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _depthLabelFor(
+                                        _currentIndex,
+                                      ).toUpperCase(),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            fontFamily: 'DMSans',
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                            color: cs.primary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 16),
 
-                        _buildSegmentedProgress(cs, totalCardCount),
+                        _wrapReveal(
+                          delay: 0.2,
+                          child: _buildSegmentedProgress(cs, totalCardCount),
+                        ),
                         const SizedBox(height: 24),
 
                         Expanded(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              if (_currentIndex < totalCardCount - 2)
-                                _buildCardDeckLayer(
-                                  cs,
-                                  isDark,
-                                  scale: 0.92,
-                                  offset: 20,
-                                ),
-                              if (_currentIndex < totalCardCount - 1)
-                                _buildCardDeckLayer(
-                                  cs,
-                                  isDark,
-                                  scale: 0.96,
-                                  offset: 10,
-                                ),
+                          child: _wrapReveal(
+                            delay: 0.35,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (_currentIndex < totalCardCount - 2)
+                                  _buildCardDeckLayer(
+                                    cs,
+                                    isDark,
+                                    scale: 0.92,
+                                    offset: 20,
+                                  ),
+                                if (_currentIndex < totalCardCount - 1)
+                                  _buildCardDeckLayer(
+                                    cs,
+                                    isDark,
+                                    scale: 0.96,
+                                    offset: 10,
+                                  ),
 
-                              _buildActiveCard(cs, isDark, isAtFinalEndingCard),
-                            ],
+                                _buildActiveCard(
+                                  cs,
+                                  isDark,
+                                  isAtFinalEndingCard,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),
 
-                        _buildNavigationRow(cs, totalCardCount, isDark),
+                        _wrapReveal(
+                          delay: 0.45,
+                          child: _buildNavigationRow(
+                            cs,
+                            totalCardCount,
+                            isDark,
+                          ),
+                        ),
                       ],
                     ),
             ),
@@ -438,7 +504,9 @@ class _DeepTalkScreenState extends State<DeepTalkScreen> {
       children: List.generate(totalCardCount, (index) {
         bool isActive = index <= _currentIndex;
         return Expanded(
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
             height: 3,
             margin: EdgeInsets.only(right: index == totalCardCount - 1 ? 0 : 4),
             decoration: BoxDecoration(

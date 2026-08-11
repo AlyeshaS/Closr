@@ -1,5 +1,34 @@
 part of 'memories_screen.dart';
 
+// ── Section Label Helper ──────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final ColorScheme cs;
+  const _SectionLabel({required this.text, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+        ),
+        Text(
+          text.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            letterSpacing: 1.1,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Timeline Tab ──────────────────────────────────────────────────────────────
 
 class MemoriesTimelineTab extends StatefulWidget {
@@ -118,15 +147,7 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'YOUR STORY',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontFamily: 'DMSans',
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.bold,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
+              _SectionLabel(text: 'Your story', cs: cs),
               const SizedBox(height: 12),
 
               // Light Pink Background Summary & Stats Container

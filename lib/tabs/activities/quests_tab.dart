@@ -6,6 +6,37 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/streaks_service.dart';
 import '../../services/quests_manager.dart';
 
+// ── Section Label Helper ──────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final ColorScheme cs;
+  const _SectionLabel({required this.text, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+        ),
+        Text(
+          text.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            letterSpacing: 1.1,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Quests Tab ────────────────────────────────────────────────────────────────
+
 class QuestsTab extends StatefulWidget {
   const QuestsTab({super.key});
 
@@ -370,14 +401,7 @@ class _QuestsTabState extends State<QuestsTab>
                         ),
                       ),
                       const SizedBox(height: 28),
-                      Text(
-                        'TODAY\'S QUESTS',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          letterSpacing: 1.1,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurfaceVariant.withOpacity(0.8),
-                        ),
-                      ),
+                      _SectionLabel(text: "Today's Quests", cs: cs),
                       const SizedBox(height: 14),
 
                       // Interactive list built dynamically from separate collection records
