@@ -205,14 +205,11 @@ class _WatchTabState extends State<WatchTab> {
   ) {
     final genres = <String>{};
     for (final item in items) {
-      genres.addAll(item.genres);
+      genres.addAll(_normalizeGenres(item.genres));
     }
     for (final record in records) {
-      genres.addAll(record.matchedGenres);
+      genres.addAll(_normalizeGenres(record.matchedGenres));
     }
-
-    genres.remove('Action & Adventure');
-    genres.remove('Sci-Fi & Fantasy');
 
     final list = genres.toList();
     list.sort();
@@ -247,16 +244,7 @@ class _WatchTabState extends State<WatchTab> {
 
     final activeGenre = _selectedGenre;
     if (activeGenre != null) {
-      final hasGenre =
-          item.genres.contains(activeGenre) ||
-          (activeGenre == 'Action' &&
-              item.genres.contains('Action & Adventure')) ||
-          (activeGenre == 'Adventure' &&
-              item.genres.contains('Action & Adventure')) ||
-          (activeGenre == 'Sci-Fi' &&
-              item.genres.contains('Sci-Fi & Fantasy')) ||
-          (activeGenre == 'Fantasy' &&
-              item.genres.contains('Sci-Fi & Fantasy'));
+      final hasGenre = _normalizeGenres(item.genres).contains(activeGenre);
       if (!hasGenre) return false;
     }
 
@@ -901,7 +889,7 @@ class _WatchTabState extends State<WatchTab> {
                                                 seasons:
                                                     (data['seasons'] as num?)
                                                         ?.toInt(),
-                                                genres: List<String>.from(
+                                                genres: _normalizeGenres(
                                                   (data['genres'] as List?) ??
                                                       record.matchedGenres,
                                                 ),
@@ -930,7 +918,9 @@ class _WatchTabState extends State<WatchTab> {
                                                   runtimeMinutes: 0,
                                                   releaseDate: null,
                                                   seasons: null,
-                                                  genres: record.matchedGenres,
+                                                  genres: _normalizeGenres(
+                                                    record.matchedGenres,
+                                                  ),
                                                   matchPercentage:
                                                       record.coupleMatchScore,
                                                   matchReason: '',
@@ -1047,6 +1037,30 @@ enum _WatchMediaType { movie, tv }
 
 enum _TopView { suggestions, matched, history }
 
+List<String> _normalizeGenres(Iterable<dynamic> genres) {
+  final normalized = <String>[];
+  final seen = <String>{};
+
+  for (final value in genres) {
+    final genre = value.toString().trim();
+    if (genre.isEmpty) continue;
+
+    final expanded = switch (genre) {
+      'Action & Adventure' => const ['Action', 'Adventure'],
+      'Sci-Fi & Fantasy' => const ['Sci-Fi', 'Fantasy'],
+      _ => [genre],
+    };
+
+    for (final tag in expanded) {
+      if (seen.add(tag)) {
+        normalized.add(tag);
+      }
+    }
+  }
+
+  return normalized;
+}
+
 class _WatchItem {
   final int tmdbId;
   final _WatchMediaType mediaType;
@@ -1093,7 +1107,8 @@ class _WatchItem {
       releaseDate == null ? 'Unknown' : '${releaseDate!.year}';
   String get runtimeLabel =>
       runtimeMinutes > 0 ? '$runtimeMinutes min' : 'Runtime unavailable';
-  String get genreLabel => genres.isEmpty ? 'Genre mix' : genres.join(' • ');
+  String get genreLabel =>
+      genres.isEmpty ? 'Genre mix' : _normalizeGenres(genres).join(' • ');
   String get mediaLabel =>
       mediaType == _WatchMediaType.movie ? 'Movie' : 'TV show';
   String? get seasonsLabel {
@@ -1200,7 +1215,7 @@ class _WatchRecord {
       ),
       watchedBy: List<String>.from((data['watchedBy'] as List?) ?? const []),
       coupleMatchScore: (data['coupleMatchScore'] as num?)?.toDouble() ?? 0,
-      matchedGenres: List<String>.from(
+      matchedGenres: _normalizeGenres(
         (data['matchedGenres'] as List?) ?? const [],
       ),
       createdAt: createdTs?.toDate() ?? DateTime.now(),
@@ -1364,9 +1379,10 @@ class _WatchRepository {
             ? _WatchMediaType.tv
             : _WatchMediaType.movie;
         final rating = (data['rating'] as num?)?.toDouble() ?? 0.0;
-        final rawGenres = List<String>.from(
+        final rawGenres = List<dynamic>.from(
           (data['genres'] as List?) ?? const [],
         );
+        final normalizedGenres = _normalizeGenres(rawGenres);
 
         DateTime? releaseDate;
         final rawRelease = data['releaseDate'];
@@ -1387,9 +1403,11 @@ class _WatchRepository {
           runtimeMinutes: (data['runtimeMinutes'] as num?)?.toInt() ?? 0,
           releaseDate: releaseDate,
           seasons: (data['seasons'] as num?)?.toInt(),
-          genres: rawGenres.isEmpty ? _defaultGenresFor(mediaType) : rawGenres,
-          matchPercentage: _predictMatchScore(rating, rawGenres),
-          matchReason: _buildMatchReason(rawGenres, mediaType),
+          genres: normalizedGenres.isEmpty
+              ? _defaultGenresFor(mediaType)
+              : normalizedGenres,
+          matchPercentage: _predictMatchScore(rating, normalizedGenres),
+          matchReason: _buildMatchReason(normalizedGenres, mediaType),
         );
       }).toList();
 
@@ -1724,19 +1742,21 @@ class _WatchRepository {
     required List<String> dislikedBy,
     required String? partnerUid,
   }) {
+    final normalizedGenres = _normalizeGenres(item.genres);
+
     if (likedBy.isEmpty && dislikedBy.isEmpty) {
-      return item.genres.take(2).toList();
+      return normalizedGenres.take(2).toList();
     }
 
     if (partnerUid != null && likedBy.contains(partnerUid)) {
-      return item.genres.take(3).toList();
+      return normalizedGenres.take(3).toList();
     }
 
     if (likedBy.isNotEmpty) {
-      return item.genres.take(2).toList();
+      return normalizedGenres.take(2).toList();
     }
 
-    return item.genres.take(1).toList();
+    return normalizedGenres.take(1).toList();
   }
 
   double _calculateCoupleScore({
