@@ -19,7 +19,10 @@ class _WatchTabState extends State<WatchTab> {
   _WatchFeedFilter _filter = _WatchFeedFilter.all;
   _TopView _topView = _TopView.suggestions;
   int _currentRecommendationIndex = 0;
-  String? _selectedGenre;
+
+  // Filter State
+  final Set<String> _selectedRegions = <String>{};
+  final Set<String> _selectedGenres = <String>{};
   double _minRating = 0;
   double _maxRuntime = 240;
   RangeValues _yearRange = const RangeValues(1980, 2026);
@@ -102,7 +105,8 @@ class _WatchTabState extends State<WatchTab> {
                               setState(() {
                                 _filter = _WatchFeedFilter.all;
                                 _currentRecommendationIndex = 0;
-                                _selectedGenre = null;
+                                _selectedRegions.clear();
+                                _selectedGenres.clear();
                                 _minRating = 0;
                                 _maxRuntime = 240;
                                 _yearRange = const RangeValues(1980, 2026);
@@ -124,7 +128,8 @@ class _WatchTabState extends State<WatchTab> {
                         cs: cs,
                         theme: theme,
                         filter: _filter,
-                        selectedGenre: _selectedGenre,
+                        selectedRegions: _selectedRegions,
+                        selectedGenres: _selectedGenres,
                         genres: genres,
                         minRating: _minRating,
                         maxRuntime: _maxRuntime,
@@ -136,10 +141,29 @@ class _WatchTabState extends State<WatchTab> {
                             _currentRecommendationIndex = 0;
                           });
                         },
-                        onGenreChanged: (value) {
+                        onRegionToggled: (region) {
                           setSheetState(() {});
                           setState(() {
-                            _selectedGenre = value;
+                            if (_selectedRegions.contains(region)) {
+                              _selectedRegions.remove(region);
+                            } else {
+                              _selectedRegions.add(region);
+                            }
+                            _currentRecommendationIndex = 0;
+                          });
+                        },
+                        onGenreToggled: (genre) {
+                          setSheetState(() {});
+                          setState(() {
+                            if (genre == null) {
+                              _selectedGenres.clear();
+                            } else {
+                              if (_selectedGenres.contains(genre)) {
+                                _selectedGenres.remove(genre);
+                              } else {
+                                _selectedGenres.add(genre);
+                              }
+                            }
                             _currentRecommendationIndex = 0;
                           });
                         },
@@ -211,6 +235,12 @@ class _WatchTabState extends State<WatchTab> {
       genres.addAll(_normalizeGenres(record.matchedGenres));
     }
 
+    genres.remove('Action & Adventure');
+    genres.remove('Sci-Fi & Fantasy');
+    genres.remove('Anime');
+    genres.remove('J-Drama');
+    genres.remove('Japanese');
+
     final list = genres.toList();
     list.sort();
     return list;
@@ -242,10 +272,51 @@ class _WatchTabState extends State<WatchTab> {
         break;
     }
 
-    final activeGenre = _selectedGenre;
-    if (activeGenre != null) {
-      final hasGenre = _normalizeGenres(item.genres).contains(activeGenre);
-      if (!hasGenre) return false;
+    final normalizedItemGenres = _normalizeGenres(item.genres);
+
+    // Multi-select Region / Category Filtering
+    if (_selectedRegions.isNotEmpty) {
+      bool regionMatches = false;
+      for (final region in _selectedRegions) {
+        if (region == 'Anime' && normalizedItemGenres.contains('Anime')) {
+          regionMatches = true;
+          break;
+        }
+        if (region == 'Japanese' &&
+            (normalizedItemGenres.contains('Japanese') ||
+                normalizedItemGenres.contains('J-Drama'))) {
+          regionMatches = true;
+          break;
+        }
+        if (region == 'Korean' &&
+            (normalizedItemGenres.contains('Korean') ||
+                normalizedItemGenres.contains('K-Drama'))) {
+          regionMatches = true;
+          break;
+        }
+        if (region == 'US / CAD' &&
+            !normalizedItemGenres.contains('Anime') &&
+            !normalizedItemGenres.contains('Japanese') &&
+            !normalizedItemGenres.contains('J-Drama') &&
+            !normalizedItemGenres.contains('Korean') &&
+            !normalizedItemGenres.contains('K-Drama')) {
+          regionMatches = true;
+          break;
+        }
+      }
+      if (!regionMatches) return false;
+    }
+
+    // Multi-select Genre Filtering
+    if (_selectedGenres.isNotEmpty) {
+      bool genreMatches = false;
+      for (final selectedGenre in _selectedGenres) {
+        if (normalizedItemGenres.contains(selectedGenre)) {
+          genreMatches = true;
+          break;
+        }
+      }
+      if (!genreMatches) return false;
     }
 
     if (item.rating < _minRating) {
@@ -616,7 +687,8 @@ class _WatchTabState extends State<WatchTab> {
 
                         final activeFilterCount =
                             (_filter != _WatchFeedFilter.all ? 1 : 0) +
-                            (_selectedGenre != null ? 1 : 0) +
+                            _selectedRegions.length +
+                            _selectedGenres.length +
                             (_minRating > 0 ? 1 : 0) +
                             (_maxRuntime < 240 ? 1 : 0) +
                             (_yearRange.start > 1980 || _yearRange.end < 2026
@@ -889,7 +961,7 @@ class _WatchTabState extends State<WatchTab> {
                                                 seasons:
                                                     (data['seasons'] as num?)
                                                         ?.toInt(),
-                                                genres: _normalizeGenres(
+                                                genres: List<String>.from(
                                                   (data['genres'] as List?) ??
                                                       record.matchedGenres,
                                                 ),
@@ -918,9 +990,7 @@ class _WatchTabState extends State<WatchTab> {
                                                   runtimeMinutes: 0,
                                                   releaseDate: null,
                                                   seasons: null,
-                                                  genres: _normalizeGenres(
-                                                    record.matchedGenres,
-                                                  ),
+                                                  genres: record.matchedGenres,
                                                   matchPercentage:
                                                       record.coupleMatchScore,
                                                   matchReason: '',
@@ -1859,13 +1929,15 @@ class _FilterPanel extends StatelessWidget {
   final ColorScheme cs;
   final ThemeData theme;
   final _WatchFeedFilter filter;
-  final String? selectedGenre;
+  final Set<String> selectedRegions;
+  final Set<String> selectedGenres;
   final List<String> genres;
   final double minRating;
   final double maxRuntime;
   final RangeValues yearRange;
   final ValueChanged<_WatchFeedFilter> onFilterChanged;
-  final ValueChanged<String?> onGenreChanged;
+  final ValueChanged<String> onRegionToggled;
+  final ValueChanged<String?> onGenreToggled;
   final ValueChanged<double> onRatingChanged;
   final ValueChanged<double> onRuntimeChanged;
   final ValueChanged<RangeValues> onYearRangeChanged;
@@ -1874,13 +1946,15 @@ class _FilterPanel extends StatelessWidget {
     required this.cs,
     required this.theme,
     required this.filter,
-    required this.selectedGenre,
+    required this.selectedRegions,
+    required this.selectedGenres,
     required this.genres,
     required this.minRating,
     required this.maxRuntime,
     required this.yearRange,
     required this.onFilterChanged,
-    required this.onGenreChanged,
+    required this.onRegionToggled,
+    required this.onGenreToggled,
     required this.onRatingChanged,
     required this.onRuntimeChanged,
     required this.onYearRangeChanged,
@@ -1893,6 +1967,8 @@ class _FilterPanel extends StatelessWidget {
       ('Movies', Icons.movie_rounded, _WatchFeedFilter.movies),
       ('TV Shows', Icons.tv_rounded, _WatchFeedFilter.tv),
     ];
+
+    final regionOptions = ['US / CAD', 'Korean', 'Japanese', 'Anime'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1948,6 +2024,22 @@ class _FilterPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 22),
+        _FilterSectionLabel(cs: cs, text: 'Region & Type'),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: regionOptions.map((region) {
+            final isSelected = selectedRegions.contains(region);
+            return _SolidChip(
+              cs: cs,
+              label: region,
+              selected: isSelected,
+              onTap: () => onRegionToggled(region),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 22),
         _FilterSectionLabel(cs: cs, text: 'Genres'),
         const SizedBox(height: 10),
         AnimatedSize(
@@ -1960,15 +2052,15 @@ class _FilterPanel extends StatelessWidget {
               _SolidChip(
                 cs: cs,
                 label: 'All Genres',
-                selected: selectedGenre == null,
-                onTap: () => onGenreChanged(null),
+                selected: selectedGenres.isEmpty,
+                onTap: () => onGenreToggled(null),
               ),
               ...genres.map(
                 (genre) => _SolidChip(
                   cs: cs,
                   label: genre,
-                  selected: selectedGenre == genre,
-                  onTap: () => onGenreChanged(genre),
+                  selected: selectedGenres.contains(genre),
+                  onTap: () => onGenreToggled(genre),
                 ),
               ),
             ],
@@ -2631,7 +2723,6 @@ class _PopcornKernelRiseOverlayState extends State<_PopcornKernelRiseOverlay>
     super.initState();
     final rand = math.Random();
 
-    // Spawn 7 multi-lobed kernel silhouettes that pop up from bottom
     for (int i = 0; i < 7; i++) {
       _kernels.add(
         _KernelParticle(
@@ -2671,7 +2762,6 @@ class _PopcornKernelRiseOverlayState extends State<_PopcornKernelRiseOverlay>
 
             return Stack(
               children: _kernels.map((kernel) {
-                // Parabolic rise and fall trajectory: y = -4 * peak * t * (1 - t)
                 final t = progress;
                 final dy = -4 * kernel.peakHeight * t * (1 - t);
                 final dx = kernel.horizontalDrift * t;
@@ -2737,22 +2827,17 @@ class _PopcornKernelSilhouettePainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Renders the multi-lobed kernel silhouette matching the design reference
     final path = Path();
 
-    // Bottom lobe
     path.addOval(
       Rect.fromCircle(center: Offset(w * 0.5, h * 0.65), radius: w * 0.32),
     );
-    // Top-left lobe
     path.addOval(
       Rect.fromCircle(center: Offset(w * 0.32, h * 0.38), radius: w * 0.28),
     );
-    // Top-right lobe
     path.addOval(
       Rect.fromCircle(center: Offset(w * 0.68, h * 0.38), radius: w * 0.28),
     );
-    // Center-top bump
     path.addOval(
       Rect.fromCircle(center: Offset(w * 0.5, h * 0.28), radius: w * 0.22),
     );
