@@ -53,8 +53,15 @@ class _WatchTabState extends State<WatchTab> {
               decoration: BoxDecoration(
                 color: cs.surface,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
+                  top: Radius.circular(32),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withValues(alpha: 0.12),
+                    blurRadius: 32,
+                    offset: const Offset(0, -8),
+                  ),
+                ],
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -64,22 +71,38 @@ class _WatchTabState extends State<WatchTab> {
                   children: [
                     Center(
                       child: Container(
-                        width: 40,
-                        height: 4,
+                        width: 44,
+                        height: 5,
                         decoration: BoxDecoration(
-                          color: cs.outlineVariant,
+                          color: cs.outlineVariant.withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     Row(
                       children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer.withValues(alpha: 0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.tune_rounded,
+                            size: 20,
+                            color: cs.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Filter watch picks',
+                            'Filter Watch Picks',
                             style: Theme.of(sheetContext).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w700),
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                ),
                           ),
                         ),
                         TextButton(
@@ -94,15 +117,24 @@ class _WatchTabState extends State<WatchTab> {
                             });
                             Navigator.of(sheetContext).pop();
                           },
-                          child: const Text('Reset'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: cs.primary,
+                          ),
+                          child: const Text(
+                            'Reset',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: cs.onSurfaceVariant,
+                          ),
                           onPressed: () => Navigator.of(sheetContext).pop(),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     _FilterPanel(
                       cs: cs,
                       filter: _filter,
@@ -147,22 +179,25 @@ class _WatchTabState extends State<WatchTab> {
                         });
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: 52,
                       child: FilledButton(
                         onPressed: () => Navigator.of(sheetContext).pop(),
                         style: FilledButton.styleFrom(
+                          backgroundColor: cs.primary,
+                          elevation: 2,
+                          shadowColor: cs.primary.withValues(alpha: 0.3),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                         ),
                         child: const Text(
                           'Apply Filters',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -594,6 +629,15 @@ class _WatchTabState extends State<WatchTab> {
                           );
                         }).toList();
 
+                        final activeFilterCount =
+                            (_filter != _WatchFeedFilter.all ? 1 : 0) +
+                            (_selectedGenre != null ? 1 : 0) +
+                            (_minRating > 0 ? 1 : 0) +
+                            (_maxRuntime < 240 ? 1 : 0) +
+                            (_yearRange.start > 1980 || _yearRange.end < 2026
+                                ? 1
+                                : 0);
+
                         return RefreshIndicator(
                           onRefresh: _refreshRecommendations,
                           child: CustomScrollView(
@@ -632,44 +676,107 @@ class _WatchTabState extends State<WatchTab> {
                                             },
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        SizedBox(
-                                          width: 110,
-                                          child: FilledButton.tonal(
-                                            onPressed: () => _openFilterSheet(
+                                        const SizedBox(width: 10),
+                                        Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => _openFilterSheet(
                                               cs: cs,
                                               genres: genres,
                                             ),
-                                            style: FilledButton.styleFrom(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                            child: AnimatedContainer(
+                                              duration: const Duration(
+                                                milliseconds: 200,
+                                              ),
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                    vertical: 12,
+                                                    horizontal: 16,
+                                                    vertical: 10,
                                                   ),
-                                              shape: RoundedRectangleBorder(
+                                              decoration: BoxDecoration(
+                                                color: activeFilterCount > 0
+                                                    ? cs.primaryContainer
+                                                    : cs.surfaceContainerHighest
+                                                          .withValues(
+                                                            alpha: 0.6,
+                                                          ),
                                                 borderRadius:
-                                                    BorderRadius.circular(14),
+                                                    BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: activeFilterCount > 0
+                                                      ? cs.primary.withValues(
+                                                          alpha: 0.4,
+                                                        )
+                                                      : cs.outlineVariant
+                                                            .withValues(
+                                                              alpha: 0.8,
+                                                            ),
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: activeFilterCount > 0
+                                                        ? cs.primary.withValues(
+                                                            alpha: 0.12,
+                                                          )
+                                                        : Colors.black
+                                                              .withValues(
+                                                                alpha: 0.03,
+                                                              ),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.tune_rounded,
-                                                  size: 18,
-                                                  color: cs.onSurface,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'Filter',
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .bodyMedium
-                                                      ?.copyWith(
-                                                        color: cs.onSurface,
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.tune_rounded,
+                                                    size: 18,
+                                                    color: activeFilterCount > 0
+                                                        ? cs.primary
+                                                        : cs.onSurfaceVariant,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Filter',
+                                                    style: TextStyle(
+                                                      color:
+                                                          activeFilterCount > 0
+                                                          ? cs.primary
+                                                          : cs.onSurface,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  if (activeFilterCount >
+                                                      0) ...[
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                            6,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: cs.primary,
+                                                        shape: BoxShape.circle,
                                                       ),
-                                                ),
-                                              ],
+                                                      child: Text(
+                                                        '$activeFilterCount',
+                                                        style: TextStyle(
+                                                          color: cs.onPrimary,
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -1702,53 +1809,72 @@ class _FilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chips = [
-      ('All', Icons.auto_awesome_rounded, _WatchFeedFilter.all),
+      ('All Picks', Icons.auto_awesome_rounded, _WatchFeedFilter.all),
       ('Movies', Icons.movie_rounded, _WatchFeedFilter.movies),
-      ('TV shows', Icons.tv_rounded, _WatchFeedFilter.tv),
+      ('TV Shows', Icons.tv_rounded, _WatchFeedFilter.tv),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Type', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Media Type',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 10),
         Row(
           children: chips.map((chip) {
             final selected = filter == chip.$3;
             return Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 6),
                 child: ChoiceChip(
                   avatar: Icon(
                     chip.$2,
-                    size: 18,
+                    size: 16,
                     color: selected ? cs.onPrimary : cs.primary,
                   ),
                   label: Text(chip.$1),
                   selected: selected,
                   onSelected: (_) => onFilterChanged(chip.$3),
                   selectedColor: cs.primary,
+                  backgroundColor: cs.surfaceContainerHighest.withValues(
+                    alpha: 0.4,
+                  ),
                   labelStyle: TextStyle(
                     color: selected ? cs.onPrimary : cs.onSurface,
                     fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
                 ),
               ),
             );
           }).toList(),
         ),
-        const SizedBox(height: 24),
-        Text('Genres', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 22),
+        Text(
+          'Genres',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             FilterChip(
-              label: const Text('All genres'),
+              label: const Text('All Genres'),
               selected: selectedGenre == null,
               onSelected: (_) => onGenreChanged(null),
               selectedColor: cs.primaryContainer,
+              backgroundColor: cs.surfaceContainerHighest.withValues(
+                alpha: 0.4,
+              ),
               checkmarkColor: cs.onPrimaryContainer,
             ),
             ...genres.map(
@@ -1757,21 +1883,25 @@ class _FilterPanel extends StatelessWidget {
                 selected: selectedGenre == genre,
                 onSelected: (_) => onGenreChanged(genre),
                 selectedColor: cs.primaryContainer,
+                backgroundColor: cs.surfaceContainerHighest.withValues(
+                  alpha: 0.4,
+                ),
                 checkmarkColor: cs.onPrimaryContainer,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
         _FilterSliderCard(
           cs: cs,
-          title: 'Release year',
+          title: 'Release Year',
           valueLabel: '${yearRange.start.round()} - ${yearRange.end.round()}',
           child: RangeSlider(
             values: yearRange,
             min: 1980,
             max: 2026,
             divisions: 46,
+            activeColor: cs.primary,
             labels: RangeLabels(
               '${yearRange.start.round()}',
               '${yearRange.end.round()}',
@@ -1779,30 +1909,32 @@ class _FilterPanel extends StatelessWidget {
             onChanged: onYearRangeChanged,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         _FilterSliderCard(
           cs: cs,
-          title: 'Minimum rating',
-          valueLabel: '${minRating.toStringAsFixed(1)}+',
+          title: 'Minimum Rating',
+          valueLabel: '${minRating.toStringAsFixed(1)}+ ⭐',
           child: Slider(
             value: minRating,
             min: 0,
             max: 10,
             divisions: 20,
+            activeColor: cs.primary,
             label: minRating.toStringAsFixed(1),
             onChanged: onRatingChanged,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         _FilterSliderCard(
           cs: cs,
-          title: 'Maximum runtime',
+          title: 'Maximum Runtime',
           valueLabel: '${maxRuntime.round()} min',
           child: Slider(
             value: maxRuntime,
             min: 20,
             max: 240,
             divisions: 11,
+            activeColor: cs.primary,
             label: '${maxRuntime.round()} min',
             onChanged: onRuntimeChanged,
           ),
@@ -1828,11 +1960,11 @@ class _FilterSliderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outlineVariant),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
@@ -1841,13 +1973,15 @@ class _FilterSliderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 5,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
                   color: cs.primaryContainer,
@@ -1858,6 +1992,7 @@ class _FilterSliderCard extends StatelessWidget {
                   style: TextStyle(
                     color: cs.onPrimaryContainer,
                     fontWeight: FontWeight.w700,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -1966,7 +2101,7 @@ class _MatchedTimelineFeed extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Your matched list',
+                          'Your Matched List',
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
@@ -2085,12 +2220,12 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                       children: [
                                         _TimelineChip(
                                           label: record.mediaType == 'tv'
-                                              ? 'TV show'
+                                              ? 'TV Show'
                                               : 'Movie',
                                           filled: true,
                                         ),
                                         const SizedBox(width: 8),
-                                        _TimelineChip(label: 'Shared yes'),
+                                        _TimelineChip(label: 'Shared Yes'),
                                       ],
                                     ),
                                     const SizedBox(height: 8),
@@ -2161,8 +2296,8 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                         ),
                                         label: Text(
                                           watchedTogether
-                                              ? 'Watched together'
-                                              : 'Mark watched',
+                                              ? 'Watched Together'
+                                              : 'Mark Watched',
                                         ),
                                       ),
                                     ),
@@ -2336,8 +2471,8 @@ class _PersonalHistoryPanel extends StatelessWidget {
 
   String _historySubtitle(_WatchRecord record, String currentUserId) {
     final parts = <String>[];
-    if (record.isLikedBy(currentUserId)) parts.add('You liked');
-    if (record.isDislikedBy(currentUserId)) parts.add('You passed');
+    if (record.isLikedBy(currentUserId)) parts.add('You Liked');
+    if (record.isDislikedBy(currentUserId)) parts.add('You Passed');
     if (record.isWatchedBy(currentUserId)) parts.add('Watched');
     if (parts.isEmpty) parts.add('No personal vote');
     final date = record.updatedAt;
@@ -2375,7 +2510,7 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
     final selected = await showMenu<_TopView>(
       context: context,
       position: RelativeRect.fromLTRB(left, top, right, bottom),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 4,
       items: [
         PopupMenuItem(
@@ -2431,10 +2566,17 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
     return GestureDetector(
       onTap: _showMenu,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: cs.primary,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: cs.primary.withValues(alpha: 0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -2443,9 +2585,10 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
             Expanded(
               child: Text(
                 label,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: cs.onPrimary),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             Icon(Icons.keyboard_arrow_down, color: cs.onPrimary),
@@ -2488,22 +2631,22 @@ class _RecommendationCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onOpenDetails,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         child: Container(
           decoration: BoxDecoration(
             color: cs.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: cs.outlineVariant),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
             boxShadow: [
               BoxShadow(
-                color: cs.primary.withValues(alpha: 0.10),
-                blurRadius: 18,
+                color: cs.primary.withValues(alpha: 0.12),
+                blurRadius: 20,
                 spreadRadius: 1,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: cs.primary.withValues(alpha: 0.06),
-                blurRadius: 28,
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 32,
                 spreadRadius: 2,
                 offset: Offset.zero,
               ),
@@ -2515,7 +2658,7 @@ class _RecommendationCard extends StatelessWidget {
               children: [
                 Positioned.fill(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(28),
                     child: item.posterUrl.isNotEmpty
                         ? Image.network(
                             item.posterUrl,
@@ -2529,14 +2672,14 @@ class _RecommendationCard extends StatelessWidget {
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(28),
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.black.withValues(alpha: 0.15),
                           Colors.black.withValues(alpha: 0.25),
-                          Colors.black.withValues(alpha: 0.92),
+                          Colors.black.withValues(alpha: 0.94),
                         ],
                       ),
                     ),
@@ -2632,18 +2775,20 @@ class _RecommendationCard extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: _ActionChip(
+                            child: _StyledActionButton(
                               label: 'Pass',
                               icon: Icons.close_rounded,
+                              isPass: true,
                               selected: isDisliked,
                               onTap: onNo,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(
-                            child: _ActionChip(
+                            child: _StyledActionButton(
                               label: 'Interested',
                               icon: Icons.favorite_rounded,
+                              isPass: false,
                               selected: isLiked,
                               onTap: onYes,
                             ),
@@ -2662,15 +2807,17 @@ class _RecommendationCard extends StatelessWidget {
   }
 }
 
-class _ActionChip extends StatelessWidget {
+class _StyledActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
+  final bool isPass;
   final bool selected;
   final VoidCallback onTap;
 
-  const _ActionChip({
+  const _StyledActionButton({
     required this.label,
     required this.icon,
+    required this.isPass,
     required this.selected,
     required this.onTap,
   });
@@ -2678,35 +2825,68 @@ class _ActionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-        decoration: BoxDecoration(
-          color: selected
-              ? cs.primaryContainer
-              : cs.surfaceContainerHighest.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? cs.primary : cs.outlineVariant),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected ? cs.primary : cs.onSurfaceVariant,
+    final activeBg = isPass
+        ? Colors.grey.shade900.withValues(alpha: 0.9)
+        : cs.primary;
+    final activeFg = isPass ? Colors.white : cs.onPrimary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          decoration: BoxDecoration(
+            color: selected ? activeBg : Colors.black.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected
+                  ? (isPass ? Colors.white54 : cs.primary)
+                  : Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: selected ? cs.primary : cs.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
+            boxShadow: [
+              BoxShadow(
+                color: selected
+                    ? (isPass
+                          ? Colors.black38
+                          : cs.primary.withValues(alpha: 0.35))
+                    : Colors.black12,
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: selected ? activeFg : Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? activeFg : Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
