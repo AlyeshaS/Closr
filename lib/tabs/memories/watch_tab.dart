@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -333,88 +335,6 @@ class _WatchTabState extends State<WatchTab> {
     await _toggleAction(item: item, liked: liked, disliked: disliked);
   }
 
-  Future<_WatchItem> _fullItemFromMatchedRecord(_WatchRecord record) async {
-    final mediaType = record.mediaType == 'tv'
-        ? _WatchMediaType.tv
-        : _WatchMediaType.movie;
-    final tmdbIdFromDocId = int.tryParse(record.id.split('_').last) ?? 0;
-    final tmdbId = record.tmdbId > 0 ? record.tmdbId : tmdbIdFromDocId;
-
-    _WatchItem fallbackItem() {
-      return _WatchItem(
-        tmdbId: tmdbId,
-        mediaType: mediaType,
-        title: record.title,
-        overview: '',
-        posterPath: record.posterPath,
-        backdropPath: record.backdropPath,
-        rating: 0,
-        runtimeMinutes: 0,
-        releaseDate: null,
-        seasons: null,
-        genres: record.matchedGenres,
-        matchPercentage: record.coupleMatchScore,
-        matchReason: '',
-      );
-    }
-
-    DateTime? parseReleaseDate(dynamic rawReleaseDate) {
-      if (rawReleaseDate is String && rawReleaseDate.isNotEmpty) {
-        return DateTime.tryParse(rawReleaseDate);
-      }
-      if (rawReleaseDate is Timestamp) {
-        return rawReleaseDate.toDate();
-      }
-      return null;
-    }
-
-    try {
-      final collection = FirebaseFirestore.instance.collection('watch_options');
-      final docKey = '${mediaType.name}_$tmdbId';
-      var docSnap = await collection.doc(docKey).get();
-
-      if (!docSnap.exists && tmdbId > 0) {
-        final querySnap = await collection
-            .where('tmdbId', isEqualTo: tmdbId)
-            .where('mediaType', isEqualTo: mediaType.name)
-            .limit(1)
-            .get();
-        if (querySnap.docs.isNotEmpty) {
-          docSnap = querySnap.docs.first;
-        }
-      }
-
-      if (!docSnap.exists) {
-        return fallbackItem();
-      }
-
-      final data = docSnap.data()!;
-      final rawGenres = List<String>.from(
-        (data['genres'] as List?) ?? const [],
-      );
-
-      return _WatchItem(
-        tmdbId: (data['tmdbId'] as num?)?.toInt() ?? tmdbId,
-        mediaType: (data['mediaType'] as String?) == 'tv'
-            ? _WatchMediaType.tv
-            : _WatchMediaType.movie,
-        title: (data['title'] as String?) ?? record.title,
-        overview: (data['overview'] as String?) ?? '',
-        posterPath: (data['posterPath'] as String?) ?? record.posterPath,
-        backdropPath: (data['backdropPath'] as String?) ?? record.backdropPath,
-        rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
-        runtimeMinutes: (data['runtimeMinutes'] as num?)?.toInt() ?? 0,
-        releaseDate: parseReleaseDate(data['releaseDate']),
-        seasons: (data['seasons'] as num?)?.toInt(),
-        genres: rawGenres.isEmpty ? record.matchedGenres : rawGenres,
-        matchPercentage: record.coupleMatchScore,
-        matchReason: (data['matchReason'] as String?) ?? '',
-      );
-    } catch (_) {
-      return fallbackItem();
-    }
-  }
-
   Future<void> _openDetails(_WatchItem item) async {
     final details = await _repository.fetchDetails(item);
     if (!mounted) return;
@@ -556,7 +476,9 @@ class _WatchTabState extends State<WatchTab> {
                       children: [
                         _DetailStat(
                           label: 'Rating',
-                          value: details.item.rating.toStringAsFixed(1),
+                          value: details.item.rating > 0
+                              ? details.item.rating.toStringAsFixed(1)
+                              : 'N/A',
                         ),
                         const SizedBox(width: 10),
                         if (details.item.mediaType == _WatchMediaType.tv)
@@ -586,11 +508,13 @@ class _WatchTabState extends State<WatchTab> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      details.item.overview,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+                    if (details.item.overview.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        details.item.overview,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     const _SectionLabel(text: 'Streaming providers'),
                     const SizedBox(height: 8),
@@ -601,6 +525,23 @@ class _WatchTabState extends State<WatchTab> {
                           .map((provider) => Chip(label: Text(provider)))
                           .toList(),
                     ),
+                    if (details.item.matchReason.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      const _SectionLabel(text: 'Couple match reason'),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          details.item.matchReason,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -902,17 +843,100 @@ class _WatchTabState extends State<WatchTab> {
                                           cs: cs,
                                           currentUserId: user.uid,
                                           partnerUid: partnerUid,
-                                          onMarkWatchedTogether: (record) =>
-                                              _repository.markWatchedTogether(
-                                                record: record,
-                                              ),
+                                          onMarkWatchedTogether:
+                                              (record) async {
+                                                await _repository
+                                                    .markWatchedTogether(
+                                                      record: record,
+                                                    );
+                                              },
                                           onOpenDetails: (record) async {
-                                            final fullItem =
-                                                await _fullItemFromMatchedRecord(
-                                                  record,
-                                                );
-                                            if (!mounted) return;
-                                            await _openDetails(fullItem);
+                                            final docKey =
+                                                '${record.mediaType}_${record.tmdbId}';
+                                            final docSnap =
+                                                await FirebaseFirestore.instance
+                                                    .collection('watch_options')
+                                                    .doc(docKey)
+                                                    .get();
+
+                                            if (docSnap.exists) {
+                                              final data = docSnap.data()!;
+                                              final mediaType =
+                                                  record.mediaType == 'tv'
+                                                  ? _WatchMediaType.tv
+                                                  : _WatchMediaType.movie;
+
+                                              final fullItem = _WatchItem(
+                                                tmdbId: record.tmdbId,
+                                                mediaType: mediaType,
+                                                title: record.title,
+                                                overview:
+                                                    (data['overview']
+                                                        as String?) ??
+                                                    '',
+                                                posterPath: record.posterPath,
+                                                backdropPath:
+                                                    (data['backdropPath']
+                                                        as String?) ??
+                                                    record.backdropPath,
+                                                rating:
+                                                    (data['rating'] as num?)
+                                                        ?.toDouble() ??
+                                                    0.0,
+                                                runtimeMinutes:
+                                                    (data['runtimeMinutes']
+                                                            as num?)
+                                                        ?.toInt() ??
+                                                    0,
+                                                releaseDate:
+                                                    data['releaseDate']
+                                                            is String &&
+                                                        (data['releaseDate']
+                                                                as String)
+                                                            .isNotEmpty
+                                                    ? DateTime.tryParse(
+                                                        data['releaseDate'],
+                                                      )
+                                                    : null,
+                                                seasons:
+                                                    (data['seasons'] as num?)
+                                                        ?.toInt(),
+                                                genres: List<String>.from(
+                                                  (data['genres'] as List?) ??
+                                                      record.matchedGenres,
+                                                ),
+                                                matchPercentage:
+                                                    record.coupleMatchScore,
+                                                matchReason:
+                                                    (data['matchReason']
+                                                        as String?) ??
+                                                    '',
+                                              );
+                                              _openDetails(fullItem);
+                                            } else {
+                                              _openDetails(
+                                                _WatchItem(
+                                                  tmdbId: record.tmdbId,
+                                                  mediaType:
+                                                      record.mediaType == 'tv'
+                                                      ? _WatchMediaType.tv
+                                                      : _WatchMediaType.movie,
+                                                  title: record.title,
+                                                  overview: '',
+                                                  posterPath: record.posterPath,
+                                                  backdropPath:
+                                                      record.backdropPath,
+                                                  rating: 0,
+                                                  runtimeMinutes: 0,
+                                                  releaseDate: null,
+                                                  seasons: null,
+                                                  genres: record.matchedGenres,
+                                                  matchPercentage:
+                                                      record.coupleMatchScore,
+                                                  matchReason: '',
+                                                ),
+                                              );
+                                            }
                                           },
                                           entries: matchedRecords
                                               .map(
@@ -2127,7 +2151,7 @@ class _FilterSliderCard extends StatelessWidget {
   }
 }
 
-class _MatchedTimelineFeed extends StatelessWidget {
+class _MatchedTimelineFeed extends StatefulWidget {
   final ColorScheme cs;
   final String currentUserId;
   final String? partnerUid;
@@ -2144,212 +2168,580 @@ class _MatchedTimelineFeed extends StatelessWidget {
     required this.entries,
   });
 
+  @override
+  State<_MatchedTimelineFeed> createState() => _MatchedTimelineFeedState();
+}
+
+enum _MatchedTabFilter { unwatched, watched }
+
+class _MatchedTimelineFeedState extends State<_MatchedTimelineFeed> {
+  _MatchedTabFilter _selectedFilter = _MatchedTabFilter.unwatched;
+  String? _animatingRecordId;
+
   String _dateLabel(DateTime date) {
     return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
   }
 
+  void _handleMarkWatched(_WatchRecord record) async {
+    setState(() {
+      _animatingRecordId = record.id;
+    });
+
+    // Wait for kernel rise up, arc & dissolve effect before writing to Firestore
+    await Future.delayed(const Duration(milliseconds: 850));
+    await widget.onMarkWatchedTogether(record);
+
+    if (mounted) {
+      setState(() {
+        _animatingRecordId = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final sortedEntries = [...entries]
-      ..sort((left, right) {
-        final leftWatched =
-            partnerUid != null &&
-            left.record.watchedBy.contains(currentUserId) &&
-            left.record.watchedBy.contains(partnerUid);
-        final rightWatched =
-            partnerUid != null &&
-            right.record.watchedBy.contains(currentUserId) &&
-            right.record.watchedBy.contains(partnerUid);
+    final cs = widget.cs;
 
-        if (leftWatched != rightWatched) {
-          return leftWatched ? 1 : -1;
-        }
+    final sortedEntries = [...widget.entries]
+      ..sort(
+        (left, right) =>
+            right.record.updatedAt.compareTo(left.record.updatedAt),
+      );
 
-        return right.record.updatedAt.compareTo(left.record.updatedAt);
-      });
+    final filteredEntries = sortedEntries.where((entry) {
+      final isWatched =
+          widget.partnerUid != null &&
+          entry.record.watchedBy.contains(widget.currentUserId) &&
+          entry.record.watchedBy.contains(widget.partnerUid);
+
+      if (_selectedFilter == _MatchedTabFilter.unwatched) {
+        return !isWatched;
+      } else {
+        return isWatched;
+      }
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final entry in sortedEntries) ...[
-          () {
-            final record = entry.record;
-            final watchedTogether =
-                partnerUid != null &&
-                record.watchedBy.contains(currentUserId) &&
-                record.watchedBy.contains(partnerUid);
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: () => onOpenDetails(record),
+        // Smooth Sliding Segment Radio Toggle
+        Container(
+          height: 44,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Stack(
+            children: [
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                alignment: _selectedFilter == _MatchedTabFilter.unwatched
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: FractionallySizedBox(
+                  widthFactor: 0.5,
                   child: Container(
-                    height: 212,
                     decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: cs.outlineVariant),
+                      color: cs.primary,
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: cs.primary.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.horizontal(
-                                left: Radius.circular(24),
-                              ),
-                              child: SizedBox(
-                                width: 132,
-                                height: double.infinity,
-                                child: record.posterPath.isEmpty
-                                    ? _PosterFallback(cs: cs)
-                                    : Image.network(
-                                        record.posterPath.startsWith('http')
-                                            ? record.posterPath
-                                            : 'https://image.tmdb.org/t/p/w500${record.posterPath}',
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
-                                            _PosterFallback(cs: cs),
-                                      ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  14,
-                                  14,
-                                  14,
-                                  12,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        _TimelineChip(
-                                          label: record.mediaType == 'tv'
-                                              ? 'TV Show'
-                                              : 'Movie',
-                                          filled: true,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        _TimelineChip(label: 'Shared Yes'),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Flexible(
-                                      fit: FlexFit.loose,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            record.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            'Matched ${_dateLabel(record.updatedAt)}',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color: cs.onSurfaceVariant,
-                                                ),
-                                          ),
-                                          if (record
-                                              .matchedGenres
-                                              .isNotEmpty) ...[
-                                            const SizedBox(height: 8),
-                                            Wrap(
-                                              spacing: 6,
-                                              runSpacing: 6,
-                                              children: record.matchedGenres
-                                                  .take(2)
-                                                  .map(
-                                                    (genre) => _TimelineChip(
-                                                      label: genre,
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: FilledButton.icon(
-                                        onPressed:
-                                            partnerUid == null ||
-                                                watchedTogether
-                                            ? null
-                                            : () =>
-                                                  onMarkWatchedTogether(record),
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: cs.primary,
-                                          foregroundColor: cs.onPrimary,
-                                        ),
-                                        icon: Icon(
-                                          watchedTogether
-                                              ? Icons
-                                                    .check_circle_outline_rounded
-                                              : Icons
-                                                    .play_circle_outline_rounded,
-                                        ),
-                                        label: Text(
-                                          watchedTogether
-                                              ? 'Watched Together'
-                                              : 'Mark Watched',
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (watchedTogether)
-                          Positioned.fill(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Container(
-                                color: Colors.black.withValues(alpha: 0.5),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
                 ),
               ),
-            );
-          }(),
-        ],
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(
+                        () => _selectedFilter = _MatchedTabFilter.unwatched,
+                      ),
+                      child: Center(
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                _selectedFilter == _MatchedTabFilter.unwatched
+                                ? cs.onPrimary
+                                : cs.onSurfaceVariant,
+                          ),
+                          child: const Text('Unwatched'),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(
+                        () => _selectedFilter = _MatchedTabFilter.watched,
+                      ),
+                      child: Center(
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _selectedFilter == _MatchedTabFilter.watched
+                                ? cs.onPrimary
+                                : cs.onSurfaceVariant,
+                          ),
+                          child: const Text('Watched'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (filteredEntries.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Text(
+                _selectedFilter == _MatchedTabFilter.unwatched
+                    ? 'No unwatched picks right now.'
+                    : 'No watched matches yet.',
+                style: TextStyle(color: cs.onSurfaceVariant),
+              ),
+            ),
+          )
+        else
+          for (final entry in filteredEntries) ...[
+            () {
+              final record = entry.record;
+              final watchedTogether =
+                  widget.partnerUid != null &&
+                  record.watchedBy.contains(widget.currentUserId) &&
+                  record.watchedBy.contains(widget.partnerUid);
+              final isDissolving = _animatingRecordId == record.id;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: () => widget.onOpenDetails(record),
+                    child: _CardDissolveWrapper(
+                      isDissolving: isDissolving,
+                      child: Container(
+                        height: 212,
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: cs.outlineVariant),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.horizontal(
+                                    left: Radius.circular(24),
+                                  ),
+                                  child: SizedBox(
+                                    width: 132,
+                                    height: double.infinity,
+                                    child: record.posterPath.isEmpty
+                                        ? _PosterFallback(cs: cs)
+                                        : Image.network(
+                                            record.posterPath.startsWith('http')
+                                                ? record.posterPath
+                                                : 'https://image.tmdb.org/t/p/w500${record.posterPath}',
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                _PosterFallback(cs: cs),
+                                          ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      14,
+                                      14,
+                                      14,
+                                      12,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            _TimelineChip(
+                                              label: record.mediaType == 'tv'
+                                                  ? 'TV Show'
+                                                  : 'Movie',
+                                              filled: true,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            _TimelineChip(label: 'Shared Yes'),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Flexible(
+                                          fit: FlexFit.loose,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                record.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                'Matched ${_dateLabel(record.updatedAt)}',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color:
+                                                          cs.onSurfaceVariant,
+                                                    ),
+                                              ),
+                                              if (record
+                                                  .matchedGenres
+                                                  .isNotEmpty) ...[
+                                                const SizedBox(height: 8),
+                                                Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 6,
+                                                  children: record.matchedGenres
+                                                      .take(2)
+                                                      .map(
+                                                        (genre) =>
+                                                            _TimelineChip(
+                                                              label: genre,
+                                                            ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: FilledButton.icon(
+                                            onPressed:
+                                                widget.partnerUid == null ||
+                                                    watchedTogether ||
+                                                    isDissolving
+                                                ? null
+                                                : () => _handleMarkWatched(
+                                                    record,
+                                                  ),
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: cs.primary,
+                                              foregroundColor: cs.onPrimary,
+                                            ),
+                                            icon: Icon(
+                                              watchedTogether
+                                                  ? Icons
+                                                        .check_circle_outline_rounded
+                                                  : Icons
+                                                        .play_circle_outline_rounded,
+                                            ),
+                                            label: Text(
+                                              watchedTogether
+                                                  ? 'Watched Together'
+                                                  : 'Mark Watched',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (watchedTogether)
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: Container(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ),
+                            if (isDissolving)
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: _PopcornKernelRiseOverlay(cs: cs),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }(),
+          ],
       ],
     );
   }
+}
+
+class _CardDissolveWrapper extends StatefulWidget {
+  final bool isDissolving;
+  final Widget child;
+
+  const _CardDissolveWrapper({required this.isDissolving, required this.child});
+
+  @override
+  State<_CardDissolveWrapper> createState() => _CardDissolveWrapperState();
+}
+
+class _CardDissolveWrapperState extends State<_CardDissolveWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    );
+
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.92,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInQuad));
+
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.45, 1.0, curve: Curves.easeOut),
+      ),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(0.0, -0.1),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void didUpdateWidget(_CardDissolveWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isDissolving && !oldWidget.isDissolving) {
+      _controller.forward();
+    } else if (!widget.isDissolving && oldWidget.isDissolving) {
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: FadeTransition(opacity: _opacityAnimation, child: widget.child),
+      ),
+    );
+  }
+}
+
+class _PopcornKernelRiseOverlay extends StatefulWidget {
+  final ColorScheme cs;
+
+  const _PopcornKernelRiseOverlay({required this.cs});
+
+  @override
+  State<_PopcornKernelRiseOverlay> createState() =>
+      _PopcornKernelRiseOverlayState();
+}
+
+class _PopcornKernelRiseOverlayState extends State<_PopcornKernelRiseOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  final List<_KernelParticle> _kernels = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final rand = math.Random();
+
+    // Spawn 7 multi-lobed kernel silhouettes that pop up from bottom
+    for (int i = 0; i < 7; i++) {
+      _kernels.add(
+        _KernelParticle(
+          startXRatio: 0.15 + (i * 0.11) + (rand.nextDouble() * 0.06 - 0.03),
+          horizontalDrift: (rand.nextDouble() - 0.5) * 45.0,
+          peakHeight: 90.0 + rand.nextDouble() * 70.0,
+          scale: 0.95 + rand.nextDouble() * 0.4,
+          rotation: (rand.nextDouble() - 0.5) * 1.8,
+        ),
+      );
+    }
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final progress = _controller.value;
+        final opacity = (1.0 - progress).clamp(0.0, 1.0);
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = constraints.maxWidth;
+            final cardHeight = constraints.maxHeight;
+
+            return Stack(
+              children: _kernels.map((kernel) {
+                // Parabolic rise and fall trajectory: y = -4 * peak * t * (1 - t)
+                final t = progress;
+                final dy = -4 * kernel.peakHeight * t * (1 - t);
+                final dx = kernel.horizontalDrift * t;
+
+                final posX = (cardWidth * kernel.startXRatio) + dx;
+                final posY = cardHeight - 20.0 + dy;
+
+                return Positioned(
+                  left: posX,
+                  top: posY,
+                  child: Transform.rotate(
+                    angle: kernel.rotation * t,
+                    child: Transform.scale(
+                      scale: kernel.scale * (0.8 + t * 0.4),
+                      child: Opacity(
+                        opacity: opacity,
+                        child: CustomPaint(
+                          size: const Size(36, 36),
+                          painter: _PopcornKernelSilhouettePainter(
+                            color: widget.cs.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _KernelParticle {
+  final double startXRatio;
+  final double horizontalDrift;
+  final double peakHeight;
+  final double scale;
+  final double rotation;
+
+  _KernelParticle({
+    required this.startXRatio,
+    required this.horizontalDrift,
+    required this.peakHeight,
+    required this.scale,
+    required this.rotation,
+  });
+}
+
+class _PopcornKernelSilhouettePainter extends CustomPainter {
+  final Color color;
+
+  _PopcornKernelSilhouettePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Renders the multi-lobed kernel silhouette matching the design reference
+    final path = Path();
+
+    // Bottom lobe
+    path.addOval(
+      Rect.fromCircle(center: Offset(w * 0.5, h * 0.65), radius: w * 0.32),
+    );
+    // Top-left lobe
+    path.addOval(
+      Rect.fromCircle(center: Offset(w * 0.32, h * 0.38), radius: w * 0.28),
+    );
+    // Top-right lobe
+    path.addOval(
+      Rect.fromCircle(center: Offset(w * 0.68, h * 0.38), radius: w * 0.28),
+    );
+    // Center-top bump
+    path.addOval(
+      Rect.fromCircle(center: Offset(w * 0.5, h * 0.28), radius: w * 0.22),
+    );
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _MatchedTimelineEntry {
@@ -2434,13 +2826,7 @@ class _PersonalHistoryPanelState extends State<_PersonalHistoryPanel> {
 
   void _loadMore() {
     setState(() {
-      _visibleCount = (_visibleCount + 5).clamp(0, widget.records.length);
-    });
-  }
-
-  void _showLess() {
-    setState(() {
-      _visibleCount = 5;
+      _visibleCount += 5;
     });
   }
 
@@ -2458,10 +2844,8 @@ class _PersonalHistoryPanelState extends State<_PersonalHistoryPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final displayedRecords = widget.records.take(_visibleCount).toList();
     final hasMore = widget.records.length > _visibleCount;
-    final canShowLess = widget.records.length > 5 && !hasMore;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
@@ -2528,41 +2912,29 @@ class _PersonalHistoryPanelState extends State<_PersonalHistoryPanel> {
                   )
                   .toList(),
             ),
-            if (hasMore || canShowLess) ...[
+            if (hasMore) ...[
               const SizedBox(height: 8),
-              Container(
+              SizedBox(
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.cs.primary.withOpacity(
-                        isDark ? 0.18 : 0.28,
-                      ),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: ElevatedButton.icon(
-                  onPressed: hasMore ? _loadMore : _showLess,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    backgroundColor: widget.cs.primary,
-                    foregroundColor: widget.cs.onPrimary,
-                    elevation: 0,
+                child: OutlinedButton.icon(
+                  onPressed: _loadMore,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: widget.cs.outlineVariant),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(100),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   icon: Icon(
-                    hasMore
-                        ? Icons.expand_more_rounded
-                        : Icons.expand_less_rounded,
+                    Icons.expand_more_rounded,
+                    color: widget.cs.primary,
                   ),
                   label: Text(
-                    hasMore ? 'Load More' : 'Show Less',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    'Load More',
+                    style: TextStyle(
+                      color: widget.cs.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -3029,49 +3401,6 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(text, style: Theme.of(context).textTheme.labelSmall);
-  }
-}
-
-class _HistoryBadge extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _HistoryBadge({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: cs.onSurface),
-          ),
-        ],
-      ),
-    );
   }
 }
 
