@@ -39,6 +39,7 @@ class _WatchTabState extends State<WatchTab> {
     required ColorScheme cs,
     required List<String> genres,
   }) async {
+    final theme = Theme.of(context);
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -49,160 +50,144 @@ class _WatchTabState extends State<WatchTab> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Container(
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(32),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: cs.primary.withValues(alpha: 0.12),
-                    blurRadius: 32,
-                    offset: const Offset(0, -8),
-                  ),
-                ],
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: cs.outlineVariant.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.tune_rounded,
-                            size: 20,
-                            color: cs.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Filter Watch Picks',
-                            style: Theme.of(sheetContext).textTheme.titleLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.2,
-                                ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _filter = _WatchFeedFilter.all;
-                              _currentRecommendationIndex = 0;
-                              _selectedGenre = null;
-                              _minRating = 0;
-                              _maxRuntime = 240;
-                              _yearRange = const RangeValues(1980, 2026);
-                            });
-                            Navigator.of(sheetContext).pop();
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: cs.primary,
-                          ),
-                          child: const Text(
-                            'Reset',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          onPressed: () => Navigator.of(sheetContext).pop(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _FilterPanel(
-                      cs: cs,
-                      filter: _filter,
-                      selectedGenre: _selectedGenre,
-                      genres: genres,
-                      minRating: _minRating,
-                      maxRuntime: _maxRuntime,
-                      yearRange: _yearRange,
-                      onFilterChanged: (value) {
-                        setSheetState(() {});
-                        setState(() {
-                          _filter = value;
-                          _currentRecommendationIndex = 0;
-                        });
-                      },
-                      onGenreChanged: (value) {
-                        setSheetState(() {});
-                        setState(() {
-                          _selectedGenre = value;
-                          _currentRecommendationIndex = 0;
-                        });
-                      },
-                      onRatingChanged: (value) {
-                        setSheetState(() {});
-                        setState(() {
-                          _minRating = value;
-                          _currentRecommendationIndex = 0;
-                        });
-                      },
-                      onRuntimeChanged: (value) {
-                        setSheetState(() {});
-                        setState(() {
-                          _maxRuntime = value;
-                          _currentRecommendationIndex = 0;
-                        });
-                      },
-                      onYearRangeChanged: (value) {
-                        setSheetState(() {});
-                        setState(() {
-                          _yearRange = value;
-                          _currentRecommendationIndex = 0;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: cs.primary,
-                          elevation: 2,
-                          shadowColor: cs.primary.withValues(alpha: 0.3),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(32),
+                  ),
+                  border: Border.all(color: cs.outlineVariant),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                      offset: const Offset(0, -4),
                     ),
                   ],
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 20, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            onPressed: () => Navigator.of(sheetContext).pop(),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Filter Watch Picks',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _filter = _WatchFeedFilter.all;
+                                _currentRecommendationIndex = 0;
+                                _selectedGenre = null;
+                                _minRating = 0;
+                                _maxRuntime = 240;
+                                _yearRange = const RangeValues(1980, 2026);
+                              });
+                              Navigator.of(sheetContext).pop();
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: cs.primary,
+                            ),
+                            child: const Text(
+                              'Reset',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _FilterPanel(
+                        cs: cs,
+                        theme: theme,
+                        filter: _filter,
+                        selectedGenre: _selectedGenre,
+                        genres: genres,
+                        minRating: _minRating,
+                        maxRuntime: _maxRuntime,
+                        yearRange: _yearRange,
+                        onFilterChanged: (value) {
+                          setSheetState(() {});
+                          setState(() {
+                            _filter = value;
+                            _currentRecommendationIndex = 0;
+                          });
+                        },
+                        onGenreChanged: (value) {
+                          setSheetState(() {});
+                          setState(() {
+                            _selectedGenre = value;
+                            _currentRecommendationIndex = 0;
+                          });
+                        },
+                        onRatingChanged: (value) {
+                          setSheetState(() {});
+                          setState(() {
+                            _minRating = value;
+                            _currentRecommendationIndex = 0;
+                          });
+                        },
+                        onRuntimeChanged: (value) {
+                          setSheetState(() {});
+                          setState(() {
+                            _maxRuntime = value;
+                            _currentRecommendationIndex = 0;
+                          });
+                        },
+                        onYearRangeChanged: (value) {
+                          setSheetState(() {});
+                          setState(() {
+                            _yearRange = value;
+                            _currentRecommendationIndex = 0;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: cs.primary,
+                            foregroundColor: cs.onPrimary,
+                            elevation: 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
+                          child: const Text(
+                            'Apply Filters',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -223,6 +208,10 @@ class _WatchTabState extends State<WatchTab> {
     for (final record in records) {
       genres.addAll(record.matchedGenres);
     }
+
+    genres.remove('Action & Adventure');
+    genres.remove('Sci-Fi & Fantasy');
+
     final list = genres.toList();
     list.sort();
     return list;
@@ -255,8 +244,18 @@ class _WatchTabState extends State<WatchTab> {
     }
 
     final activeGenre = _selectedGenre;
-    if (activeGenre != null && !item.genres.contains(activeGenre)) {
-      return false;
+    if (activeGenre != null) {
+      final hasGenre =
+          item.genres.contains(activeGenre) ||
+          (activeGenre == 'Action' &&
+              item.genres.contains('Action & Adventure')) ||
+          (activeGenre == 'Adventure' &&
+              item.genres.contains('Action & Adventure')) ||
+          (activeGenre == 'Sci-Fi' &&
+              item.genres.contains('Sci-Fi & Fantasy')) ||
+          (activeGenre == 'Fantasy' &&
+              item.genres.contains('Sci-Fi & Fantasy'));
+      if (!hasGenre) return false;
     }
 
     if (item.rating < _minRating) {
@@ -501,24 +500,14 @@ class _WatchTabState extends State<WatchTab> {
                     Text(
                       details.item.genreLabel,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 14),
                     Text(
                       details.item.overview,
                       style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 18),
-                    const _SectionLabel(text: 'Cast'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: details.cast
-                          .map((castMember) => Chip(label: Text(castMember)))
-                          .toList(),
                     ),
                     const SizedBox(height: 18),
                     const _SectionLabel(text: 'Streaming providers'),
@@ -687,10 +676,7 @@ class _WatchTabState extends State<WatchTab> {
                                             borderRadius: BorderRadius.circular(
                                               16,
                                             ),
-                                            child: AnimatedContainer(
-                                              duration: const Duration(
-                                                milliseconds: 200,
-                                              ),
+                                            child: Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                     horizontal: 16,
@@ -699,34 +685,30 @@ class _WatchTabState extends State<WatchTab> {
                                               decoration: BoxDecoration(
                                                 color: activeFilterCount > 0
                                                     ? cs.primaryContainer
-                                                    : cs.surfaceContainerHighest
-                                                          .withValues(
-                                                            alpha: 0.6,
-                                                          ),
+                                                    : cs.surfaceContainerHighest,
                                                 borderRadius:
                                                     BorderRadius.circular(16),
                                                 border: Border.all(
                                                   color: activeFilterCount > 0
-                                                      ? cs.primary.withValues(
-                                                          alpha: 0.4,
-                                                        )
-                                                      : cs.outlineVariant
-                                                            .withValues(
-                                                              alpha: 0.8,
-                                                            ),
+                                                      ? cs.primary
+                                                      : cs.outlineVariant,
                                                 ),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: activeFilterCount > 0
-                                                        ? cs.primary.withValues(
-                                                            alpha: 0.12,
-                                                          )
-                                                        : Colors.black
-                                                              .withValues(
-                                                                alpha: 0.03,
-                                                              ),
+                                                    color: cs.primary
+                                                        .withValues(
+                                                          alpha: 0.12,
+                                                        ),
                                                     blurRadius: 10,
                                                     offset: const Offset(0, 4),
+                                                  ),
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(
+                                                          alpha: 0.05,
+                                                        ),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
                                                   ),
                                                 ],
                                               ),
@@ -737,7 +719,7 @@ class _WatchTabState extends State<WatchTab> {
                                                     Icons.tune_rounded,
                                                     size: 18,
                                                     color: activeFilterCount > 0
-                                                        ? cs.primary
+                                                        ? cs.onPrimaryContainer
                                                         : cs.onSurfaceVariant,
                                                   ),
                                                   const SizedBox(width: 8),
@@ -746,7 +728,7 @@ class _WatchTabState extends State<WatchTab> {
                                                     style: TextStyle(
                                                       color:
                                                           activeFilterCount > 0
-                                                          ? cs.primary
+                                                          ? cs.onPrimaryContainer
                                                           : cs.onSurface,
                                                       fontWeight:
                                                           FontWeight.w700,
@@ -1779,6 +1761,7 @@ class _WatchRepository {
 
 class _FilterPanel extends StatelessWidget {
   final ColorScheme cs;
+  final ThemeData theme;
   final _WatchFeedFilter filter;
   final String? selectedGenre;
   final List<String> genres;
@@ -1793,6 +1776,7 @@ class _FilterPanel extends StatelessWidget {
 
   const _FilterPanel({
     required this.cs,
+    required this.theme,
     required this.filter,
     required this.selectedGenre,
     required this.genres,
@@ -1817,83 +1801,87 @@ class _FilterPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Media Type',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: cs.onSurfaceVariant,
-          ),
-        ),
+        _FilterSectionLabel(cs: cs, text: 'Media Type'),
         const SizedBox(height: 10),
-        Row(
-          children: chips.map((chip) {
-            final selected = filter == chip.$3;
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: ChoiceChip(
-                  avatar: Icon(
-                    chip.$2,
-                    size: 16,
-                    color: selected ? cs.onPrimary : cs.primary,
-                  ),
-                  label: Text(chip.$1),
-                  selected: selected,
-                  onSelected: (_) => onFilterChanged(chip.$3),
-                  selectedColor: cs.primary,
-                  backgroundColor: cs.surfaceContainerHighest.withValues(
-                    alpha: 0.4,
-                  ),
-                  labelStyle: TextStyle(
-                    color: selected ? cs.onPrimary : cs.onSurface,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Row(
+            children: chips.map((chip) {
+              final selected = filter == chip.$3;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onFilterChanged(chip.$3),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: selected ? cs.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          chip.$2,
+                          size: 18,
+                          color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          chip.$1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? cs.onPrimary
+                                : cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
         const SizedBox(height: 22),
-        Text(
-          'Genres',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: cs.onSurfaceVariant,
-          ),
-        ),
+        _FilterSectionLabel(cs: cs, text: 'Genres'),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilterChip(
-              label: const Text('All Genres'),
-              selected: selectedGenre == null,
-              onSelected: (_) => onGenreChanged(null),
-              selectedColor: cs.primaryContainer,
-              backgroundColor: cs.surfaceContainerHighest.withValues(
-                alpha: 0.4,
+        AnimatedSize(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _SolidChip(
+                cs: cs,
+                label: 'All Genres',
+                selected: selectedGenre == null,
+                onTap: () => onGenreChanged(null),
               ),
-              checkmarkColor: cs.onPrimaryContainer,
-            ),
-            ...genres.map(
-              (genre) => FilterChip(
-                label: Text(genre),
-                selected: selectedGenre == genre,
-                onSelected: (_) => onGenreChanged(genre),
-                selectedColor: cs.primaryContainer,
-                backgroundColor: cs.surfaceContainerHighest.withValues(
-                  alpha: 0.4,
+              ...genres.map(
+                (genre) => _SolidChip(
+                  cs: cs,
+                  label: genre,
+                  selected: selectedGenre == genre,
+                  onTap: () => onGenreChanged(genre),
                 ),
-                checkmarkColor: cs.onPrimaryContainer,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 22),
         _FilterSliderCard(
           cs: cs,
+          icon: Icons.calendar_month_rounded,
           title: 'Release Year',
           valueLabel: '${yearRange.start.round()} - ${yearRange.end.round()}',
           child: RangeSlider(
@@ -1902,6 +1890,7 @@ class _FilterPanel extends StatelessWidget {
             max: 2026,
             divisions: 46,
             activeColor: cs.primary,
+            inactiveColor: cs.outlineVariant,
             labels: RangeLabels(
               '${yearRange.start.round()}',
               '${yearRange.end.round()}',
@@ -1912,14 +1901,16 @@ class _FilterPanel extends StatelessWidget {
         const SizedBox(height: 12),
         _FilterSliderCard(
           cs: cs,
+          icon: Icons.star_rounded,
           title: 'Minimum Rating',
-          valueLabel: '${minRating.toStringAsFixed(1)}+ ⭐',
+          valueLabel: '${minRating.toStringAsFixed(1)}+',
           child: Slider(
             value: minRating,
             min: 0,
             max: 10,
             divisions: 20,
             activeColor: cs.primary,
+            inactiveColor: cs.outlineVariant,
             label: minRating.toStringAsFixed(1),
             onChanged: onRatingChanged,
           ),
@@ -1927,6 +1918,7 @@ class _FilterPanel extends StatelessWidget {
         const SizedBox(height: 12),
         _FilterSliderCard(
           cs: cs,
+          icon: Icons.timer_outlined,
           title: 'Maximum Runtime',
           valueLabel: '${maxRuntime.round()} min',
           child: Slider(
@@ -1935,6 +1927,7 @@ class _FilterPanel extends StatelessWidget {
             max: 240,
             divisions: 11,
             activeColor: cs.primary,
+            inactiveColor: cs.outlineVariant,
             label: '${maxRuntime.round()} min',
             onChanged: onRuntimeChanged,
           ),
@@ -1944,14 +1937,81 @@ class _FilterPanel extends StatelessWidget {
   }
 }
 
+class _FilterSectionLabel extends StatelessWidget {
+  final ColorScheme cs;
+  final String text;
+
+  const _FilterSectionLabel({required this.cs, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+        color: cs.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+class _SolidChip extends StatelessWidget {
+  final ColorScheme cs;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SolidChip({
+    required this.cs,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? cs.primary : cs.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check_rounded, size: 14, color: cs.onPrimaryContainer),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? cs.onPrimaryContainer : cs.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FilterSliderCard extends StatelessWidget {
   final ColorScheme cs;
+  final IconData icon;
   final String title;
   final String valueLabel;
   final Widget child;
 
   const _FilterSliderCard({
     required this.cs,
+    required this.icon,
     required this.title,
     required this.valueLabel,
     required this.child,
@@ -1960,16 +2020,25 @@ class _FilterSliderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      padding: const EdgeInsets.fromLTRB(14, 12, 16, 6),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+        color: cs.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(color: cs.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
+              Icon(icon, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
@@ -1984,13 +2053,14 @@ class _FilterSliderCard extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: cs.primaryContainer,
+                  color: cs.surface,
                   borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Text(
                   valueLabel,
                   style: TextStyle(
-                    color: cs.onPrimaryContainer,
+                    color: cs.onSurface,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
@@ -2046,110 +2116,9 @@ class _MatchedTimelineFeed extends StatelessWidget {
         return right.record.updatedAt.compareTo(left.record.updatedAt);
       });
 
-    final watchedCount = sortedEntries.where((entry) {
-      final record = entry.record;
-      return partnerUid != null &&
-          record.watchedBy.contains(currentUserId) &&
-          record.watchedBy.contains(partnerUid);
-    }).length;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                cs.primaryContainer.withValues(alpha: 0.75),
-                cs.secondaryContainer.withValues(alpha: 0.45),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: cs.primary.withValues(alpha: 0.16),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: cs.surface.withValues(alpha: 0.82),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.favorite_border_rounded,
-                      color: cs.primary,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your Matched List',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Movies and shows you both said yes to.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _HistoryBadge(
-                      label: 'Matches',
-                      value: entries.length.toString(),
-                      color: cs.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _HistoryBadge(
-                      label: 'Watched',
-                      value: watchedCount.toString(),
-                      color: cs.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _HistoryBadge(
-                      label: 'Latest',
-                      value: entries.isEmpty
-                          ? '--'
-                          : _dateLabel(entries.first.record.updatedAt),
-                      color: cs.tertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
         for (final entry in sortedEntries) ...[
           () {
             final record = entry.record;
@@ -2170,14 +2139,12 @@ class _MatchedTimelineFeed extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: cs.surface,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.7),
-                      ),
+                      border: Border.all(color: cs.outlineVariant),
                       boxShadow: [
                         BoxShadow(
-                          color: cs.primary.withValues(alpha: 0.10),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -2280,13 +2247,17 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                     const SizedBox(height: 6),
                                     SizedBox(
                                       width: double.infinity,
-                                      child: FilledButton.tonalIcon(
+                                      child: FilledButton.icon(
                                         onPressed:
                                             partnerUid == null ||
                                                 watchedTogether
                                             ? null
                                             : () =>
                                                   onMarkWatchedTogether(record),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: cs.primary,
+                                          foregroundColor: cs.onPrimary,
+                                        ),
                                         icon: Icon(
                                           watchedTogether
                                               ? Icons
@@ -2390,7 +2361,7 @@ class _TimelineChip extends StatelessWidget {
   }
 }
 
-class _PersonalHistoryPanel extends StatelessWidget {
+class _PersonalHistoryPanel extends StatefulWidget {
   final ColorScheme cs;
   final String currentUserId;
   final List<_WatchRecord> records;
@@ -2403,15 +2374,51 @@ class _PersonalHistoryPanel extends StatelessWidget {
   });
 
   @override
+  State<_PersonalHistoryPanel> createState() => _PersonalHistoryPanelState();
+}
+
+class _PersonalHistoryPanelState extends State<_PersonalHistoryPanel> {
+  int _visibleCount = 5;
+
+  void _loadMore() {
+    setState(() {
+      _visibleCount = (_visibleCount + 5).clamp(0, widget.records.length);
+    });
+  }
+
+  void _showLess() {
+    setState(() {
+      _visibleCount = 5;
+    });
+  }
+
+  String _historySubtitle(_WatchRecord record, String currentUserId) {
+    final parts = <String>[];
+    if (record.isLikedBy(currentUserId)) parts.add('You Liked');
+    if (record.isDislikedBy(currentUserId)) parts.add('You Passed');
+    if (record.isWatchedBy(currentUserId)) parts.add('Watched');
+    if (parts.isEmpty) parts.add('No personal vote');
+    final date = record.updatedAt;
+    final dateLabel =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return '${parts.join(' • ')} · $dateLabel';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayedRecords = widget.records.take(_visibleCount).toList();
+    final hasMore = widget.records.length > _visibleCount;
+    final canShowLess = widget.records.length > 5 && !hasMore;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (records.isEmpty)
+          if (widget.records.isEmpty)
             _HistoryEmptyState(
-              cs: cs,
+              cs: widget.cs,
               icon: Icons.local_fire_department_outlined,
               title: 'Start building your taste profile',
               subtitle:
@@ -2422,9 +2429,9 @@ class _PersonalHistoryPanel extends StatelessWidget {
                 'Save favorites and build a pattern',
               ],
             )
-          else
+          else ...[
             Column(
-              children: records
+              children: displayedRecords
                   .map(
                     (record) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -2436,7 +2443,7 @@ class _PersonalHistoryPanel extends StatelessWidget {
                                 : (record.posterPath.startsWith('http')
                                       ? record.posterPath
                                       : 'https://image.tmdb.org/t/p/w500${record.posterPath}'),
-                            cs: cs,
+                            cs: widget.cs,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -2451,9 +2458,14 @@ class _PersonalHistoryPanel extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  _historySubtitle(record, currentUserId),
+                                  _historySubtitle(
+                                    record,
+                                    widget.currentUserId,
+                                  ),
                                   style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                      ?.copyWith(
+                                        color: widget.cs.onSurfaceVariant,
+                                      ),
                                 ),
                               ],
                             ),
@@ -2464,21 +2476,49 @@ class _PersonalHistoryPanel extends StatelessWidget {
                   )
                   .toList(),
             ),
+            if (hasMore || canShowLess) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.cs.primary.withOpacity(
+                        isDark ? 0.18 : 0.28,
+                      ),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: hasMore ? _loadMore : _showLess,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    backgroundColor: widget.cs.primary,
+                    foregroundColor: widget.cs.onPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                  icon: Icon(
+                    hasMore
+                        ? Icons.expand_more_rounded
+                        : Icons.expand_less_rounded,
+                  ),
+                  label: Text(
+                    hasMore ? 'Load More' : 'Show Less',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
-  }
-
-  String _historySubtitle(_WatchRecord record, String currentUserId) {
-    final parts = <String>[];
-    if (record.isLikedBy(currentUserId)) parts.add('You Liked');
-    if (record.isDislikedBy(currentUserId)) parts.add('You Passed');
-    if (record.isWatchedBy(currentUserId)) parts.add('Watched');
-    if (parts.isEmpty) parts.add('No personal vote');
-    final date = record.updatedAt;
-    final dateLabel =
-        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    return '${parts.join(' • ')} · $dateLabel';
   }
 }
 
@@ -2636,21 +2676,7 @@ class _RecommendationCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surface,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
-            boxShadow: [
-              BoxShadow(
-                color: cs.primary.withValues(alpha: 0.12),
-                blurRadius: 20,
-                spreadRadius: 1,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 32,
-                spreadRadius: 2,
-                offset: Offset.zero,
-              ),
-            ],
+            border: Border.all(color: cs.outlineVariant),
           ),
           child: AspectRatio(
             aspectRatio: 0.65,
@@ -2825,9 +2851,7 @@ class _StyledActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final activeBg = isPass
-        ? Colors.grey.shade900.withValues(alpha: 0.9)
-        : cs.primary;
+    final activeBg = isPass ? Colors.grey.shade900 : cs.primary;
     final activeFg = isPass ? Colors.white : cs.onPrimary;
 
     return Material(
@@ -2847,17 +2871,6 @@ class _StyledActionButton extends StatelessWidget {
                   : Colors.white.withValues(alpha: 0.25),
               width: 1.5,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: selected
-                    ? (isPass
-                          ? Colors.black38
-                          : cs.primary.withValues(alpha: 0.35))
-                    : Colors.black12,
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2935,7 +2948,7 @@ class _DetailStat extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
