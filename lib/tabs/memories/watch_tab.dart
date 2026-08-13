@@ -333,6 +333,88 @@ class _WatchTabState extends State<WatchTab> {
     await _toggleAction(item: item, liked: liked, disliked: disliked);
   }
 
+  Future<_WatchItem> _fullItemFromMatchedRecord(_WatchRecord record) async {
+    final mediaType = record.mediaType == 'tv'
+        ? _WatchMediaType.tv
+        : _WatchMediaType.movie;
+    final tmdbIdFromDocId = int.tryParse(record.id.split('_').last) ?? 0;
+    final tmdbId = record.tmdbId > 0 ? record.tmdbId : tmdbIdFromDocId;
+
+    _WatchItem fallbackItem() {
+      return _WatchItem(
+        tmdbId: tmdbId,
+        mediaType: mediaType,
+        title: record.title,
+        overview: '',
+        posterPath: record.posterPath,
+        backdropPath: record.backdropPath,
+        rating: 0,
+        runtimeMinutes: 0,
+        releaseDate: null,
+        seasons: null,
+        genres: record.matchedGenres,
+        matchPercentage: record.coupleMatchScore,
+        matchReason: '',
+      );
+    }
+
+    DateTime? parseReleaseDate(dynamic rawReleaseDate) {
+      if (rawReleaseDate is String && rawReleaseDate.isNotEmpty) {
+        return DateTime.tryParse(rawReleaseDate);
+      }
+      if (rawReleaseDate is Timestamp) {
+        return rawReleaseDate.toDate();
+      }
+      return null;
+    }
+
+    try {
+      final collection = FirebaseFirestore.instance.collection('watch_options');
+      final docKey = '${mediaType.name}_$tmdbId';
+      var docSnap = await collection.doc(docKey).get();
+
+      if (!docSnap.exists && tmdbId > 0) {
+        final querySnap = await collection
+            .where('tmdbId', isEqualTo: tmdbId)
+            .where('mediaType', isEqualTo: mediaType.name)
+            .limit(1)
+            .get();
+        if (querySnap.docs.isNotEmpty) {
+          docSnap = querySnap.docs.first;
+        }
+      }
+
+      if (!docSnap.exists) {
+        return fallbackItem();
+      }
+
+      final data = docSnap.data()!;
+      final rawGenres = List<String>.from(
+        (data['genres'] as List?) ?? const [],
+      );
+
+      return _WatchItem(
+        tmdbId: (data['tmdbId'] as num?)?.toInt() ?? tmdbId,
+        mediaType: (data['mediaType'] as String?) == 'tv'
+            ? _WatchMediaType.tv
+            : _WatchMediaType.movie,
+        title: (data['title'] as String?) ?? record.title,
+        overview: (data['overview'] as String?) ?? '',
+        posterPath: (data['posterPath'] as String?) ?? record.posterPath,
+        backdropPath: (data['backdropPath'] as String?) ?? record.backdropPath,
+        rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+        runtimeMinutes: (data['runtimeMinutes'] as num?)?.toInt() ?? 0,
+        releaseDate: parseReleaseDate(data['releaseDate']),
+        seasons: (data['seasons'] as num?)?.toInt(),
+        genres: rawGenres.isEmpty ? record.matchedGenres : rawGenres,
+        matchPercentage: record.coupleMatchScore,
+        matchReason: (data['matchReason'] as String?) ?? '',
+      );
+    } catch (_) {
+      return fallbackItem();
+    }
+  }
+
   Future<void> _openDetails(_WatchItem item) async {
     final details = await _repository.fetchDetails(item);
     if (!mounted) return;
@@ -518,21 +600,6 @@ class _WatchTabState extends State<WatchTab> {
                       children: details.providers
                           .map((provider) => Chip(label: Text(provider)))
                           .toList(),
-                    ),
-                    const SizedBox(height: 18),
-                    const _SectionLabel(text: 'Couple match reason'),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        details.item.matchReason,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
                     ),
                   ],
                 ),
@@ -839,29 +906,14 @@ class _WatchTabState extends State<WatchTab> {
                                               _repository.markWatchedTogether(
                                                 record: record,
                                               ),
-                                          onOpenDetails: (record) =>
-                                              _openDetails(
-                                                _WatchItem(
-                                                  tmdbId: record.tmdbId,
-                                                  mediaType:
-                                                      record.mediaType == 'tv'
-                                                      ? _WatchMediaType.tv
-                                                      : _WatchMediaType.movie,
-                                                  title: record.title,
-                                                  overview: '',
-                                                  posterPath: record.posterPath,
-                                                  backdropPath:
-                                                      record.backdropPath,
-                                                  rating: 0,
-                                                  runtimeMinutes: 0,
-                                                  releaseDate: null,
-                                                  seasons: null,
-                                                  genres: record.matchedGenres,
-                                                  matchPercentage:
-                                                      record.coupleMatchScore,
-                                                  matchReason: '',
-                                                ),
-                                              ),
+                                          onOpenDetails: (record) async {
+                                            final fullItem =
+                                                await _fullItemFromMatchedRecord(
+                                                  record,
+                                                );
+                                            if (!mounted) return;
+                                            await _openDetails(fullItem);
+                                          },
                                           entries: matchedRecords
                                               .map(
                                                 (record) =>
