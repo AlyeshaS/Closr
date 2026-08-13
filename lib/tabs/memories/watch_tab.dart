@@ -1,10 +1,6 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 
 class WatchTab extends StatefulWidget {
   const WatchTab({super.key});
@@ -24,6 +20,7 @@ class _WatchTabState extends State<WatchTab> {
   String? _selectedGenre;
   double _minRating = 0;
   double _maxRuntime = 240;
+  RangeValues _yearRange = const RangeValues(1980, 2026);
 
   @override
   void initState() {
@@ -31,21 +28,23 @@ class _WatchTabState extends State<WatchTab> {
     _recommendationsFuture = _repository.fetchRecommendations();
   }
 
+  Future<void> _refreshRecommendations() async {
+    setState(() {
+      _recommendationsFuture = _repository.fetchRecommendations();
+      _currentRecommendationIndex = 0;
+    });
+  }
+
   Future<void> _openFilterSheet({
     required ColorScheme cs,
-    required _WatchFeedFilter filter,
-    required String? selectedGenre,
     required List<String> genres,
   }) async {
-    var tempFilter = _filter;
-    var tempGenre = selectedGenre;
-    var tempMinRating = _minRating;
-    var tempMaxRuntime = _maxRuntime;
-
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
@@ -58,27 +57,29 @@ class _WatchTabState extends State<WatchTab> {
                 ),
               ),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Center(
                       child: Container(
-                        width: 44,
-                        height: 5,
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
                           color: cs.outlineVariant,
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'Filter watch picks',
-                            style: Theme.of(sheetContext).textTheme.titleLarge,
+                            style: Theme.of(sheetContext).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
                         TextButton(
@@ -89,49 +90,82 @@ class _WatchTabState extends State<WatchTab> {
                               _selectedGenre = null;
                               _minRating = 0;
                               _maxRuntime = 240;
+                              _yearRange = const RangeValues(1980, 2026);
                             });
                             Navigator.of(sheetContext).pop();
                           },
                           child: const Text('Reset'),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     _FilterPanel(
                       cs: cs,
-                      filter: tempFilter,
-                      selectedGenre: tempGenre,
+                      filter: _filter,
+                      selectedGenre: _selectedGenre,
                       genres: genres,
-                      minRating: tempMinRating,
-                      maxRuntime: tempMaxRuntime,
+                      minRating: _minRating,
+                      maxRuntime: _maxRuntime,
+                      yearRange: _yearRange,
                       onFilterChanged: (value) {
-                        setSheetState(() => tempFilter = value);
+                        setSheetState(() {});
                         setState(() {
                           _filter = value;
                           _currentRecommendationIndex = 0;
                         });
                       },
                       onGenreChanged: (value) {
-                        setSheetState(() => tempGenre = value);
+                        setSheetState(() {});
                         setState(() {
                           _selectedGenre = value;
                           _currentRecommendationIndex = 0;
                         });
                       },
                       onRatingChanged: (value) {
-                        setSheetState(() => tempMinRating = value);
+                        setSheetState(() {});
                         setState(() {
                           _minRating = value;
                           _currentRecommendationIndex = 0;
                         });
                       },
                       onRuntimeChanged: (value) {
-                        setSheetState(() => tempMaxRuntime = value);
+                        setSheetState(() {});
                         setState(() {
                           _maxRuntime = value;
                           _currentRecommendationIndex = 0;
                         });
                       },
+                      onYearRangeChanged: (value) {
+                        setSheetState(() {});
+                        setState(() {
+                          _yearRange = value;
+                          _currentRecommendationIndex = 0;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -168,23 +202,6 @@ class _WatchTabState extends State<WatchTab> {
     return null;
   }
 
-  List<_WatchRecord> _matchedRecordsFor(
-    List<_WatchRecord> records,
-    String currentUserId,
-    String? partnerUid,
-  ) {
-    final matches = records.where((record) {
-      final currentLiked = record.isLikedBy(currentUserId);
-      final partnerLiked = partnerUid != null
-          ? record.isLikedBy(partnerUid)
-          : record.likedBy.length >= 2;
-      return currentLiked && partnerLiked;
-    }).toList();
-
-    matches.sort((a, b) => b.coupleMatchScore.compareTo(a.coupleMatchScore));
-    return matches;
-  }
-
   bool _matchesFilter(
     _WatchItem item,
     _WatchRecord? record,
@@ -211,8 +228,15 @@ class _WatchTabState extends State<WatchTab> {
       return false;
     }
 
-    if (item.runtimeMinutes > _maxRuntime) {
+    if (item.runtimeMinutes > 0 && item.runtimeMinutes > _maxRuntime) {
       return false;
+    }
+
+    if (item.releaseDate != null) {
+      final year = item.releaseDate!.year;
+      if (year < _yearRange.start || year > _yearRange.end) {
+        return false;
+      }
     }
 
     return true;
@@ -239,8 +263,10 @@ class _WatchTabState extends State<WatchTab> {
 
     if (currentLiked && partnerLiked) return 96;
     if (currentDisliked && partnerDisliked) return 12;
-    if ((currentLiked && partnerDisliked) || (currentDisliked && partnerLiked))
+    if ((currentLiked && partnerDisliked) ||
+        (currentDisliked && partnerLiked)) {
       return 34;
+    }
     if (currentLiked || partnerLiked) return 78;
     if (currentDisliked || partnerDisliked) return 24;
     return record.coupleMatchScore > 0
@@ -271,12 +297,6 @@ class _WatchTabState extends State<WatchTab> {
     bool? disliked,
   }) async {
     await _toggleAction(item: item, liked: liked, disliked: disliked);
-
-    if (!mounted) return;
-
-    setState(() {
-      _currentRecommendationIndex = 0;
-    });
   }
 
   Future<void> _openDetails(_WatchItem item) async {
@@ -490,11 +510,6 @@ class _WatchTabState extends State<WatchTab> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Data and images via TMDb.',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
                   ],
                 ),
               );
@@ -559,9 +574,6 @@ class _WatchTabState extends State<WatchTab> {
                             recommendationsSnapshot.connectionState ==
                             ConnectionState.waiting;
                         final genres = _collectGenres(recommendations, records);
-                        final selectedGenre = genres.contains(_selectedGenre)
-                            ? _selectedGenre
-                            : null;
                         final filteredItems = recommendations.where((item) {
                           final record = _recordFor(item, records);
 
@@ -574,11 +586,6 @@ class _WatchTabState extends State<WatchTab> {
                             return false;
                           }
 
-                          if (selectedGenre != null &&
-                              !item.genres.contains(selectedGenre)) {
-                            return false;
-                          }
-
                           return _matchesFilter(
                             item,
                             record,
@@ -587,262 +594,274 @@ class _WatchTabState extends State<WatchTab> {
                           );
                         }).toList();
 
-                        return CustomScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          slivers: [
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(
-                                20,
-                                18,
-                                20,
-                                14,
-                              ),
-                              sliver: SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: _TopViewDropdown(
-                                          value: _topView,
-                                          cs: cs,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _topView = value;
-                                              _currentRecommendationIndex = 0;
-                                              if (value ==
-                                                  _TopView.suggestions) {
-                                                _filter = _WatchFeedFilter.all;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 110,
-                                        child: FilledButton.tonal(
-                                          onPressed: () => _openFilterSheet(
-                                            cs: cs,
-                                            filter: _filter,
-                                            selectedGenre: selectedGenre,
-                                            genres: genres,
-                                          ),
-                                          style: FilledButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.tune_rounded,
-                                                size: 18,
-                                                color: cs.onSurface,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Filter',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(
-                                                      color: cs.onSurface,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                        return RefreshIndicator(
+                          onRefresh: _refreshRecommendations,
+                          child: CustomScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
                             ),
-                            if (recommendationsLoading &&
-                                _topView == _TopView.suggestions)
-                              SliverFillRemaining(
-                                hasScrollBody: false,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    color: cs.primary,
-                                  ),
-                                ),
-                              )
-                            else ...[
+                            slivers: [
                               SliverPadding(
                                 padding: const EdgeInsets.fromLTRB(
                                   20,
-                                  0,
+                                  18,
                                   20,
-                                  16,
+                                  14,
                                 ),
                                 sliver: SliverToBoxAdapter(
-                                  child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 300),
-                                    switchInCurve: Curves.easeOut,
-                                    switchOutCurve: Curves.easeIn,
-                                    child: _topView == _TopView.history
-                                        ? _PersonalHistoryPanel(
-                                            key: const ValueKey('history'),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: _TopViewDropdown(
+                                            value: _topView,
                                             cs: cs,
-                                            currentUserId: user.uid,
-                                            records: records,
-                                          )
-                                        : const SizedBox.shrink(
-                                            key: ValueKey('empty'),
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _topView = value;
+                                                _currentRecommendationIndex = 0;
+                                                if (value ==
+                                                    _TopView.suggestions) {
+                                                  _filter =
+                                                      _WatchFeedFilter.all;
+                                                }
+                                              });
+                                            },
                                           ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        SizedBox(
+                                          width: 110,
+                                          child: FilledButton.tonal(
+                                            onPressed: () => _openFilterSheet(
+                                              cs: cs,
+                                              genres: genres,
+                                            ),
+                                            style: FilledButton.styleFrom(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.tune_rounded,
+                                                  size: 18,
+                                                  color: cs.onSurface,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Filter',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        color: cs.onSurface,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                              if (_topView == _TopView.matched)
-                                if (matchedRecords.isEmpty)
-                                  SliverFillRemaining(
-                                    hasScrollBody: false,
-                                    child: _MatchedTimelineState(
-                                      cs: cs,
-                                      icon: Icons.favorite_border_rounded,
-                                      title: 'No shared matches yet',
-                                      subtitle:
-                                          'Once you both like the same picks, they will show up here as a shared timeline.',
-                                      milestones: const [
-                                        'Pick a few recommendations together',
-                                        'Save items you both say yes to',
-                                        'Watch the matched timeline grow',
-                                      ],
-                                    ),
-                                  )
-                                else
-                                  SliverPadding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      20,
-                                      0,
-                                      20,
-                                      32,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: _MatchedTimelineFeed(
-                                        cs: cs,
-                                        currentUserId: user.uid,
-                                        partnerUid: partnerUid,
-                                        onMarkWatchedTogether: (record) =>
-                                            _repository.markWatchedTogether(
-                                              record: record,
-                                            ),
-                                        onOpenDetails: (record) => _openDetails(
-                                          _WatchItem(
-                                            tmdbId: record.tmdbId,
-                                            mediaType: record.mediaType == 'tv'
-                                                ? _WatchMediaType.tv
-                                                : _WatchMediaType.movie,
-                                            title: record.title,
-                                            overview: '',
-                                            posterPath: record.posterPath,
-                                            backdropPath: record.backdropPath,
-                                            rating: 0,
-                                            runtimeMinutes: 0,
-                                            releaseDate: null,
-                                            seasons: null,
-                                            genres: record.matchedGenres,
-                                            matchPercentage:
-                                                record.coupleMatchScore,
-                                            matchReason: '',
-                                          ),
-                                        ),
-                                        entries: matchedRecords
-                                            .map(
-                                              (record) => _MatchedTimelineEntry(
-                                                record: record,
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                    ),
-                                  )
-                              else if (_topView == _TopView.history)
-                                const SliverToBoxAdapter(
-                                  child: SizedBox.shrink(),
-                                )
-                              else if (filteredItems.isEmpty)
+                              if (recommendationsLoading &&
+                                  _topView == _TopView.suggestions)
                                 SliverFillRemaining(
                                   hasScrollBody: false,
-                                  child: _EmptyWatchState(
-                                    cs: cs,
-                                    title: 'No new picks right now',
-                                    subtitle:
-                                        'You may have interacted with all current suggestions. Try changing filters or loading more movies.',
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: cs.primary,
+                                    ),
                                   ),
                                 )
-                              else
-                                SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      20,
-                                      0,
-                                      20,
-                                      14,
-                                    ),
-                                    child: Builder(
-                                      builder: (context) {
-                                        final activeIndex =
-                                            _currentRecommendationIndex %
-                                            filteredItems.length;
-                                        final item = filteredItems[activeIndex];
-                                        final record = _recordFor(
-                                          item,
-                                          records,
-                                        );
-                                        final score = _displayScore(
-                                          item,
-                                          record,
-                                          user.uid,
-                                          partnerUid,
-                                        );
-
-                                        return Center(
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxWidth: 360,
-                                            ),
-                                            child: _RecommendationCard(
+                              else ...[
+                                SliverPadding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    0,
+                                    20,
+                                    16,
+                                  ),
+                                  sliver: SliverToBoxAdapter(
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
+                                      switchInCurve: Curves.easeOut,
+                                      switchOutCurve: Curves.easeIn,
+                                      child: _topView == _TopView.history
+                                          ? _PersonalHistoryPanel(
+                                              key: const ValueKey('history'),
                                               cs: cs,
-                                              item: item,
-                                              score: score,
-                                              record: record,
                                               currentUserId: user.uid,
-                                              partnerUid: partnerUid,
-                                              onOpenDetails: () =>
-                                                  _openDetails(item),
-                                              onYes: () => _voteAndAdvance(
-                                                item: item,
-                                                liked: true,
-                                                currentListCount:
-                                                    filteredItems.length,
-                                              ),
-                                              onNo: () => _voteAndAdvance(
-                                                item: item,
-                                                disliked: true,
-                                                currentListCount:
-                                                    filteredItems.length,
-                                              ),
+                                              records: records,
+                                            )
+                                          : const SizedBox.shrink(
+                                              key: ValueKey('empty'),
                                             ),
-                                          ),
-                                        );
-                                      },
                                     ),
                                   ),
                                 ),
+                                if (_topView == _TopView.matched)
+                                  if (matchedRecords.isEmpty)
+                                    SliverFillRemaining(
+                                      hasScrollBody: false,
+                                      child: _MatchedTimelineState(
+                                        cs: cs,
+                                        icon: Icons.favorite_border_rounded,
+                                        title: 'No shared matches yet',
+                                        subtitle:
+                                            'Once you both like the same picks, they will show up here as a shared timeline.',
+                                        milestones: const [
+                                          'Pick a few recommendations together',
+                                          'Save items you both say yes to',
+                                          'Watch the matched timeline grow',
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    SliverPadding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        0,
+                                        20,
+                                        32,
+                                      ),
+                                      sliver: SliverToBoxAdapter(
+                                        child: _MatchedTimelineFeed(
+                                          cs: cs,
+                                          currentUserId: user.uid,
+                                          partnerUid: partnerUid,
+                                          onMarkWatchedTogether: (record) =>
+                                              _repository.markWatchedTogether(
+                                                record: record,
+                                              ),
+                                          onOpenDetails: (record) =>
+                                              _openDetails(
+                                                _WatchItem(
+                                                  tmdbId: record.tmdbId,
+                                                  mediaType:
+                                                      record.mediaType == 'tv'
+                                                      ? _WatchMediaType.tv
+                                                      : _WatchMediaType.movie,
+                                                  title: record.title,
+                                                  overview: '',
+                                                  posterPath: record.posterPath,
+                                                  backdropPath:
+                                                      record.backdropPath,
+                                                  rating: 0,
+                                                  runtimeMinutes: 0,
+                                                  releaseDate: null,
+                                                  seasons: null,
+                                                  genres: record.matchedGenres,
+                                                  matchPercentage:
+                                                      record.coupleMatchScore,
+                                                  matchReason: '',
+                                                ),
+                                              ),
+                                          entries: matchedRecords
+                                              .map(
+                                                (record) =>
+                                                    _MatchedTimelineEntry(
+                                                      record: record,
+                                                    ),
+                                              )
+                                              .toList(),
+                                        ),
+                                      ),
+                                    )
+                                else if (_topView == _TopView.history)
+                                  const SliverToBoxAdapter(
+                                    child: SizedBox.shrink(),
+                                  )
+                                else if (filteredItems.isEmpty)
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: _EmptyWatchState(
+                                      cs: cs,
+                                      title: 'No new picks right now',
+                                      subtitle:
+                                          'You may have interacted with all current suggestions or active filters.',
+                                    ),
+                                  )
+                                else
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        0,
+                                        20,
+                                        14,
+                                      ),
+                                      child: Builder(
+                                        builder: (context) {
+                                          final activeIndex =
+                                              _currentRecommendationIndex %
+                                              filteredItems.length;
+                                          final item =
+                                              filteredItems[activeIndex];
+                                          final record = _recordFor(
+                                            item,
+                                            records,
+                                          );
+                                          final score = _displayScore(
+                                            item,
+                                            record,
+                                            user.uid,
+                                            partnerUid,
+                                          );
+
+                                          return Center(
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 360,
+                                              ),
+                                              child: _RecommendationCard(
+                                                cs: cs,
+                                                item: item,
+                                                score: score,
+                                                record: record,
+                                                currentUserId: user.uid,
+                                                partnerUid: partnerUid,
+                                                onOpenDetails: () =>
+                                                    _openDetails(item),
+                                                onYes: () => _voteAndAdvance(
+                                                  item: item,
+                                                  liked: true,
+                                                  currentListCount:
+                                                      filteredItems.length,
+                                                ),
+                                                onNo: () => _voteAndAdvance(
+                                                  item: item,
+                                                  disliked: true,
+                                                  currentListCount:
+                                                      filteredItems.length,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ],
-                          ],
+                          ),
                         );
                       },
                     );
@@ -895,11 +914,16 @@ class _WatchItem {
   });
 
   String get tmdbKey => '${mediaType.name}_$tmdbId';
-  String get posterUrl =>
-      posterPath.isEmpty ? '' : 'https://image.tmdb.org/t/p/w500$posterPath';
+  String get posterUrl => posterPath.isEmpty
+      ? ''
+      : (posterPath.startsWith('http')
+            ? posterPath
+            : 'https://image.tmdb.org/t/p/w500$posterPath');
   String get backdropUrl => backdropPath.isEmpty
       ? ''
-      : 'https://image.tmdb.org/t/p/w780$backdropPath';
+      : (backdropPath.startsWith('http')
+            ? backdropPath
+            : 'https://image.tmdb.org/t/p/w780$backdropPath');
   String get releaseYear =>
       releaseDate == null ? 'Unknown' : '${releaseDate!.year}';
   String get runtimeLabel =>
@@ -1027,8 +1051,6 @@ class _WatchRecord {
 
 class _WatchRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  String get _apiKey => dotenv.env['TMDB_API_KEY'] ?? '';
 
   Future<String?> resolvePartnerUid(String partnerEmail) async {
     final normalizedEmail = partnerEmail.trim().toLowerCase();
@@ -1160,88 +1182,98 @@ class _WatchRepository {
   }
 
   Future<List<_WatchItem>> fetchRecommendations() async {
-    if (_apiKey.isEmpty) {
-      return _sampleRecommendations();
-    }
-
     try {
-      final seeds = await Future.wait([
-        _fetchSeeds(_WatchMediaType.movie),
-        _fetchSeeds(_WatchMediaType.tv),
-      ]);
-      final allSeeds = [...seeds[0], ...seeds[1]];
-      final enriched = await Future.wait(allSeeds.take(30).map(_enrichSeed));
-      enriched.sort((a, b) => b.matchPercentage.compareTo(a.matchPercentage));
-      return enriched;
-    } catch (_) {
+      final querySnapshot = await _db
+          .collection('watch_options')
+          .limit(500)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        return _sampleRecommendations();
+      }
+
+      final items = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        final mediaTypeStr = (data['mediaType'] as String?) ?? 'movie';
+        final mediaType = mediaTypeStr == 'tv'
+            ? _WatchMediaType.tv
+            : _WatchMediaType.movie;
+        final rating = (data['rating'] as num?)?.toDouble() ?? 0.0;
+        final rawGenres = List<String>.from(
+          (data['genres'] as List?) ?? const [],
+        );
+
+        DateTime? releaseDate;
+        final rawRelease = data['releaseDate'];
+        if (rawRelease is String && rawRelease.isNotEmpty) {
+          releaseDate = DateTime.tryParse(rawRelease);
+        } else if (rawRelease is Timestamp) {
+          releaseDate = rawRelease.toDate();
+        }
+
+        return _WatchItem(
+          tmdbId: (data['tmdbId'] as num?)?.toInt() ?? 0,
+          mediaType: mediaType,
+          title: (data['title'] as String?) ?? 'Untitled',
+          overview: (data['overview'] as String?) ?? '',
+          posterPath: (data['posterPath'] as String?) ?? '',
+          backdropPath: (data['backdropPath'] as String?) ?? '',
+          rating: rating,
+          runtimeMinutes: (data['runtimeMinutes'] as num?)?.toInt() ?? 0,
+          releaseDate: releaseDate,
+          seasons: (data['seasons'] as num?)?.toInt(),
+          genres: rawGenres.isEmpty ? _defaultGenresFor(mediaType) : rawGenres,
+          matchPercentage: _predictMatchScore(rating, rawGenres),
+          matchReason: _buildMatchReason(rawGenres, mediaType),
+        );
+      }).toList();
+
+      items.sort((a, b) => b.matchPercentage.compareTo(a.matchPercentage));
+      return items;
+    } catch (e) {
       return _sampleRecommendations();
     }
   }
 
   Future<_WatchDetails> fetchDetails(_WatchItem item) async {
-    if (_apiKey.isEmpty) {
+    try {
+      final docSnap = await _db
+          .collection('watch_options')
+          .doc(item.tmdbKey)
+          .get();
+
+      if (!docSnap.exists) {
+        return _WatchDetails(
+          item: item,
+          cast: const ['Cast unavailable'],
+          providers: const ['Streaming options unavailable'],
+          tagline: null,
+          seasons: item.seasons,
+        );
+      }
+
+      final data = docSnap.data()!;
+      final cast = List<String>.from((data['cast'] as List?) ?? const []);
+      final providers = List<String>.from(
+        (data['providers'] as List?) ?? const [],
+      );
+
       return _WatchDetails(
         item: item,
-        cast: const ['Cast unavailable'],
-        providers: const ['TMDb'],
-        tagline: null,
-        seasons: null,
-      );
-    }
-
-    try {
-      final details = await _getJson('/${item.mediaType.name}/${item.tmdbId}');
-      final credits = await _getJson(
-        '/${item.mediaType.name}/${item.tmdbId}/credits',
-      );
-      final providers = await _getJson(
-        '/${item.mediaType.name}/${item.tmdbId}/watch/providers',
-      );
-
-      final cast = (credits['cast'] as List? ?? const [])
-          .take(6)
-          .map(
-            (member) =>
-                (member as Map<String, dynamic>)['name'] as String? ?? '',
-          )
-          .where((name) => name.isNotEmpty)
-          .toList();
-
-      final providerNames = _extractProviders(providers);
-      final seasons = (details['number_of_seasons'] as num?)?.toInt();
-
-      return _WatchDetails(
-        item: item.copyWith(
-          overview: ((details['overview'] as String?) ?? item.overview).trim(),
-          posterPath: (details['poster_path'] as String?) ?? item.posterPath,
-          backdropPath:
-              (details['backdrop_path'] as String?) ?? item.backdropPath,
-          rating: (details['vote_average'] as num?)?.toDouble() ?? item.rating,
-          runtimeMinutes: _runtimeFromDetails(
-            details,
-            item.mediaType,
-            item.runtimeMinutes,
-          ),
-          seasons: seasons,
-          releaseDate:
-              _releaseDateFromDetails(details, item.mediaType) ??
-              item.releaseDate,
-          genres: _genresFromDetails(details).isEmpty
-              ? item.genres
-              : _genresFromDetails(details),
-        ),
         cast: cast.isEmpty ? const ['Cast unavailable'] : cast,
-        providers: providerNames.isEmpty ? const ['TMDb'] : providerNames,
-        tagline: _cleanString(details['tagline'] as String?),
-        seasons: seasons,
+        providers: providers.isEmpty
+            ? const ['Streaming options unavailable']
+            : providers,
+        tagline: _cleanString(data['tagline'] as String?),
+        seasons: (data['seasons'] as num?)?.toInt() ?? item.seasons,
       );
     } catch (_) {
       return _WatchDetails(
         item: item,
         cast: const ['Cast unavailable'],
-        providers: const ['TMDb'],
+        providers: const ['Streaming options unavailable'],
         tagline: null,
-        seasons: null,
+        seasons: item.seasons,
       );
     }
   }
@@ -1516,127 +1548,6 @@ class _WatchRepository {
     await partnerMatchRef.set(watchedTogetherPayload, SetOptions(merge: true));
   }
 
-  Future<List<_WatchSeed>> _fetchSeeds(_WatchMediaType type) async {
-    final path = type == _WatchMediaType.movie
-        ? '/movie/popular'
-        : '/tv/popular';
-    final json = await _getJson(path);
-    final results = json['results'] as List? ?? const [];
-
-    return results
-        .take(20)
-        .map((raw) {
-          final data = Map<String, dynamic>.from(raw as Map);
-          final title = type == _WatchMediaType.movie
-              ? (data['title'] as String?) ?? 'Untitled'
-              : (data['name'] as String?) ?? 'Untitled';
-          final release = type == _WatchMediaType.movie
-              ? (data['release_date'] as String?)
-              : (data['first_air_date'] as String?);
-          return _WatchSeed(
-            id: (data['id'] as num?)?.toInt() ?? 0,
-            mediaType: type,
-            title: title,
-            overview: (data['overview'] as String?) ?? '',
-            posterPath: (data['poster_path'] as String?) ?? '',
-            backdropPath: (data['backdrop_path'] as String?) ?? '',
-            rating: (data['vote_average'] as num?)?.toDouble() ?? 0,
-            releaseDate: DateTime.tryParse(release ?? ''),
-          );
-        })
-        .where((seed) => seed.id != 0)
-        .toList();
-  }
-
-  Future<_WatchItem> _enrichSeed(_WatchSeed seed) async {
-    final details = await _getJson('/${seed.mediaType.name}/${seed.id}');
-    final runtime = _runtimeFromDetails(details, seed.mediaType, 0);
-    final genres = _genresFromDetails(details);
-    final rating = (details['vote_average'] as num?)?.toDouble() ?? seed.rating;
-    final seasons = (details['number_of_seasons'] as num?)?.toInt();
-
-    return seed.toItem().copyWith(
-      overview: _cleanString(details['overview'] as String?) ?? seed.overview,
-      posterPath: (details['poster_path'] as String?) ?? seed.posterPath,
-      backdropPath: (details['backdrop_path'] as String?) ?? seed.backdropPath,
-      rating: rating,
-      runtimeMinutes: runtime,
-      seasons: seasons,
-      releaseDate:
-          _releaseDateFromDetails(details, seed.mediaType) ?? seed.releaseDate,
-      genres: genres.isEmpty ? _defaultGenresFor(seed.mediaType) : genres,
-      matchPercentage: _predictMatchScore(rating, genres),
-      matchReason: _buildMatchReason(genres, seed.mediaType),
-    );
-  }
-
-  Future<Map<String, dynamic>> _getJson(String path) async {
-    final uri = Uri.https('api.themoviedb.org', '/3$path', {
-      'api_key': _apiKey,
-      'language': 'en-US',
-    });
-    final response = await http.get(uri);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('TMDb request failed with status ${response.statusCode}');
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  List<String> _extractProviders(Map<String, dynamic> data) {
-    final results = data['results'] as Map<String, dynamic>? ?? const {};
-    final us = results['US'] as Map<String, dynamic>? ?? const {};
-    final providerList =
-        us['flatrate'] as List? ??
-        us['rent'] as List? ??
-        us['buy'] as List? ??
-        const [];
-    return providerList
-        .take(5)
-        .map(
-          (provider) =>
-              (provider as Map<String, dynamic>)['provider_name'] as String? ??
-              '',
-        )
-        .where((name) => name.isNotEmpty)
-        .toList();
-  }
-
-  List<String> _genresFromDetails(Map<String, dynamic> details) {
-    final genres = details['genres'] as List? ?? const [];
-    return genres
-        .map(
-          (genre) => (genre as Map<String, dynamic>)['name'] as String? ?? '',
-        )
-        .where((name) => name.isNotEmpty)
-        .toList();
-  }
-
-  int _runtimeFromDetails(
-    Map<String, dynamic> details,
-    _WatchMediaType mediaType,
-    int fallback,
-  ) {
-    if (mediaType == _WatchMediaType.movie) {
-      return (details['runtime'] as num?)?.toInt() ?? fallback;
-    }
-
-    final runTimes = details['episode_run_time'] as List?;
-    if (runTimes != null && runTimes.isNotEmpty) {
-      return (runTimes.first as num?)?.toInt() ?? fallback;
-    }
-    return fallback;
-  }
-
-  DateTime? _releaseDateFromDetails(
-    Map<String, dynamic> details,
-    _WatchMediaType mediaType,
-  ) {
-    final raw = mediaType == _WatchMediaType.movie
-        ? details['release_date'] as String?
-        : details['first_air_date'] as String?;
-    return DateTime.tryParse(raw ?? '');
-  }
-
   String? _cleanString(String? value) {
     final trimmed = value?.trim() ?? '';
     return trimmed.isEmpty ? null : trimmed;
@@ -1755,267 +1666,7 @@ class _WatchRepository {
         matchReason:
             'A sharp, conversation-starting thriller with drama at its core.',
       ),
-      _WatchItem(
-        tmdbId: 906126,
-        mediaType: _WatchMediaType.tv,
-        title: 'Heartstopper',
-        overview:
-            'Teens Charlie and Nick discover that their unlikely friendship might be something more as they navigate school and young love.',
-        posterPath: '/6R4P3C7pY6R5xQ0n2r3o1k7m8Ff.jpg',
-        backdropPath: '/uY3j0I2b0M3Pp2n0Z3u4w7K5WnJ.jpg',
-        rating: 8.6,
-        runtimeMinutes: 30,
-        releaseDate: DateTime(2022, 4, 22),
-        seasons: 3,
-        genres: const ['Drama', 'Romance'],
-        matchPercentage: 91,
-        matchReason: 'A gentle TV pick centered on romance and warmth.',
-      ),
-      _WatchItem(
-        tmdbId: 537915,
-        mediaType: _WatchMediaType.movie,
-        title: 'After the Sunset',
-        overview:
-            'A jewel thief and his wife try to enjoy a quieter life, but one last score draws them back into the game.',
-        posterPath: '/nGcqdZl4z6C3m7j1yQmGg2K8f9j.jpg',
-        backdropPath: '/xAqK7VY4P0TzQ4p8kQWvJ6yF4v7.jpg',
-        rating: 7.1,
-        runtimeMinutes: 110,
-        releaseDate: DateTime(2004, 11, 12),
-        seasons: null,
-        genres: const ['Action', 'Comedy'],
-        matchPercentage: 76,
-        matchReason:
-            'A playful movie-night pick with action and a light touch.',
-      ),
-      _WatchItem(
-        tmdbId: 568124,
-        mediaType: _WatchMediaType.tv,
-        title: 'The Good Place',
-        overview:
-            'A surprisingly sweet afterlife comedy about becoming better, together, and still having fun while doing it.',
-        posterPath: '/qIHSB9K5uP1eY1k0sM0l4Yl3oB8.jpg',
-        backdropPath: '/wP8jQpR4sY2zQ7pL5tB2mS9dV2.jpg',
-        rating: 8.2,
-        runtimeMinutes: 22,
-        releaseDate: DateTime(2016, 9, 19),
-        seasons: 4,
-        genres: const ['Comedy', 'Fantasy'],
-        matchPercentage: 89,
-        matchReason: 'A cozy binge with comedy and a feel-good tone.',
-      ),
-      _WatchItem(
-        tmdbId: 157336,
-        mediaType: _WatchMediaType.movie,
-        title: 'Interstellar',
-        overview:
-            'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
-        posterPath: '/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
-        backdropPath: '/rAiYTfKGqDCRIIqo664sY9XZIvQ.jpg',
-        rating: 8.7,
-        runtimeMinutes: 169,
-        releaseDate: DateTime(2014, 11, 5),
-        seasons: null,
-        genres: const ['Adventure', 'Drama', 'Sci-Fi'],
-        matchPercentage: 82,
-        matchReason:
-            'For nights when you want something big, emotional, and immersive.',
-      ),
-      _WatchItem(
-        tmdbId: 1399,
-        mediaType: _WatchMediaType.tv,
-        title: 'Game of Thrones',
-        overview:
-            'Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns.',
-        posterPath: '/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
-        backdropPath: '/mQeXW0nQx3M5Qn8pU4n2s9Bq2hN.jpg',
-        rating: 8.4,
-        runtimeMinutes: 60,
-        releaseDate: DateTime(2011, 4, 17),
-        seasons: 8,
-        genres: const ['Drama', 'Fantasy'],
-        matchPercentage: 71,
-        matchReason: 'An epic, high-drama series for longer shared evenings.',
-      ),
     ];
-  }
-}
-
-class _WatchSeed {
-  final int id;
-  final _WatchMediaType mediaType;
-  final String title;
-  final String overview;
-  final String posterPath;
-  final String backdropPath;
-  final double rating;
-  final DateTime? releaseDate;
-
-  const _WatchSeed({
-    required this.id,
-    required this.mediaType,
-    required this.title,
-    required this.overview,
-    required this.posterPath,
-    required this.backdropPath,
-    required this.rating,
-    required this.releaseDate,
-  });
-
-  _WatchItem toItem() {
-    return _WatchItem(
-      tmdbId: id,
-      mediaType: mediaType,
-      title: title,
-      overview: overview,
-      posterPath: posterPath,
-      backdropPath: backdropPath,
-      rating: rating,
-      runtimeMinutes: 0,
-      releaseDate: releaseDate,
-      seasons: null,
-      genres: const [],
-      matchPercentage: 0,
-      matchReason: '',
-    );
-  }
-}
-
-class _WatchHeroCard extends StatelessWidget {
-  final ColorScheme cs;
-  final String title;
-  final String subtitle;
-  final String headline;
-  final String filterLabel;
-  final int count;
-  final bool partnerLinked;
-  final VoidCallback onFilterTap;
-
-  const _WatchHeroCard({
-    required this.cs,
-    required this.title,
-    required this.subtitle,
-    required this.headline,
-    required this.filterLabel,
-    required this.count,
-    required this.partnerLinked,
-    required this.onFilterTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            cs.primaryContainer.withValues(alpha: 0.72),
-            cs.secondaryContainer.withValues(alpha: 0.55),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: cs.surface.withValues(alpha: 0.78),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.theaters_outlined,
-                  color: cs.primary,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.tonalIcon(
-                onPressed: onFilterTap,
-                icon: const Icon(Icons.tune_rounded),
-                label: const Text('Filter'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HeroMetric(label: 'Visible picks', value: '$count'),
-              _HeroMetric(
-                label: 'Couple link',
-                value: partnerLinked ? 'Connected' : 'Waiting',
-              ),
-              _HeroMetric(label: 'Focus', value: headline),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Showing $filterLabel',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroMetric extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _HeroMetric({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: cs.surface.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelSmall),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -2026,10 +1677,12 @@ class _FilterPanel extends StatelessWidget {
   final List<String> genres;
   final double minRating;
   final double maxRuntime;
+  final RangeValues yearRange;
   final ValueChanged<_WatchFeedFilter> onFilterChanged;
   final ValueChanged<String?> onGenreChanged;
   final ValueChanged<double> onRatingChanged;
   final ValueChanged<double> onRuntimeChanged;
+  final ValueChanged<RangeValues> onYearRangeChanged;
 
   const _FilterPanel({
     required this.cs,
@@ -2038,10 +1691,12 @@ class _FilterPanel extends StatelessWidget {
     required this.genres,
     required this.minRating,
     required this.maxRuntime,
+    required this.yearRange,
     required this.onFilterChanged,
     required this.onGenreChanged,
     required this.onRatingChanged,
     required this.onRuntimeChanged,
+    required this.onYearRangeChanged,
   });
 
   @override
@@ -2077,17 +1732,12 @@ class _FilterPanel extends StatelessWidget {
                     color: selected ? cs.onPrimary : cs.onSurface,
                     fontWeight: FontWeight.w700,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
                 ),
               ),
             );
           }).toList(),
         ),
-
         const SizedBox(height: 24),
-
         Text('Genres', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         Wrap(
@@ -2112,9 +1762,24 @@ class _FilterPanel extends StatelessWidget {
             ),
           ],
         ),
-
         const SizedBox(height: 24),
-
+        _FilterSliderCard(
+          cs: cs,
+          title: 'Release year',
+          valueLabel: '${yearRange.start.round()} - ${yearRange.end.round()}',
+          child: RangeSlider(
+            values: yearRange,
+            min: 1980,
+            max: 2026,
+            divisions: 46,
+            labels: RangeLabels(
+              '${yearRange.start.round()}',
+              '${yearRange.end.round()}',
+            ),
+            onChanged: onYearRangeChanged,
+          ),
+        ),
+        const SizedBox(height: 14),
         _FilterSliderCard(
           cs: cs,
           title: 'Minimum rating',
@@ -2128,9 +1793,7 @@ class _FilterPanel extends StatelessWidget {
             onChanged: onRatingChanged,
           ),
         ),
-
         const SizedBox(height: 14),
-
         _FilterSliderCard(
           cs: cs,
           title: 'Maximum runtime',
@@ -2167,7 +1830,7 @@ class _FilterSliderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.45),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: cs.outlineVariant),
       ),
@@ -2201,165 +1864,6 @@ class _FilterSliderCard extends StatelessWidget {
             ],
           ),
           child,
-        ],
-      ),
-    );
-  }
-}
-
-class _MatchHistoryPanel extends StatelessWidget {
-  final ColorScheme cs;
-  final String currentUserId;
-  final String? partnerUid;
-  final List<_WatchRecord> records;
-
-  const _MatchHistoryPanel({
-    required this.cs,
-    required this.currentUserId,
-    required this.partnerUid,
-    required this.records,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final partnerId = partnerUid;
-    if (partnerId == null) {
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Match history',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            _MatchedTimelineState(
-              cs: cs,
-              icon: Icons.link_rounded,
-              title: 'No partner connected',
-              subtitle:
-                  'Connect a partner to unlock the shared match timeline.',
-              milestones: const [
-                'Link your partner account',
-                'Vote on a few movies or shows together',
-                'See your shared story appear here',
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (records.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Match history',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            _MatchedTimelineState(
-              cs: cs,
-              icon: Icons.favorite_border_rounded,
-              title: 'No shared history yet',
-              subtitle:
-                  'Start voting together and this area will fill with moments.',
-              milestones: const [
-                'Swipe through a few recommendations',
-                'Mark what you both like or skip',
-                'See mutual taste and disagreements build up',
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    final bothLiked = records.where((record) {
-      return record.isLikedBy(currentUserId) && record.isLikedBy(partnerId);
-    }).toList();
-    final bothDisliked = records.where((record) {
-      return record.isDislikedBy(currentUserId) &&
-          record.isDislikedBy(partnerId);
-    }).toList();
-    final disagreements = records.where((record) {
-      final currentLiked = record.isLikedBy(currentUserId);
-      final currentDisliked = record.isDislikedBy(currentUserId);
-      final partnerLiked = record.isLikedBy(partnerId);
-      final partnerDisliked = record.isDislikedBy(partnerId);
-      return (currentLiked && partnerDisliked) ||
-          (currentDisliked && partnerLiked);
-    }).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Match history', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HistoryBadge(
-                label: 'Both liked',
-                value: bothLiked.length.toString(),
-                color: cs.primary,
-              ),
-              _HistoryBadge(
-                label: 'Both disliked',
-                value: bothDisliked.length.toString(),
-                color: cs.secondary,
-              ),
-              _HistoryBadge(
-                label: 'Disagreed',
-                value: disagreements.length.toString(),
-                color: cs.tertiary,
-              ),
-              _HistoryBadge(
-                label: 'Your yes',
-                value: records
-                    .where((record) => record.isLikedBy(currentUserId))
-                    .length
-                    .toString(),
-                color: cs.primaryContainer,
-              ),
-              _HistoryBadge(
-                label: 'Your no',
-                value: records
-                    .where((record) => record.isDislikedBy(currentUserId))
-                    .length
-                    .toString(),
-                color: cs.secondaryContainer,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _HistorySection(title: 'What you both liked', items: bothLiked),
-          const SizedBox(height: 12),
-          _HistorySection(title: 'What you both disliked', items: bothDisliked),
-          const SizedBox(height: 12),
-          _HistorySection(title: 'Where you disagreed', items: disagreements),
         ],
       ),
     );
@@ -2527,7 +2031,6 @@ class _MatchedTimelineFeed extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   onTap: () => onOpenDetails(record),
                   child: Container(
-                    // compact height, but still leaves room for the poster and action row
                     height: 212,
                     decoration: BoxDecoration(
                       color: cs.surface,
@@ -2553,13 +2056,14 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                 left: Radius.circular(24),
                               ),
                               child: SizedBox(
-                                // keep poster at a 2:3 aspect ratio; reduced width for smaller cards
                                 width: 132,
                                 height: double.infinity,
                                 child: record.posterPath.isEmpty
                                     ? _PosterFallback(cs: cs)
                                     : Image.network(
-                                        'https://image.tmdb.org/t/p/w500${record.posterPath}',
+                                        record.posterPath.startsWith('http')
+                                            ? record.posterPath
+                                            : 'https://image.tmdb.org/t/p/w500${record.posterPath}',
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) =>
                                             _PosterFallback(cs: cs),
@@ -2590,8 +2094,6 @@ class _MatchedTimelineFeed extends StatelessWidget {
                                       ],
                                     ),
                                     const SizedBox(height: 8),
-                                    // make the middle content flexible so the action button can sit
-                                    // at the bottom without causing overflow
                                     Flexible(
                                       fit: FlexFit.loose,
                                       child: Column(
@@ -2709,7 +2211,6 @@ class _MatchedPosterThumb extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        // poster thumb should mirror the 2:3 poster aspect ratio (smaller)
         width: 72,
         height: 108,
         color: cs.surfaceContainerHighest,
@@ -2760,11 +2261,11 @@ class _PersonalHistoryPanel extends StatelessWidget {
   final List<_WatchRecord> records;
 
   const _PersonalHistoryPanel({
-    Key? key,
+    super.key,
     required this.cs,
     required this.currentUserId,
     required this.records,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2797,7 +2298,9 @@ class _PersonalHistoryPanel extends StatelessWidget {
                           _MatchedPosterThumb(
                             posterUrl: record.posterPath.isEmpty
                                 ? ''
-                                : 'https://image.tmdb.org/t/p/w500${record.posterPath}',
+                                : (record.posterPath.startsWith('http')
+                                      ? record.posterPath
+                                      : 'https://image.tmdb.org/t/p/w500${record.posterPath}'),
                             cs: cs,
                           ),
                           const SizedBox(width: 12),
@@ -2872,11 +2375,7 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
     final selected = await showMenu<_TopView>(
       context: context,
       position: RelativeRect.fromLTRB(left, top, right, bottom),
-      // FIX 2: Remove the border from the popup menu by providing a clean shape
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide.none,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 4,
       items: [
         PopupMenuItem(
@@ -2890,7 +2389,6 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
           ),
         ),
         PopupMenuItem(
-          // FIX 1: Use outline heart icon instead of filled heart
           value: _TopView.matched,
           child: Row(
             children: [
@@ -2926,7 +2424,6 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
     };
     final icon = switch (widget.value) {
       _TopView.suggestions => Icons.lightbulb_outline,
-      // FIX 1: Also use outline heart in the button itself when Matched is selected
       _TopView.matched => Icons.favorite_border_rounded,
       _TopView.history => Icons.history,
     };
@@ -2959,41 +2456,6 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
   }
 }
 
-class _HistorySection extends StatelessWidget {
-  final String title;
-  final List<_WatchRecord> items;
-
-  const _HistorySection({required this.title, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.labelSmall),
-        const SizedBox(height: 6),
-        if (items.isEmpty)
-          Text(
-            'Nothing yet. Keep voting to populate this section.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: items
-                .take(5)
-                .map((record) => Chip(label: Text(record.title)))
-                .toList(),
-          ),
-      ],
-    );
-  }
-}
-
 class _RecommendationCard extends StatelessWidget {
   final ColorScheme cs;
   final _WatchItem item;
@@ -3021,7 +2483,6 @@ class _RecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLiked = record?.isLikedBy(currentUserId) ?? false;
     final isDisliked = record?.isDislikedBy(currentUserId) ?? false;
-    final seasonsLabel = item.seasonsLabel;
 
     return Material(
       color: Colors.transparent,
@@ -3034,14 +2495,12 @@ class _RecommendationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: cs.outlineVariant),
             boxShadow: [
-              // Subtle directional depth
               BoxShadow(
                 color: cs.primary.withValues(alpha: 0.10),
                 blurRadius: 18,
                 spreadRadius: 1,
                 offset: const Offset(0, 6),
               ),
-              // Soft even halo around the card
               BoxShadow(
                 color: cs.primary.withValues(alpha: 0.06),
                 blurRadius: 28,
@@ -3067,7 +2526,6 @@ class _RecommendationCard extends StatelessWidget {
                         : _PosterFallback(cs: cs),
                   ),
                 ),
-
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
@@ -3084,7 +2542,6 @@ class _RecommendationCard extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 Positioned(
                   top: 16,
                   left: 16,
@@ -3094,7 +2551,6 @@ class _RecommendationCard extends StatelessWidget {
                     foreground: cs.onSurface,
                   ),
                 ),
-
                 Positioned(
                   top: 16,
                   right: 16,
@@ -3126,7 +2582,6 @@ class _RecommendationCard extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 Positioned(
                   left: 18,
                   right: 18,
@@ -3145,9 +2600,7 @@ class _RecommendationCard extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                             ),
                       ),
-
                       const SizedBox(height: 6),
-
                       Text(
                         item.mediaType == _WatchMediaType.tv
                             ? '${item.releaseYear} • ${item.seasonsLabel ?? 'TV Show'}'
@@ -3156,9 +2609,7 @@ class _RecommendationCard extends StatelessWidget {
                           context,
                         ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                       ),
-
                       const SizedBox(height: 10),
-
                       Text(
                         item.genreLabel,
                         maxLines: 1,
@@ -3167,9 +2618,7 @@ class _RecommendationCard extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
                       Text(
                         item.overview,
                         maxLines: 3,
@@ -3179,9 +2628,7 @@ class _RecommendationCard extends StatelessWidget {
                           height: 1.4,
                         ),
                       ),
-
                       const SizedBox(height: 18),
-
                       Row(
                         children: [
                           Expanded(
@@ -3602,7 +3049,6 @@ class _HistoryEmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(22),
-        // outer border removed per design
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3616,7 +3062,6 @@ class _HistoryEmptyState extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: cs.primaryContainer,
                   shape: BoxShape.circle,
-                  // inner circle border removed per design
                 ),
                 child: Icon(icon, color: cs.primary, size: 26),
               ),
