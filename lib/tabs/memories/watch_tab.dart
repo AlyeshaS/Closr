@@ -388,15 +388,6 @@ class _WatchTabState extends State<WatchTab> {
     );
   }
 
-  Future<void> _voteAndAdvance({
-    required _WatchItem item,
-    required int currentListCount,
-    bool? liked,
-    bool? disliked,
-  }) async {
-    await _toggleAction(item: item, liked: liked, disliked: disliked);
-  }
-
   Future<void> _openDetails(_WatchItem item) async {
     final details = await _repository.fetchDetails(item);
     if (!mounted) return;
@@ -1027,55 +1018,57 @@ class _WatchTabState extends State<WatchTab> {
                                     child: SizedBox.shrink(),
                                   )
                                 else if (filteredItems.isEmpty)
-                                  SliverPadding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      20,
-                                      0,
-                                      20,
-                                      32,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: _EmptyWatchState(
-                                        cs: cs,
-                                        title: 'No new picks right now',
-                                        subtitle:
-                                            'You may have interacted with all current suggestions or active filters.',
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                        ),
+                                        child: _EmptyWatchState(
+                                          cs: cs,
+                                          title: 'No new picks right now',
+                                          subtitle:
+                                              'You may have interacted with all current suggestions or active filters.',
+                                        ),
                                       ),
                                     ),
                                   )
                                 else
-                                  SliverPadding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      20,
-                                      0,
-                                      20,
-                                      24,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: Builder(
-                                        builder: (context) {
-                                          final activeIndex =
-                                              _currentRecommendationIndex %
-                                              filteredItems.length;
-                                          final item =
-                                              filteredItems[activeIndex];
-                                          final record = _recordFor(
-                                            item,
-                                            records,
-                                          );
-                                          final score = _displayScore(
-                                            item,
-                                            record,
-                                            user.uid,
-                                            partnerUid,
-                                          );
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          20,
+                                          0,
+                                          20,
+                                          24,
+                                        ),
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 360,
+                                          ),
+                                          child: Builder(
+                                            builder: (context) {
+                                              final activeIndex =
+                                                  _currentRecommendationIndex %
+                                                  filteredItems.length;
+                                              final item =
+                                                  filteredItems[activeIndex];
+                                              final record = _recordFor(
+                                                item,
+                                                records,
+                                              );
+                                              final score = _displayScore(
+                                                item,
+                                                record,
+                                                user.uid,
+                                                partnerUid,
+                                              );
 
-                                          return Center(
-                                            child: ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                maxWidth: 360,
-                                              ),
-                                              child: _RecommendationCard(
+                                              return _RecommendationCard(
+                                                key: ValueKey(item.tmdbKey),
                                                 cs: cs,
                                                 item: item,
                                                 score: score,
@@ -1084,22 +1077,21 @@ class _WatchTabState extends State<WatchTab> {
                                                 partnerUid: partnerUid,
                                                 onOpenDetails: () =>
                                                     _openDetails(item),
-                                                onYes: () => _voteAndAdvance(
-                                                  item: item,
-                                                  liked: true,
-                                                  currentListCount:
-                                                      filteredItems.length,
-                                                ),
-                                                onNo: () => _voteAndAdvance(
-                                                  item: item,
-                                                  disliked: true,
-                                                  currentListCount:
-                                                      filteredItems.length,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                                onVote: (isLiked) async {
+                                                  await _toggleAction(
+                                                    item: item,
+                                                    liked: isLiked
+                                                        ? true
+                                                        : null,
+                                                    disliked: isLiked
+                                                        ? null
+                                                        : true,
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -2712,9 +2704,6 @@ class _CardDissolveWrapperState extends State<_CardDissolveWrapper>
   }
 }
 
-/// Fades its child in once, on first mount — for cases where content may
-/// already be present when the widget first appears (so there's nothing
-/// for an [AnimatedSwitcher] further down to transition from).
 class _DissolveIn extends StatefulWidget {
   final Widget child;
 
@@ -3216,7 +3205,7 @@ class _TopViewDropdownState extends State<_TopViewDropdown> {
   }
 }
 
-class _RecommendationCard extends StatelessWidget {
+class _RecommendationCard extends StatefulWidget {
   final ColorScheme cs;
   final _WatchItem item;
   final double score;
@@ -3224,10 +3213,10 @@ class _RecommendationCard extends StatelessWidget {
   final String currentUserId;
   final String? partnerUid;
   final VoidCallback onOpenDetails;
-  final VoidCallback onYes;
-  final VoidCallback onNo;
+  final Future<void> Function(bool isLiked) onVote;
 
   const _RecommendationCard({
+    super.key,
     required this.cs,
     required this.item,
     required this.score,
@@ -3235,173 +3224,287 @@ class _RecommendationCard extends StatelessWidget {
     required this.currentUserId,
     required this.partnerUid,
     required this.onOpenDetails,
-    required this.onYes,
-    required this.onNo,
+    required this.onVote,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isLiked = record?.isLikedBy(currentUserId) ?? false;
-    final isDisliked = record?.isDislikedBy(currentUserId) ?? false;
+  State<_RecommendationCard> createState() => _RecommendationCardState();
+}
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onOpenDetails,
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: AspectRatio(
-            aspectRatio: 0.65,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: item.posterUrl.isNotEmpty
-                        ? Image.network(
-                            item.posterUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _PosterFallback(cs: cs),
-                          )
-                        : _PosterFallback(cs: cs),
-                  ),
+class _RecommendationCardState extends State<_RecommendationCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  bool? _votedLike;
+  bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.9,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animController,
+        curve: const Interval(0.35, 1.0, curve: Curves.easeIn),
+      ),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset.zero,
+    ).animate(_animController);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleVote(bool isLiked) async {
+    if (_isProcessing) return;
+
+    setState(() {
+      _isProcessing = true;
+      _votedLike = isLiked;
+      _slideAnimation =
+          Tween<Offset>(
+            begin: Offset.zero,
+            end: Offset(isLiked ? 0.35 : -0.35, 0.0),
+          ).animate(
+            CurvedAnimation(
+              parent: _animController,
+              curve: Curves.easeOutCubic,
+            ),
+          );
+    });
+
+    await _animController.forward();
+    await widget.onVote(isLiked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = widget.cs;
+    final item = widget.item;
+
+    return SlideTransition(
+      position: _slideAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: FadeTransition(
+          opacity: _opacityAnimation,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onOpenDetails,
+              borderRadius: BorderRadius.circular(28),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.15),
-                          Colors.black.withValues(alpha: 0.25),
-                          Colors.black.withValues(alpha: 0.94),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: _Pill(
-                    label: item.mediaLabel,
-                    background: cs.surface.withValues(alpha: 0.88),
-                    foreground: cs.onSurface,
-                  ),
-                ),
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: Colors.amber,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          item.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 18,
-                  right: 18,
-                  bottom: 18,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                child: AspectRatio(
+                  aspectRatio: 0.65,
+                  child: Stack(
                     children: [
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.mediaType == _WatchMediaType.tv
-                            ? '${item.releaseYear} • ${item.seasonsLabel ?? 'TV Show'}'
-                            : '${item.releaseYear} • ${item.runtimeLabel}',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        item.genreLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.9),
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: item.posterUrl.isNotEmpty
+                              ? Image.network(
+                                  item.posterUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _PosterFallback(cs: cs),
+                                )
+                              : _PosterFallback(cs: cs),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        item.overview,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          height: 1.4,
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(28),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.15),
+                                Colors.black.withValues(alpha: 0.25),
+                                Colors.black.withValues(alpha: 0.94),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StyledActionButton(
-                              label: 'Pass',
-                              icon: Icons.close_rounded,
-                              isPass: true,
-                              selected: isDisliked,
-                              onTap: onNo,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _StyledActionButton(
-                              label: 'Interested',
-                              icon: Icons.favorite_rounded,
-                              isPass: false,
-                              selected: isLiked,
-                              onTap: onYes,
-                            ),
-                          ),
-                        ],
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        child: _Pill(
+                          label: item.mediaLabel,
+                          background: cs.surface.withValues(alpha: 0.88),
+                          foreground: cs.onSurface,
+                        ),
                       ),
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Colors.amber,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                item.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 18,
+                        right: 18,
+                        bottom: 18,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              item.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              item.mediaType == _WatchMediaType.tv
+                                  ? '${item.releaseYear} • ${item.seasonsLabel ?? 'TV Show'}'
+                                  : '${item.releaseYear} • ${item.runtimeLabel}',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              item.genreLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                  ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              item.overview,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.92),
+                                    height: 1.4,
+                                  ),
+                            ),
+                            const SizedBox(height: 18),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _StyledActionButton(
+                                    label: 'Pass',
+                                    icon: Icons.close_rounded,
+                                    isPass: true,
+                                    selected: false,
+                                    onTap: () => _handleVote(false),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _StyledActionButton(
+                                    label: 'Interested',
+                                    icon: Icons.favorite_rounded,
+                                    isPass: false,
+                                    selected: false,
+                                    onTap: () => _handleVote(true),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_votedLike != null)
+                        Positioned.fill(
+                          child: Center(
+                            child: AnimatedScale(
+                              scale: _votedLike != null ? 1.0 : 0.4,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOutBack,
+                              child: Container(
+                                padding: const EdgeInsets.all(22),
+                                decoration: BoxDecoration(
+                                  color:
+                                      (_votedLike!
+                                              ? cs.primary
+                                              : Colors.grey.shade900)
+                                          .withValues(alpha: 0.92),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      blurRadius: 20,
+                                      spreadRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  _votedLike!
+                                      ? Icons.favorite_rounded
+                                      : Icons.close_rounded,
+                                  size: 64,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -3410,7 +3513,7 @@ class _RecommendationCard extends StatelessWidget {
   }
 }
 
-class _StyledActionButton extends StatelessWidget {
+class _StyledActionButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final bool isPass;
@@ -3418,6 +3521,7 @@ class _StyledActionButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _StyledActionButton({
+    super.key,
     required this.label,
     required this.icon,
     required this.isPass,
@@ -3426,51 +3530,73 @@ class _StyledActionButton extends StatelessWidget {
   });
 
   @override
+  State<_StyledActionButton> createState() => _StyledActionButtonState();
+}
+
+class _StyledActionButtonState extends State<_StyledActionButton> {
+  bool _isPressed = false;
+
+  void _handleTapDown(TapDownDetails details) {
+    setState(() => _isPressed = true);
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    setState(() => _isPressed = false);
+  }
+
+  void _handleTapCancel() {
+    setState(() => _isPressed = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final activeBg = isPass ? Colors.grey.shade900 : cs.primary;
-    final activeFg = isPass ? Colors.white : cs.onPrimary;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+    final bgColor = widget.isPass
+        ? cs.surfaceContainerHighest.withValues(alpha: 0.85)
+        : cs.primary;
+
+    final fgColor = widget.isPass ? cs.onSurface : cs.onPrimary;
+
+    return GestureDetector(
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOutCubic,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 100),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
           decoration: BoxDecoration(
-            color: selected ? activeBg : Colors.black.withValues(alpha: 0.45),
+            color: bgColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected
-                  ? (isPass ? Colors.white54 : cs.primary)
-                  : Colors.white.withValues(alpha: 0.25),
+              color: widget.isPass ? cs.outlineVariant : cs.primary,
               width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: (widget.isPass ? Colors.black : cs.primary).withValues(
+                  alpha: _isPressed ? 0.08 : 0.22,
+                ),
+                blurRadius: _isPressed ? 3 : 8,
+                offset: _isPressed ? const Offset(0, 1) : const Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : Colors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: selected ? activeFg : Colors.white,
-                ),
-              ),
+              Icon(widget.icon, size: 18, color: fgColor),
               const SizedBox(width: 8),
               Text(
-                label,
+                widget.label,
                 style: TextStyle(
-                  color: selected ? activeFg : Colors.white,
+                  color: fgColor,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
@@ -3633,7 +3759,6 @@ class _MatchedTimelineState extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3727,7 +3852,11 @@ class _MatchedTimelineState extends StatelessWidget {
                           child: Row(
                             children: [
                               Icon(
-                                index.isEven ? Icons.favorite_rounded : icon,
+                                index == 0
+                                    ? Icons.favorite_rounded
+                                    : index == 1
+                                    ? Icons.close_rounded
+                                    : Icons.history_rounded,
                                 color: cs.primary,
                                 size: 20,
                               ),
