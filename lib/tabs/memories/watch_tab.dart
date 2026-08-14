@@ -235,11 +235,16 @@ class _WatchTabState extends State<WatchTab> {
       genres.addAll(_normalizeGenres(record.matchedGenres));
     }
 
+    // Keep US / CAD, Anime, and Asian categories exclusively in "Region & Type"
+    genres.remove('US / CAD');
+    genres.remove('US/CAD');
     genres.remove('Action & Adventure');
     genres.remove('Sci-Fi & Fantasy');
     genres.remove('Anime');
     genres.remove('J-Drama');
     genres.remove('Japanese');
+    genres.remove('Korean');
+    genres.remove('K-Drama');
 
     final list = genres.toList();
     list.sort();
@@ -948,16 +953,9 @@ class _WatchTabState extends State<WatchTab> {
                                                             as num?)
                                                         ?.toInt() ??
                                                     0,
-                                                releaseDate:
-                                                    data['releaseDate']
-                                                            is String &&
-                                                        (data['releaseDate']
-                                                                as String)
-                                                            .isNotEmpty
-                                                    ? DateTime.tryParse(
-                                                        data['releaseDate'],
-                                                      )
-                                                    : null,
+                                                releaseDate: _parseReleaseDate(
+                                                  data['releaseDate'],
+                                                ),
                                                 seasons:
                                                     (data['seasons'] as num?)
                                                         ?.toInt(),
@@ -1106,6 +1104,25 @@ enum _WatchFeedFilter { all, movies, tv }
 enum _WatchMediaType { movie, tv }
 
 enum _TopView { suggestions, matched, history }
+
+DateTime? _parseReleaseDate(dynamic rawRelease) {
+  if (rawRelease == null) return null;
+  if (rawRelease is Timestamp) return rawRelease.toDate();
+  if (rawRelease is String && rawRelease.isNotEmpty) {
+    final parsed = DateTime.tryParse(rawRelease);
+    if (parsed != null) return parsed;
+
+    // Extracts any 4-digit year format (e.g., "16 Jul 2010", "2024", "2023–2024")
+    final match = RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(rawRelease);
+    if (match != null) {
+      final year = int.tryParse(match.group(0)!);
+      if (year != null) {
+        return DateTime(year);
+      }
+    }
+  }
+  return null;
+}
 
 List<String> _normalizeGenres(Iterable<dynamic> genres) {
   final normalized = <String>[];
@@ -1435,7 +1452,7 @@ class _WatchRepository {
     try {
       final querySnapshot = await _db
           .collection('watch_options')
-          .limit(500)
+          .limit(1500)
           .get();
 
       if (querySnapshot.docs.isEmpty) {
@@ -1454,13 +1471,7 @@ class _WatchRepository {
         );
         final normalizedGenres = _normalizeGenres(rawGenres);
 
-        DateTime? releaseDate;
-        final rawRelease = data['releaseDate'];
-        if (rawRelease is String && rawRelease.isNotEmpty) {
-          releaseDate = DateTime.tryParse(rawRelease);
-        } else if (rawRelease is Timestamp) {
-          releaseDate = rawRelease.toDate();
-        }
+        final releaseDate = _parseReleaseDate(data['releaseDate']);
 
         return _WatchItem(
           tmdbId: (data['tmdbId'] as num?)?.toInt() ?? 0,
@@ -2299,7 +2310,6 @@ class _MatchedTimelineFeedState extends State<_MatchedTimelineFeed> {
       _animatingRecordId = record.id;
     });
 
-    // Wait for kernel rise up, arc & dissolve effect before writing to Firestore
     await Future.delayed(const Duration(milliseconds: 850));
     await widget.onMarkWatchedTogether(record);
 
@@ -2336,7 +2346,6 @@ class _MatchedTimelineFeedState extends State<_MatchedTimelineFeed> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Smooth Sliding Segment Radio Toggle
         Container(
           height: 44,
           padding: const EdgeInsets.all(4),
