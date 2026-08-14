@@ -1110,7 +1110,6 @@ DateTime? _parseReleaseDate(dynamic rawRelease) {
     final parsed = DateTime.tryParse(rawRelease);
     if (parsed != null) return parsed;
 
-    // Extracts any 4-digit year format (e.g., "16 Jul 2010", "2024", "2023–2024")
     final match = RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(rawRelease);
     if (match != null) {
       final year = int.tryParse(match.group(0)!);
@@ -1123,7 +1122,6 @@ DateTime? _parseReleaseDate(dynamic rawRelease) {
 }
 
 List<String> _normalizeGenres(Iterable<dynamic> genres) {
-  // Unwanted / niche / adult genres filtered out
   const excludedGenres = {
     'Ecchi',
     'Hentai',
@@ -1219,35 +1217,6 @@ class _WatchItem {
       return null;
     }
     return seasons == 1 ? '1 season' : '$seasons seasons';
-  }
-
-  _WatchItem copyWith({
-    String? overview,
-    String? posterPath,
-    String? backdropPath,
-    double? rating,
-    int? runtimeMinutes,
-    DateTime? releaseDate,
-    int? seasons,
-    List<String>? genres,
-    double? matchPercentage,
-    String? matchReason,
-  }) {
-    return _WatchItem(
-      tmdbId: tmdbId,
-      mediaType: mediaType,
-      title: title,
-      overview: overview ?? this.overview,
-      posterPath: posterPath ?? this.posterPath,
-      backdropPath: backdropPath ?? this.backdropPath,
-      rating: rating ?? this.rating,
-      runtimeMinutes: runtimeMinutes ?? this.runtimeMinutes,
-      releaseDate: releaseDate ?? this.releaseDate,
-      seasons: seasons ?? this.seasons,
-      genres: genres ?? this.genres,
-      matchPercentage: matchPercentage ?? this.matchPercentage,
-      matchReason: matchReason ?? this.matchReason,
-    );
   }
 }
 
