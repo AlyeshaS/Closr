@@ -849,186 +849,209 @@ class _WatchTabState extends State<WatchTab> {
                                   ),
                                 )
                               else ...[
-                                SliverPadding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    0,
-                                    20,
-                                    16,
-                                  ),
-                                  sliver: SliverToBoxAdapter(
-                                    child: AnimatedSwitcher(
-                                      duration: const Duration(
-                                        milliseconds: 300,
+                                if (_topView == _TopView.history)
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      32,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _PersonalHistoryPanel(
+                                        key: const ValueKey('history'),
+                                        cs: cs,
+                                        currentUserId: user.uid,
+                                        records: records,
                                       ),
-                                      switchInCurve: Curves.easeOut,
-                                      switchOutCurve: Curves.easeIn,
-                                      child: _topView == _TopView.history
-                                          ? _PersonalHistoryPanel(
-                                              key: const ValueKey('history'),
-                                              cs: cs,
-                                              currentUserId: user.uid,
-                                              records: records,
-                                            )
-                                          : const SizedBox.shrink(
-                                              key: ValueKey('empty'),
-                                            ),
                                     ),
                                   ),
-                                ),
                                 if (_topView == _TopView.matched)
-                                  if (matchedRecords.isEmpty)
-                                    SliverFillRemaining(
-                                      hasScrollBody: false,
-                                      child: _MatchedTimelineState(
-                                        cs: cs,
-                                        icon: Icons.favorite_border_rounded,
-                                        title: 'No shared matches yet',
-                                        subtitle:
-                                            'Once you both like the same picks, they will show up here as a shared timeline.',
-                                        milestones: const [
-                                          'Pick a few recommendations together',
-                                          'Save items you both say yes to',
-                                          'Watch the matched timeline grow',
-                                        ],
-                                      ),
-                                    )
-                                  else
-                                    SliverPadding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        20,
-                                        0,
-                                        20,
-                                        32,
-                                      ),
-                                      sliver: SliverToBoxAdapter(
-                                        child: _MatchedTimelineFeed(
-                                          cs: cs,
-                                          currentUserId: user.uid,
-                                          partnerUid: partnerUid,
-                                          onMarkWatchedTogether:
-                                              (record) async {
-                                                await _repository
-                                                    .markWatchedTogether(
-                                                      record: record,
-                                                    );
-                                              },
-                                          onOpenDetails: (record) async {
-                                            final docKey =
-                                                '${record.mediaType}_${record.tmdbId}';
-                                            final docSnap =
-                                                await FirebaseFirestore.instance
-                                                    .collection('watch_options')
-                                                    .doc(docKey)
-                                                    .get();
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      32,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _DissolveIn(
+                                        child: AnimatedSwitcher(
+                                          duration: const Duration(
+                                            milliseconds: 450,
+                                          ),
+                                          switchInCurve: Curves.easeOut,
+                                          switchOutCurve: Curves.easeIn,
+                                          transitionBuilder:
+                                              (child, animation) =>
+                                                  FadeTransition(
+                                                    opacity: animation,
+                                                    child: child,
+                                                  ),
+                                          child: matchedRecords.isEmpty
+                                              ? _MatchedTimelineState(
+                                                  key: const ValueKey(
+                                                    'matched-empty',
+                                                  ),
+                                                  cs: cs,
+                                                  icon: Icons
+                                                      .favorite_border_rounded,
+                                                )
+                                              : _MatchedTimelineFeed(
+                                                  key: const ValueKey(
+                                                    'matched-content',
+                                                  ),
+                                                  cs: cs,
+                                                  currentUserId: user.uid,
+                                                  partnerUid: partnerUid,
+                                                  onMarkWatchedTogether:
+                                                      (record) async {
+                                                        await _repository
+                                                            .markWatchedTogether(
+                                                              record: record,
+                                                            );
+                                                      },
+                                                  onOpenDetails: (record) async {
+                                                    final docKey =
+                                                        '${record.mediaType}_${record.tmdbId}';
+                                                    final docSnap =
+                                                        await FirebaseFirestore
+                                                            .instance
+                                                            .collection(
+                                                              'watch_options',
+                                                            )
+                                                            .doc(docKey)
+                                                            .get();
 
-                                            if (docSnap.exists) {
-                                              final data = docSnap.data()!;
-                                              final mediaType =
-                                                  record.mediaType == 'tv'
-                                                  ? _WatchMediaType.tv
-                                                  : _WatchMediaType.movie;
+                                                    if (docSnap.exists) {
+                                                      final data = docSnap
+                                                          .data()!;
+                                                      final mediaType =
+                                                          record.mediaType ==
+                                                              'tv'
+                                                          ? _WatchMediaType.tv
+                                                          : _WatchMediaType
+                                                                .movie;
 
-                                              final fullItem = _WatchItem(
-                                                tmdbId: record.tmdbId,
-                                                mediaType: mediaType,
-                                                title: record.title,
-                                                overview:
-                                                    (data['overview']
-                                                        as String?) ??
-                                                    '',
-                                                posterPath: record.posterPath,
-                                                backdropPath:
-                                                    (data['backdropPath']
-                                                        as String?) ??
-                                                    record.backdropPath,
-                                                rating:
-                                                    (data['rating'] as num?)
-                                                        ?.toDouble() ??
-                                                    0.0,
-                                                runtimeMinutes:
-                                                    (data['runtimeMinutes']
-                                                            as num?)
-                                                        ?.toInt() ??
-                                                    0,
-                                                releaseDate: _parseReleaseDate(
-                                                  data['releaseDate'],
+                                                      final fullItem = _WatchItem(
+                                                        tmdbId: record.tmdbId,
+                                                        mediaType: mediaType,
+                                                        title: record.title,
+                                                        overview:
+                                                            (data['overview']
+                                                                as String?) ??
+                                                            '',
+                                                        posterPath:
+                                                            record.posterPath,
+                                                        backdropPath:
+                                                            (data['backdropPath']
+                                                                as String?) ??
+                                                            record.backdropPath,
+                                                        rating:
+                                                            (data['rating']
+                                                                    as num?)
+                                                                ?.toDouble() ??
+                                                            0.0,
+                                                        runtimeMinutes:
+                                                            (data['runtimeMinutes']
+                                                                    as num?)
+                                                                ?.toInt() ??
+                                                            0,
+                                                        releaseDate:
+                                                            _parseReleaseDate(
+                                                              data['releaseDate'],
+                                                            ),
+                                                        seasons:
+                                                            (data['seasons']
+                                                                    as num?)
+                                                                ?.toInt(),
+                                                        genres: List<String>.from(
+                                                          (data['genres']
+                                                                  as List?) ??
+                                                              record
+                                                                  .matchedGenres,
+                                                        ),
+                                                        matchPercentage: record
+                                                            .coupleMatchScore,
+                                                        matchReason:
+                                                            (data['matchReason']
+                                                                as String?) ??
+                                                            '',
+                                                      );
+                                                      _openDetails(fullItem);
+                                                    } else {
+                                                      _openDetails(
+                                                        _WatchItem(
+                                                          tmdbId: record.tmdbId,
+                                                          mediaType:
+                                                              record.mediaType ==
+                                                                  'tv'
+                                                              ? _WatchMediaType
+                                                                    .tv
+                                                              : _WatchMediaType
+                                                                    .movie,
+                                                          title: record.title,
+                                                          overview: '',
+                                                          posterPath:
+                                                              record.posterPath,
+                                                          backdropPath: record
+                                                              .backdropPath,
+                                                          rating: 0,
+                                                          runtimeMinutes: 0,
+                                                          releaseDate: null,
+                                                          seasons: null,
+                                                          genres: record
+                                                              .matchedGenres,
+                                                          matchPercentage: record
+                                                              .coupleMatchScore,
+                                                          matchReason: '',
+                                                        ),
+                                                      );
+                                                    }
+                                                  },
+                                                  entries: matchedRecords
+                                                      .map(
+                                                        (record) =>
+                                                            _MatchedTimelineEntry(
+                                                              record: record,
+                                                            ),
+                                                      )
+                                                      .toList(),
                                                 ),
-                                                seasons:
-                                                    (data['seasons'] as num?)
-                                                        ?.toInt(),
-                                                genres: List<String>.from(
-                                                  (data['genres'] as List?) ??
-                                                      record.matchedGenres,
-                                                ),
-                                                matchPercentage:
-                                                    record.coupleMatchScore,
-                                                matchReason:
-                                                    (data['matchReason']
-                                                        as String?) ??
-                                                    '',
-                                              );
-                                              _openDetails(fullItem);
-                                            } else {
-                                              _openDetails(
-                                                _WatchItem(
-                                                  tmdbId: record.tmdbId,
-                                                  mediaType:
-                                                      record.mediaType == 'tv'
-                                                      ? _WatchMediaType.tv
-                                                      : _WatchMediaType.movie,
-                                                  title: record.title,
-                                                  overview: '',
-                                                  posterPath: record.posterPath,
-                                                  backdropPath:
-                                                      record.backdropPath,
-                                                  rating: 0,
-                                                  runtimeMinutes: 0,
-                                                  releaseDate: null,
-                                                  seasons: null,
-                                                  genres: record.matchedGenres,
-                                                  matchPercentage:
-                                                      record.coupleMatchScore,
-                                                  matchReason: '',
-                                                ),
-                                              );
-                                            }
-                                          },
-                                          entries: matchedRecords
-                                              .map(
-                                                (record) =>
-                                                    _MatchedTimelineEntry(
-                                                      record: record,
-                                                    ),
-                                              )
-                                              .toList(),
                                         ),
                                       ),
-                                    )
+                                    ),
+                                  )
                                 else if (_topView == _TopView.history)
                                   const SliverToBoxAdapter(
                                     child: SizedBox.shrink(),
                                   )
                                 else if (filteredItems.isEmpty)
-                                  SliverFillRemaining(
-                                    hasScrollBody: false,
-                                    child: _EmptyWatchState(
-                                      cs: cs,
-                                      title: 'No new picks right now',
-                                      subtitle:
-                                          'You may have interacted with all current suggestions or active filters.',
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      32,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _EmptyWatchState(
+                                        cs: cs,
+                                        title: 'No new picks right now',
+                                        subtitle:
+                                            'You may have interacted with all current suggestions or active filters.',
+                                      ),
                                     ),
                                   )
                                 else
-                                  SliverFillRemaining(
-                                    hasScrollBody: false,
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        20,
-                                        0,
-                                        20,
-                                        14,
-                                      ),
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      24,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
                                       child: Builder(
                                         builder: (context) {
                                           final activeIndex =
@@ -1110,6 +1133,7 @@ DateTime? _parseReleaseDate(dynamic rawRelease) {
     final parsed = DateTime.tryParse(rawRelease);
     if (parsed != null) return parsed;
 
+    // Extracts any 4-digit year format (e.g., "16 Jul 2010", "2024", "2023–2024")
     final match = RegExp(r'\b(19\d\d|20\d\d)\b').firstMatch(rawRelease);
     if (match != null) {
       final year = int.tryParse(match.group(0)!);
@@ -2258,6 +2282,7 @@ class _MatchedTimelineFeed extends StatefulWidget {
   final List<_MatchedTimelineEntry> entries;
 
   const _MatchedTimelineFeed({
+    super.key,
     required this.cs,
     required this.currentUserId,
     required this.partnerUid,
@@ -2687,6 +2712,40 @@ class _CardDissolveWrapperState extends State<_CardDissolveWrapper>
   }
 }
 
+/// Fades its child in once, on first mount — for cases where content may
+/// already be present when the widget first appears (so there's nothing
+/// for an [AnimatedSwitcher] further down to transition from).
+class _DissolveIn extends StatefulWidget {
+  final Widget child;
+
+  const _DissolveIn({required this.child});
+
+  @override
+  State<_DissolveIn> createState() => _DissolveInState();
+}
+
+class _DissolveInState extends State<_DissolveIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+      child: widget.child,
+    );
+  }
+}
+
 class _PopcornKernelRiseOverlay extends StatefulWidget {
   final ColorScheme cs;
 
@@ -2937,99 +2996,104 @@ class _PersonalHistoryPanelState extends State<_PersonalHistoryPanel> {
     final hasMore = widget.records.length > _visibleCount;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.records.isEmpty)
-            _HistoryEmptyState(
-              cs: widget.cs,
-              icon: Icons.local_fire_department_outlined,
-              title: 'Start building your taste profile',
-              subtitle:
-                  'Your personal milestones will appear here as you vote.',
-              milestones: const [
-                'Like a few picks you want to revisit',
-                'Dislike the ones you want to skip',
-                'Save favorites and build a pattern',
-              ],
-            )
-          else ...[
-            Column(
-              children: displayedRecords
-                  .map(
-                    (record) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          _MatchedPosterThumb(
-                            posterUrl: record.posterPath.isEmpty
-                                ? ''
-                                : (record.posterPath.startsWith('http')
-                                      ? record.posterPath
-                                      : 'https://image.tmdb.org/t/p/w500${record.posterPath}'),
-                            cs: widget.cs,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  record.title,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _historySubtitle(
-                                    record,
-                                    widget.currentUserId,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
+      child: _DissolveIn(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 450),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) =>
+              FadeTransition(opacity: animation, child: child),
+          child: widget.records.isEmpty
+              ? _HistoryEmptyState(
+                  key: const ValueKey('history-empty'),
+                  cs: widget.cs,
+                  icon: Icons.history_rounded,
+                )
+              : Column(
+                  key: const ValueKey('history-content'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      children: displayedRecords
+                          .map(
+                            (record) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                children: [
+                                  _MatchedPosterThumb(
+                                    posterUrl: record.posterPath.isEmpty
+                                        ? ''
+                                        : (record.posterPath.startsWith('http')
+                                              ? record.posterPath
+                                              : 'https://image.tmdb.org/t/p/w500${record.posterPath}'),
+                                    cs: widget.cs,
                                   ),
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: widget.cs.onSurfaceVariant,
-                                      ),
-                                ),
-                              ],
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          record.title,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _historySubtitle(
+                                            record,
+                                            widget.currentUserId,
+                                          ),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color:
+                                                    widget.cs.onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    if (hasMore) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _loadMore,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: widget.cs.outlineVariant),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                        ],
+                          icon: Icon(
+                            Icons.expand_more_rounded,
+                            color: widget.cs.primary,
+                          ),
+                          label: Text(
+                            'Load More',
+                            style: TextStyle(
+                              color: widget.cs.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            if (hasMore) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _loadMore,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: widget.cs.outlineVariant),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: Icon(
-                    Icons.expand_more_rounded,
-                    color: widget.cs.primary,
-                  ),
-                  label: Text(
-                    'Load More',
-                    style: TextStyle(
-                      color: widget.cs.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                    ],
+                  ],
                 ),
-              ),
-            ],
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -3506,37 +3570,33 @@ class _EmptyWatchState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(24),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 420),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(28),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.movie_filter_outlined, color: cs.primary, size: 48),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.movie_filter_outlined, color: cs.primary, size: 48),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -3550,11 +3610,17 @@ class _MatchedTimelineState extends StatelessWidget {
   final List<String> milestones;
 
   const _MatchedTimelineState({
+    super.key,
     required this.cs,
     required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.milestones,
+    this.title = 'No shared matches yet',
+    this.subtitle =
+        'When you both say "Interested" on the same movie or show, it becomes an official match here!',
+    this.milestones = const [
+      'Swipe through your suggestions',
+      'Tap "Interested" on picks you want to watch',
+      'When your partner also says "Interested", it lands here',
+    ],
   });
 
   @override
@@ -3567,6 +3633,7 @@ class _MatchedTimelineState extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3697,25 +3764,35 @@ class _HistoryEmptyState extends StatelessWidget {
   final List<String> milestones;
 
   const _HistoryEmptyState({
+    super.key,
     required this.cs,
     required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.milestones,
+    this.title = 'No vote history yet',
+    this.subtitle =
+        'Every time you tap "Interested" or "Pass", your choices will be saved here.',
+    this.milestones = const [
+      'Tap "Interested" on titles that catch your eye',
+      'Tap "Pass" on the ones you want to skip',
+      'Review and track all your personal votes anytime',
+    ],
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 14),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -3725,6 +3802,7 @@ class _HistoryEmptyState extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: cs.primaryContainer,
                   shape: BoxShape.circle,
+                  border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Icon(icon, color: cs.primary, size: 26),
               ),
@@ -3733,11 +3811,11 @@ class _HistoryEmptyState extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: Theme.of(context).textTheme.titleLarge),
+                    Text(title, style: theme.textTheme.titleLarge),
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
                     ),
@@ -3747,54 +3825,89 @@ class _HistoryEmptyState extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          ...List.generate(milestones.length, (index) {
-            final isLast = index == milestones.length - 1;
-            return Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '${index + 1}',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: cs.onPrimary,
-                                fontWeight: FontWeight.w700,
+          for (var index = 0; index < milestones.length; index++) ...[
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: index == milestones.length - 1 ? 0 : 12,
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: index.isEven
+                                  ? cs.primary
+                                  : cs.primaryContainer,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: cs.primary, width: 1.5),
+                            ),
+                          ),
+                          if (index != milestones.length - 1)
+                            Expanded(
+                              child: Container(
+                                width: 1.5,
+                                color: cs.primary.withValues(alpha: 0.2),
                               ),
-                        ),
-                      ),
-                      if (!isLast)
-                        Container(
-                          width: 2,
-                          height: 24,
-                          color: cs.outlineVariant,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        milestones[index],
-                        style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: index.isEven
+                                ? cs.primaryContainer
+                                : theme.brightness == Brightness.dark
+                                ? const Color(0xFF231519)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: index.isEven
+                                  ? cs.primary.withValues(alpha: 0.3)
+                                  : cs.outlineVariant,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                index == 0
+                                    ? Icons.favorite_rounded
+                                    : index == 1
+                                    ? Icons.close_rounded
+                                    : Icons.history_rounded,
+                                color: cs.primary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  milestones[index],
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            );
-          }),
+            ),
+          ],
         ],
       ),
     );
