@@ -116,10 +116,6 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final lightPinkBg = isDark
-        ? const Color(0xFF2E1C22)
-        : const Color(0xFFFFF0F3);
-
     return StreamBuilder<List<TimelineEntry>>(
       stream: _timelineStream,
       builder: (context, snapshot) {
@@ -136,170 +132,189 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
             ? entriesWithinThreeWeeks
             : entriesWhereWithin(entries, oneWeekAgo);
 
-        final removedCount = entries.length - entriesWithinThreeWeeks.length;
         final hasMoreToShow =
             entriesWithinThreeWeeks.length >
             entriesWhereWithin(entries, oneWeekAgo).length;
 
+        final stats = _buildStats(entries);
+
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SectionLabel(text: 'Your story', cs: cs),
-              const SizedBox(height: 12),
-
-              // Light Pink Background Summary & Stats Container
+              // ── Frosted Glass Top Stats Card ──
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: lightPinkBg,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: cs.primary.withOpacity(isDark ? 0.3 : 0.35),
-                    width: 1.5,
-                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: cs.primary.withOpacity(isDark ? 0.05 : 0.08),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
+                      color: cs.shadow.withOpacity(0.07),
+                      blurRadius: 26,
+                      offset: const Offset(0, 14),
+                    ),
+                    BoxShadow(
+                      color: cs.primary.withOpacity(0.12),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                      spreadRadius: -4,
                     ),
                   ],
                 ),
-                child: entries.isEmpty
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TIMELINE SUMMARY',
-                            style: TextStyle(
-                              fontFamily: 'DMSans',
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
-                              color: cs.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Your timeline is empty right now.',
-                            style: TextStyle(
-                              fontFamily: 'CormorantGaramond',
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Log a scrapbook date, finish a quest, or watch something together to start building it.',
-                            style: TextStyle(
-                              fontFamily: 'DMSans',
-                              fontSize: 14,
-                              height: 1.45,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TIMELINE STATS',
-                            style: TextStyle(
-                              fontFamily: 'DMSans',
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
-                              color: cs.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${entries.length} Moments Logged',
-                            style: TextStyle(
-                              fontFamily: 'CormorantGaramond',
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Refined Stats Widgets (Dates / Watches / Activities)
-                          Row(
-                            children: _buildStats(entries).map((stat) {
-                              return Expanded(
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 8),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        cs.primaryContainer.withOpacity(
-                                          isDark ? 0.35 : 0.5,
-                                        ),
-                                        cs.surface.withOpacity(
-                                          isDark ? 0.6 : 0.9,
-                                        ),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: cs.primary.withOpacity(0.25),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: cs.primary.withOpacity(0.04),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            cs.primaryContainer.withOpacity(0.85),
+                            cs.secondaryContainer.withOpacity(0.55),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: cs.primary.withOpacity(0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: entries.isEmpty
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'TIMELINE SUMMARY',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        letterSpacing: 1.3,
+                                        fontWeight: FontWeight.bold,
+                                        color: cs.primary,
                                       ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        stat.value.toString(),
-                                        style: TextStyle(
-                                          fontFamily: 'DMSans',
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.w800,
-                                          color: cs.primary,
-                                        ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Your timeline is empty right now.',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        color: cs.onSurface,
+                                        fontWeight: FontWeight.w800,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        stat.label,
-                                        style: TextStyle(
-                                          fontFamily: 'DMSans',
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: cs.onSurfaceVariant
-                                              .withOpacity(0.9),
-                                        ),
-                                      ),
-                                    ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Log a scrapbook date, finish a quest, or watch something together to start building it.',
+                                  style: TextStyle(
+                                    fontFamily: 'DMSans',
+                                    fontSize: 14,
+                                    height: 1.45,
+                                    color: cs.onSurfaceVariant,
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'TIMELINE STATS',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        letterSpacing: 1.3,
+                                        fontWeight: FontWeight.bold,
+                                        color: cs.primary,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${entries.length} Moments Logged',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(
+                                        color: cs.onSurface,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
+                                const SizedBox(height: 18),
+
+                                // Metric Badges
+                                Row(
+                                  children: stats.map((stat) {
+                                    return Expanded(
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                          horizontal: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? cs.surfaceContainerLowest
+                                                    .withOpacity(0.5)
+                                              : Colors.white.withOpacity(0.5),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          border: Border.all(
+                                            color: cs.primary.withOpacity(0.2),
+                                            width: 1,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: cs.shadow.withOpacity(
+                                                0.04,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              stat.value.toString(),
+                                              style: TextStyle(
+                                                fontFamily: 'DMSans',
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w800,
+                                                color: cs.primary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              stat.label,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontFamily: 'DMSans',
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: cs.onSurfaceVariant
+                                                    .withOpacity(0.9),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 20),
+
+              const SizedBox(height: 28),
+              _SectionLabel(text: 'Your story', cs: cs),
+              const SizedBox(height: 14),
 
               // Timeline List Rendering
               if (snapshot.connectionState == ConnectionState.waiting &&
@@ -316,19 +331,6 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
               else if (entries.isEmpty)
                 const SizedBox.shrink()
               else ...[
-                if (removedCount > 0 && visibleEntries.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Text(
-                      'Some older events (more than 3 weeks) were hidden.',
-                      style: TextStyle(
-                        fontFamily: 'DMSans',
-                        fontSize: 12,
-                        color: cs.onSurfaceVariant.withOpacity(0.8),
-                      ),
-                    ),
-                  ),
-
                 if (visibleEntries.isEmpty)
                   Container(
                     width: double.infinity,
@@ -457,7 +459,6 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
                                   child: Container(
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      // White activity card background
                                       color: entry.isMilestone
                                           ? cs.primaryContainer.withOpacity(0.4)
                                           : (isDark
