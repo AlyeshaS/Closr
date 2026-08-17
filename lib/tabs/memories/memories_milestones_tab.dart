@@ -93,6 +93,7 @@ class _MilestonesGoalsContentTab extends StatefulWidget {
 class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     with TickerProviderStateMixin {
   int _selectedTabIndex = 0; // 0: For Us, 1: For Me, 2: Badges
+  bool _expandedBadges = false;
 
   late int userCoins;
   late int nextRewardTarget;
@@ -182,25 +183,25 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   void didUpdateWidget(covariant _MilestonesGoalsContentTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialCoins != widget.initialCoins) {
-      userCoins = widget.initialCoins;
+      setState(() => userCoins = widget.initialCoins);
     }
     if (oldWidget.rewardTarget != widget.rewardTarget) {
-      nextRewardTarget = widget.rewardTarget;
+      setState(() => nextRewardTarget = widget.rewardTarget);
     }
     if (oldWidget.accessoryName != widget.accessoryName) {
-      nextAccessoryName = widget.accessoryName;
+      setState(() => nextAccessoryName = widget.accessoryName);
     }
     if (oldWidget.initialNudges != widget.initialNudges) {
-      customNudges = List.from(widget.initialNudges);
+      setState(() => customNudges = List.from(widget.initialNudges));
     }
     if (oldWidget.initialCoupleGoals != widget.initialCoupleGoals) {
-      coupleGoals = List.from(widget.initialCoupleGoals);
+      setState(() => coupleGoals = List.from(widget.initialCoupleGoals));
     }
     if (oldWidget.initialPersonalGoals != widget.initialPersonalGoals) {
-      personalGoals = List.from(widget.initialPersonalGoals);
+      setState(() => personalGoals = List.from(widget.initialPersonalGoals));
     }
     if (oldWidget.initialAchievements != widget.initialAchievements) {
-      achievements = List.from(widget.initialAchievements);
+      setState(() => achievements = List.from(widget.initialAchievements));
     }
   }
 
@@ -297,6 +298,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   }
 
   Widget _buildActiveTabContent(ColorScheme colorScheme) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     if (_selectedTabIndex == 0) {
       return Column(
         key: const ValueKey('couple_tab'),
@@ -350,25 +353,133 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
         ],
       );
     } else {
+      if (achievements.isEmpty) {
+        return Column(
+          key: const ValueKey('badges_tab'),
+          children: [
+            _buildEmptyState(
+              icon: Icons.military_tech_outlined,
+              title: 'No achievements available',
+              subtitle: 'Complete goals and activities to unlock badges!',
+              colorScheme: colorScheme,
+            ),
+          ],
+        );
+      }
+
+      final completedBadges = achievements
+          .where((a) => (a['isUnlocked'] as bool? ?? false))
+          .toList();
+
+      final inProgressBadges = achievements
+          .where((a) => !(a['isUnlocked'] as bool? ?? false))
+          .toList();
+
+      final hasMoreActiveToShow = inProgressBadges.length > 10;
+      final visibleInProgress = _expandedBadges
+          ? inProgressBadges
+          : inProgressBadges.take(10).toList();
+
+      final visibleBadges = [...completedBadges, ...visibleInProgress];
+
       return Column(
         key: const ValueKey('badges_tab'),
-        children: achievements.isEmpty
-            ? [
-                _buildEmptyState(
-                  icon: Icons.military_tech_outlined,
-                  title: 'No achievements available',
-                  subtitle: 'Complete goals and activities to unlock badges!',
-                  colorScheme: colorScheme,
-                ),
-              ]
-            : achievements
-                  .map(
-                    (a) => _buildAchievementCard(
-                      achievement: a,
-                      colorScheme: colorScheme,
+        children: [
+          ...visibleBadges.map(
+            (a) =>
+                _buildAchievementCard(achievement: a, colorScheme: colorScheme),
+          ),
+
+          if ((hasMoreActiveToShow && !_expandedBadges) || _expandedBadges)
+            const SizedBox(height: 16),
+
+          if (hasMoreActiveToShow && !_expandedBadges)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(100),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(
+                      isDark ? 0.18 : 0.28,
                     ),
-                  )
-                  .toList(),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () => setState(() => _expandedBadges = true),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ),
+                child: const Text(
+                  'Show More',
+                  style: TextStyle(
+                    fontFamily: 'DMSans',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+
+          if (_expandedBadges)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(100),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(
+                      isDark ? 0.18 : 0.28,
+                    ),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () => setState(() => _expandedBadges = false),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ),
+                child: const Text(
+                  'Show Less',
+                  style: TextStyle(
+                    fontFamily: 'DMSans',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              'Showing completed badges and up to 10 active badge tasks at a time.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'DMSans',
+                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
       );
     }
   }
