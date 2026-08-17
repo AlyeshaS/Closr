@@ -1,3 +1,4 @@
+// lib/memories/memories_timeline_tab.dart
 part of 'memories_screen.dart';
 
 // ── Section Label Helper ──────────────────────────────────────────────────────
@@ -38,10 +39,19 @@ class MemoriesTimelineTab extends StatefulWidget {
   State<MemoriesTimelineTab> createState() => _MemoriesTimelineTabState();
 }
 
-class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
-  late final Stream<List<TimelineEntry>> _timelineStream = TimelineService()
-      .streamTimelineEntries();
-  bool _expanded = false; // when true, show up to 3 weeks; otherwise 1 week
+class _MemoriesTimelineTabState extends State<MemoriesTimelineTab>
+    with AutomaticKeepAliveClientMixin {
+  late final Stream<List<TimelineEntry>> _timelineStream;
+  bool _expanded = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _timelineStream = TimelineService().streamTimelineEntries();
+  }
 
   String _dateLabel(DateTime date) {
     const months = [
@@ -113,12 +123,19 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<List<TimelineEntry>>(
       stream: _timelineStream,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         final entries = snapshot.data ?? const <TimelineEntry>[];
 
         final now = DateTime.now();
@@ -139,12 +156,13 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
         final stats = _buildStats(entries);
 
         return SingleChildScrollView(
+          key: const PageStorageKey('memories_timeline_scroll'),
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Frosted Glass Top Stats Card ──
+              // Top Stats Card matching Quests Progress Card Styling and Timing
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
@@ -231,17 +249,28 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
                                       ),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
-                                  '${entries.length} Moments Logged',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        color: cs.onSurface,
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                                TweenAnimationBuilder<double>(
+                                  key: ValueKey(entries.length),
+                                  tween: Tween<double>(
+                                    begin: 0.0,
+                                    end: entries.length.toDouble(),
+                                  ),
+                                  duration: const Duration(milliseconds: 350),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, animatedCount, _) {
+                                    return Text(
+                                      '${animatedCount.round()} Moments Logged',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            color: cs.onSurface,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 18),
-
-                                // Metric Badges
                                 Row(
                                   children: stats.map((stat) {
                                     return Expanded(
@@ -263,28 +292,34 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
                                             color: cs.primary.withOpacity(0.2),
                                             width: 1,
                                           ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: cs.shadow.withOpacity(
-                                                0.04,
-                                              ),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ],
                                         ),
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              stat.value.toString(),
-                                              style: TextStyle(
-                                                fontFamily: 'DMSans',
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w800,
-                                                color: cs.primary,
+                                            TweenAnimationBuilder<double>(
+                                              key: ValueKey(stat.value),
+                                              tween: Tween<double>(
+                                                begin: 0.0,
+                                                end: stat.value.toDouble(),
                                               ),
+                                              duration: const Duration(
+                                                milliseconds: 350,
+                                              ),
+                                              curve: Curves.easeOutCubic,
+                                              builder:
+                                                  (context, animatedVal, _) {
+                                                    return Text(
+                                                      '${animatedVal.round()}',
+                                                      style: TextStyle(
+                                                        fontFamily: 'DMSans',
+                                                        fontSize: 20,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color: cs.primary,
+                                                      ),
+                                                    );
+                                                  },
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
@@ -316,85 +351,79 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
               _SectionLabel(text: 'Your story', cs: cs),
               const SizedBox(height: 14),
 
-              // Timeline List Rendering
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  entries.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 36),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: cs.primary,
-                      strokeWidth: 2,
+              if (entries.isEmpty)
+                const SizedBox.shrink()
+              else if (visibleEntries.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF231519) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: cs.outlineVariant.withOpacity(0.5),
                     ),
                   ),
-                )
-              else if (entries.isEmpty)
-                const SizedBox.shrink()
-              else ...[
-                if (visibleEntries.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF231519) : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: cs.outlineVariant.withOpacity(0.5),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.archive_outlined,
-                              color: cs.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Timeline archived for now',
-                              style: TextStyle(
-                                fontFamily: 'CormorantGaramond',
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'There are no timeline items in the last 3 weeks yet. Add a scrapbook moment, watch activity, or new quest to bring it back to life.',
-                          style: TextStyle(
-                            fontFamily: 'DMSans',
-                            fontSize: 13,
-                            height: 1.45,
-                            color: cs.onSurfaceVariant,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.archive_outlined,
+                            color: cs.primary,
+                            size: 20,
                           ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Timeline archived for now',
+                            style: TextStyle(
+                              fontFamily: 'CormorantGaramond',
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'There are no timeline items in the last 3 weeks yet. Add a scrapbook moment, watch activity, or new quest to bring it back to life.',
+                        style: TextStyle(
+                          fontFamily: 'DMSans',
+                          fontSize: 13,
+                          height: 1.45,
+                          color: cs.onSurfaceVariant,
                         ),
-                      ],
-                    ),
-                  )
-                else ...[
-                  ...List.generate(visibleEntries.length, (i) {
-                    final entry = visibleEntries[i];
-                    final previousVisible = i > 0
-                        ? visibleEntries[i - 1]
-                        : null;
-                    final showDate =
-                        previousVisible == null ||
-                        previousVisible.occurredAt.year !=
-                            entry.occurredAt.year ||
-                        previousVisible.occurredAt.month !=
-                            entry.occurredAt.month ||
-                        previousVisible.occurredAt.day != entry.occurredAt.day;
+                      ),
+                    ],
+                  ),
+                )
+              else
+                // Pure dissolve matching quests list animation timing (350ms + i * 80ms, Curves.easeInOut)
+                ...List.generate(visibleEntries.length, (i) {
+                  final entry = visibleEntries[i];
+                  final previousVisible = i > 0 ? visibleEntries[i - 1] : null;
+                  final showDate =
+                      previousVisible == null ||
+                      previousVisible.occurredAt.year !=
+                          entry.occurredAt.year ||
+                      previousVisible.occurredAt.month !=
+                          entry.occurredAt.month ||
+                      previousVisible.occurredAt.day != entry.occurredAt.day;
 
-                    final isLastVisible = i == visibleEntries.length - 1;
+                  final isLastVisible = i == visibleEntries.length - 1;
 
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: isLastVisible ? 0 : 12),
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: isLastVisible ? 0 : 12),
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey(entry.id),
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: Duration(milliseconds: 350 + (i * 80)),
+                      curve: Curves.easeInOut,
+                      builder: (context, opacityValue, child) {
+                        return Opacity(opacity: opacityValue, child: child);
+                      },
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -467,7 +496,9 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                         color: entry.isMilestone
-                                            ? cs.primary.withOpacity(0.4)
+                                            ? cs.primaryContainer.withOpacity(
+                                                0.4,
+                                              )
                                             : cs.primary.withOpacity(
                                                 isDark ? 0.2 : 0.25,
                                               ),
@@ -571,96 +602,95 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab> {
                           ),
                         ],
                       ),
-                    );
-                  }),
-                ],
-
-                if ((hasMoreToShow && !_expanded) || _expanded)
-                  const SizedBox(height: 16),
-
-                if (hasMoreToShow && !_expanded)
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(100),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.primary.withOpacity(isDark ? 0.18 : 0.28),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
                     ),
-                    child: ElevatedButton(
-                      onPressed: () => setState(() => _expanded = true),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
-                        ),
+                  );
+                }),
+
+              if ((hasMoreToShow && !_expanded) || _expanded)
+                const SizedBox(height: 16),
+
+              if (hasMoreToShow && !_expanded)
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cs.primary.withOpacity(isDark ? 0.18 : 0.28),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
-                      child: const Text(
-                        'Show More',
-                        style: TextStyle(
-                          fontFamily: 'DMSans',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-
-                if (_expanded)
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(100),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.primary.withOpacity(isDark ? 0.18 : 0.28),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () => setState(() => _expanded = false),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                      ),
-                      child: const Text(
-                        'Show Less',
-                        style: TextStyle(
-                          fontFamily: 'DMSans',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+                  child: ElevatedButton(
+                    onPressed: () => setState(() => _expanded = true),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
                       ),
                     ),
-                  ),
-
-                const SizedBox(height: 20),
-                Center(
-                  child: Text(
-                    'Timeline syncs scrapbook, watch activity, and streak events.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'DMSans',
-                      color: cs.onSurfaceVariant.withOpacity(0.6),
-                      fontSize: 12,
+                    child: const Text(
+                      'Show More',
+                      style: TextStyle(
+                        fontFamily: 'DMSans',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
-              ],
+
+              if (_expanded)
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cs.primary.withOpacity(isDark ? 0.18 : 0.28),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () => setState(() => _expanded = false),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                    child: const Text(
+                      'Show Less',
+                      style: TextStyle(
+                        fontFamily: 'DMSans',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  'Timeline syncs scrapbook, watch activity, and streak events.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'DMSans',
+                    color: cs.onSurfaceVariant.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             ],
           ),
         );

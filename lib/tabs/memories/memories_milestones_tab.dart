@@ -1,8 +1,8 @@
-part of 'memories_screen.dart'; //[cite: 1]
+// lib/memories/memories_milestones_tab.dart
+part of 'memories_screen.dart';
 
 class MemoriesMilestonesTab extends StatelessWidget {
-  //[cite: 1]
-  const MemoriesMilestonesTab({super.key}); //[cite: 1]
+  const MemoriesMilestonesTab({super.key});
 
   @override
   Widget build(BuildContext context) => const _MilestonesGoalsContentTab();
@@ -20,18 +20,15 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     with SingleTickerProviderStateMixin {
   int _selectedTabIndex = 0; // 0: For Us, 1: For Me, 2: Badges
 
-  // Points & Level Progress
   int userCoins = 240;
   final int nextRewardTarget = 300;
 
-  // Animation controller for goal creation burst
   late AnimationController _celebrationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   bool _showCelebration = false;
   String _celebrationTitle = '';
 
-  // Quick Care Nudges
   List<Map<String, dynamic>> customNudges = [
     {'icon': Icons.water_drop_rounded, 'label': 'Water'},
     {'icon': Icons.medication_rounded, 'label': 'Vitamins'},
@@ -40,7 +37,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     {'icon': Icons.bedtime_rounded, 'label': 'Sleep'},
   ];
 
-  // Couple Goals
   final List<Map<String, dynamic>> coupleGoals = [
     {
       'id': '1',
@@ -68,7 +64,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     },
   ];
 
-  // Personal Goals
   final List<Map<String, dynamic>> personalGoals = [
     {
       'id': 'p1',
@@ -96,7 +91,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     },
   ];
 
-  // Achievements
   final List<Map<String, dynamic>> achievements = [
     {
       'id': 'a1',
@@ -206,31 +200,22 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     return Stack(
       children: [
         ListView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
-            // 🐾 Smooth Animated Pet & Points Card
             _buildPetHeroCard(colorScheme),
             const SizedBox(height: 18),
-
-            // ⚡ Quick Nudge Bar
             _buildQuickNudgeSection(colorScheme),
             const SizedBox(height: 20),
-
-            // 🔀 3-Way Segmented Control
             _buildSegmentedTab(colorScheme),
             const SizedBox(height: 16),
-
-            // 🎯 Animated Goals Switcher
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: _buildActiveTabContent(colorScheme),
             ),
-
             const SizedBox(height: 40),
           ],
         ),
-
-        // 🎉 Cute Celebration Overlay when Goal is Added
         if (_showCelebration) _buildCelebrationOverlay(colorScheme),
       ],
     );
@@ -288,7 +273,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     }
   }
 
-  // MARK: - Pet Hero Card with Smooth Animated Progress & Shadow
   Widget _buildPetHeroCard(ColorScheme colors) {
     final progress = (userCoins / nextRewardTarget).clamp(0.0, 1.0);
 
@@ -386,7 +370,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Smooth Progress Bar
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0, end: progress),
                   duration: const Duration(milliseconds: 800),
@@ -422,7 +405,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Quick Nudge Section
   Widget _buildQuickNudgeSection(ColorScheme colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -538,7 +520,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - 3-Way Segmented Tab with Layered Shadow
   Widget _buildSegmentedTab(ColorScheme colors) {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -629,7 +610,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Goal Card Item with Elevation Shadow
   Widget _buildGoalCard({
     required Map<String, dynamic> goal,
     required bool isCoupleGoal,
@@ -662,7 +642,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       ),
       child: Row(
         children: [
-          // Smooth Animated Completion Checkbox
           GestureDetector(
             onTap: () {
               setState(() {
@@ -699,8 +678,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             ),
           ),
           const SizedBox(width: 14),
-
-          // Primary Themed Icon
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -714,8 +691,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             ),
           ),
           const SizedBox(width: 12),
-
-          // Title & Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -763,8 +738,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
               ],
             ),
           ),
-
-          // Contextual Nudge
           if (isCoupleGoal && !isCompleted)
             IconButton(
               icon: const Icon(Icons.notifications_active_outlined, size: 20),
@@ -777,7 +750,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Achievement Card Item
   Widget _buildAchievementCard({
     required Map<String, dynamic> achievement,
     required ColorScheme colorScheme,
@@ -905,7 +877,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Add Goal Button
   Widget _buildAddGoalButton({
     required String label,
     required ColorScheme colorScheme,
@@ -925,7 +896,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Cute Goal Creation Burst Overlay
   Widget _buildCelebrationOverlay(ColorScheme colors) {
     return Positioned.fill(
       child: IgnorePointer(
@@ -1002,7 +972,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Working Modals & Actions
   void _sendNudge(String title) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1020,7 +989,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Expanded 20+ Care Nudge Icon Options
   void _openAddCustomNudgeDialog() {
     final labelCtrl = TextEditingController();
     IconData selectedIcon = Icons.notifications_active_rounded;
@@ -1146,7 +1114,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     );
   }
 
-  // MARK: - Add Goal Modal with Fixed Overflow Wrap
   void _openAddGoalModal(BuildContext context) {
     final titleController = TextEditingController();
     final categoryController = TextEditingController(
@@ -1271,8 +1238,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-
-                  // Fixed Pixel Overflow: Using Wrap with flexible padding
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,

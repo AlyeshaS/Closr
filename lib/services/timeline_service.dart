@@ -47,7 +47,25 @@ class TimelineService {
     var watchMatchDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
     var activityDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
+    // Each of the 5 collections below reports in independently, and emit()
+    // used to fire after every single one of them regardless of whether the
+    // others had loaded yet. That meant the very first emission was often a
+    // partial merge -- e.g. scrapbook resolves empty while watch/activity
+    // are still pending -- which looked like a real "0 entries" result to
+    // the UI. Gate emit() until all 5 have delivered at least one snapshot
+    // so the first thing the UI ever sees is the complete picture.
+    final hasLoadedOnce = <String, bool>{
+      'scrapbook': false,
+      'loveLetters': false,
+      'watchItems': false,
+      'watchMatches': false,
+      'activity': false,
+    };
+    bool allSourcesLoaded() => hasLoadedOnce.values.every((loaded) => loaded);
+
     void emit() {
+      if (!allSourcesLoaded()) return;
+
       final entries =
           <TimelineEntry>[
             ..._mapScrapbookEntries(scrapbookEntries),
@@ -89,6 +107,7 @@ class TimelineService {
             )
             .listen((entries) {
               scrapbookEntries = entries;
+              hasLoadedOnce['scrapbook'] = true;
               emit();
             }, onError: controller.addError);
 
@@ -100,6 +119,7 @@ class TimelineService {
             .snapshots()
             .listen((snapshot) {
               loveLetterDocs = snapshot.docs;
+              hasLoadedOnce['loveLetters'] = true;
               emit();
             }, onError: controller.addError);
 
@@ -111,6 +131,7 @@ class TimelineService {
             .snapshots()
             .listen((snapshot) {
               watchItemDocs = snapshot.docs;
+              hasLoadedOnce['watchItems'] = true;
               emit();
             }, onError: controller.addError);
 
@@ -122,6 +143,7 @@ class TimelineService {
             .snapshots()
             .listen((snapshot) {
               watchMatchDocs = snapshot.docs;
+              hasLoadedOnce['watchMatches'] = true;
               emit();
             }, onError: controller.addError);
 
@@ -133,6 +155,7 @@ class TimelineService {
             .snapshots()
             .listen((snapshot) {
               activityDocs = snapshot.docs;
+              hasLoadedOnce['activity'] = true;
               emit();
             }, onError: controller.addError);
       },
