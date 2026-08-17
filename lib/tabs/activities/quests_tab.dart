@@ -335,7 +335,7 @@ class _QuestsTabState extends State<QuestsTab>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Frosted Glass Top Progress Summary Card
+                      // Top Progress Summary Card
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(24),
@@ -479,7 +479,7 @@ class _QuestsTabState extends State<QuestsTab>
                       _SectionLabel(text: "Today's Quests", cs: cs),
                       const SizedBox(height: 14),
 
-                      // Interactive list
+                      // Pure dissolve (opacity fade) per quest item
                       ...List.generate(questDocs.length, (i) {
                         final doc = questDocs[i];
                         final quest = doc.data();
@@ -491,147 +491,166 @@ class _QuestsTabState extends State<QuestsTab>
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 14),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () async {
-                              final bool nextState = !done;
-
-                              WriteBatch updateBatch = _firestore.batch();
-
-                              final myDocRef = _firestore
-                                  .collection('users')
-                                  .doc(_myUid)
-                                  .collection('quests')
-                                  .doc(doc.id);
-                              final partnerDocRef = _firestore
-                                  .collection('users')
-                                  .doc(partnerUid)
-                                  .collection('quests')
-                                  .doc(doc.id);
-
-                              updateBatch.update(myDocRef, {'done': nextState});
-                              updateBatch.update(partnerDocRef, {
-                                'done': nextState,
-                              });
-
-                              updateBatch.commit().catchError((_) {});
-
-                              try {
-                                if (nextState) {
-                                  StreaksService()
-                                      .recordActivity('quest_completed')
-                                      .catchError((_) {});
-                                }
-                              } catch (_) {}
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0.0, end: 1.0),
+                            duration: Duration(milliseconds: 350 + (i * 80)),
+                            curve: Curves.easeInOut,
+                            builder: (context, opacityValue, child) {
+                              return Opacity(
+                                opacity: opacityValue,
+                                child: child,
+                              );
                             },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeInOut,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: done
-                                    ? (isDark
-                                          ? const Color(0xFF1E2B24)
-                                          : cs.primaryContainer.withOpacity(
-                                              0.35,
-                                            ))
-                                    : (isDark
-                                          ? cs.surfaceContainerLow
-                                          : Colors.white),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () async {
+                                final bool nextState = !done;
+
+                                WriteBatch updateBatch = _firestore.batch();
+
+                                final myDocRef = _firestore
+                                    .collection('users')
+                                    .doc(_myUid)
+                                    .collection('quests')
+                                    .doc(doc.id);
+                                final partnerDocRef = _firestore
+                                    .collection('users')
+                                    .doc(partnerUid)
+                                    .collection('quests')
+                                    .doc(doc.id);
+
+                                updateBatch.update(myDocRef, {
+                                  'done': nextState,
+                                });
+                                updateBatch.update(partnerDocRef, {
+                                  'done': nextState,
+                                });
+
+                                updateBatch.commit().catchError((_) {});
+
+                                try {
+                                  if (nextState) {
+                                    StreaksService()
+                                        .recordActivity('quest_completed')
+                                        .catchError((_) {});
+                                  }
+                                } catch (_) {}
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOut,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
                                   color: done
-                                      ? cs.primary.withOpacity(0.6)
-                                      : cs.outlineVariant.withOpacity(0.9),
-                                  width: 2.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
+                                      ? (isDark
+                                            ? const Color(0xFF1E2B24)
+                                            : cs.primaryContainer.withOpacity(
+                                                0.35,
+                                              ))
+                                      : (isDark
+                                            ? cs.surfaceContainerLow
+                                            : Colors.white),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
                                     color: done
-                                        ? Colors.transparent
-                                        : (isDark
-                                              ? Colors.black.withOpacity(0.3)
-                                              : Colors.black.withOpacity(0.04)),
-                                    blurRadius: 10,
-                                    spreadRadius: 0,
-                                    offset: const Offset(0, 4),
+                                        ? cs.primary.withOpacity(0.6)
+                                        : cs.outlineVariant.withOpacity(0.9),
+                                    width: 2.0,
                                   ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  // Primary Tinted Icon Container
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 250),
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
+                                  boxShadow: [
+                                    BoxShadow(
                                       color: done
-                                          ? cs.primaryContainer.withOpacity(
-                                              0.85,
-                                            )
-                                          : cs.primaryContainer.withOpacity(
-                                              0.5,
-                                            ),
-                                      borderRadius: BorderRadius.circular(14),
+                                          ? Colors.transparent
+                                          : (isDark
+                                                ? Colors.black.withOpacity(0.3)
+                                                : Colors.black.withOpacity(
+                                                    0.04,
+                                                  )),
+                                      blurRadius: 10,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 4),
                                     ),
-                                    child: Center(
-                                      child: Icon(
-                                        questIcon,
-                                        size: 22,
-                                        color: cs.primary,
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Primary Tinted Icon Container
+                                    AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 250,
+                                      ),
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: done
+                                            ? cs.primaryContainer.withOpacity(
+                                                0.85,
+                                              )
+                                            : cs.primaryContainer.withOpacity(
+                                                0.5,
+                                              ),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          questIcon,
+                                          size: 22,
+                                          color: cs.primary,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      quest['title'] ?? '',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            fontWeight: done
-                                                ? FontWeight.normal
-                                                : FontWeight.w600,
-                                            color: done
-                                                ? cs.onSurfaceVariant
-                                                      .withOpacity(0.7)
-                                                : cs.onSurface,
-                                            decoration: done
-                                                ? TextDecoration.lineThrough
-                                                : TextDecoration.none,
-                                          ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Text(
+                                        quest['title'] ?? '',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: done
+                                                  ? FontWeight.normal
+                                                  : FontWeight.w600,
+                                              color: done
+                                                  ? cs.onSurfaceVariant
+                                                        .withOpacity(0.7)
+                                                  : cs.onSurface,
+                                              decoration: done
+                                                  ? TextDecoration.lineThrough
+                                                  : TextDecoration.none,
+                                            ),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: done
-                                          ? cs.primary
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
+                                    const SizedBox(width: 8),
+                                    AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
                                         color: done
                                             ? cs.primary
-                                            : cs.outline.withOpacity(0.6),
-                                        width: 2,
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: done
+                                              ? cs.primary
+                                              : cs.outline.withOpacity(0.6),
+                                          width: 2,
+                                        ),
                                       ),
+                                      child: done
+                                          ? Icon(
+                                              Icons.check_rounded,
+                                              size: 16,
+                                              color: cs.onPrimary,
+                                            )
+                                          : null,
                                     ),
-                                    child: done
-                                        ? Icon(
-                                            Icons.check_rounded,
-                                            size: 16,
-                                            color: cs.onPrimary,
-                                          )
-                                        : null,
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),

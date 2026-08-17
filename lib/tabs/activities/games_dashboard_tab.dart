@@ -114,6 +114,90 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                       partnerScoresSnapshot.data?.docs,
                     );
 
+                    final gamesList = [
+                      _GameInfo(
+                        title: 'Better Together',
+                        subtitle:
+                            'A memory-card pairing game! Match iconic partners like 🍷 + 🧀 across themed decks.',
+                        icon: Icons.style_rounded,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const BetterTogetherDashboard(),
+                            ),
+                          );
+                        },
+                      ),
+                      _GameInfo(
+                        title: 'LetterLocked',
+                        subtitle:
+                            'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
+                        icon: Icons.lock_open_rounded,
+                        onTap: () {
+                          if (partnerUid.isEmpty) return;
+
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LetterLockedDashboard(
+                                myUid: _myUid,
+                                partnerUid: partnerUid,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      _GameInfo(
+                        title: 'Our Trivia',
+                        subtitle:
+                            'Test your compatibility! Sync matching responses and see who remembers best.',
+                        icon: Icons.quiz_rounded,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TriviaGameScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _GameInfo(
+                        title: 'DoodleClues',
+                        subtitle:
+                            'An asymmetric sketching showdown! Translate secret items into line art and see if your partner can crack the hint.',
+                        icon: Icons.gesture_rounded,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DoodleCluesGameScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _GameInfo(
+                        title: 'Telepathy',
+                        subtitle:
+                            'Collaborative word chains! Start with a seed phrase and build bridges together until your lines of thinking merge.',
+                        icon: Icons.psychology_rounded,
+                        onTap: () {
+                          if (partnerUid.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Waiting to connect with partner...",
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TelepathyDashboard(),
+                            ),
+                          );
+                        },
+                      ),
+                    ];
+
                     return SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -168,7 +252,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                                     children: [
                                       _buildScoreColumn(
                                         context,
-                                        '$myTotalWins',
+                                        myTotalWins,
                                         'Your Wins',
                                         cs.primary,
                                       ),
@@ -179,7 +263,7 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                                       ),
                                       _buildScoreColumn(
                                         context,
-                                        '$partnerTotalWins',
+                                        partnerTotalWins,
                                         "Partner's Wins",
                                         cs.secondary,
                                       ),
@@ -193,111 +277,34 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
                           _SectionLabel(text: 'Available Games', cs: cs),
                           const SizedBox(height: 14),
 
-                          // Better Together Game Card
-                          _buildCleanGameCard(
-                            context: context,
-                            title: 'Better Together',
-                            subtitle:
-                                'A memory-card pairing game! Match iconic partners like 🍷 + 🧀 across themed decks.',
-                            icon: Icons.style_rounded,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const BetterTogetherDashboard(),
+                          // Interactive games list with pure dissolve animation
+                          ...List.generate(gamesList.length, (i) {
+                            final game = gamesList[i];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween<double>(begin: 0.0, end: 1.0),
+                                duration: Duration(
+                                  milliseconds: 350 + (i * 80),
                                 ),
-                              );
-                            },
-                            cs: cs,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // LetterLocked Game Card
-                          _buildCleanGameCard(
-                            context: context,
-                            title: 'LetterLocked',
-                            subtitle:
-                                'Co-op Vault or Versus Word Trap. Build words, flip turns, and lock combinations.',
-                            icon: Icons.lock_open_rounded,
-                            onTap: () {
-                              if (partnerUid.isEmpty) return;
-
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => LetterLockedDashboard(
-                                    myUid: _myUid,
-                                    partnerUid: partnerUid,
-                                  ),
+                                curve: Curves.easeInOut,
+                                builder: (context, opacityValue, child) {
+                                  return Opacity(
+                                    opacity: opacityValue,
+                                    child: child,
+                                  );
+                                },
+                                child: _buildCleanGameCard(
+                                  context: context,
+                                  title: game.title,
+                                  subtitle: game.subtitle,
+                                  icon: game.icon,
+                                  onTap: game.onTap,
+                                  cs: cs,
                                 ),
-                              );
-                            },
-                            cs: cs,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Our Trivia Game Card
-                          _buildCleanGameCard(
-                            context: context,
-                            title: 'Our Trivia',
-                            subtitle:
-                                'Test your compatibility! Sync matching responses and see who remembers best.',
-                            icon: Icons.quiz_rounded,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const TriviaGameScreen(),
-                                ),
-                              );
-                            },
-                            cs: cs,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // DoodleClues Game Card
-                          _buildCleanGameCard(
-                            context: context,
-                            title: 'DoodleClues',
-                            subtitle:
-                                'An asymmetric sketching showdown! Translate secret items into line art and see if your partner can crack the hint.',
-                            icon: Icons.gesture_rounded,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DoodleCluesGameScreen(),
-                                ),
-                              );
-                            },
-                            cs: cs,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Telepathy Game Card
-                          _buildCleanGameCard(
-                            context: context,
-                            title: 'Telepathy',
-                            subtitle:
-                                'Collaborative word chains! Start with a seed phrase and build bridges together until your lines of thinking merge.',
-                            icon: Icons.psychology_rounded,
-                            onTap: () {
-                              if (partnerUid.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      "Waiting to connect with partner...",
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const TelepathyDashboard(),
-                                ),
-                              );
-                            },
-                            cs: cs,
-                          ),
+                              ),
+                            );
+                          }),
                         ],
                       ),
                     );
@@ -311,14 +318,13 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
     );
   }
 
-  /// 🔍 Migrated: Loops through individual document records inside the score subcollection to pull totals
+  /// Loops through individual document records inside the score subcollection to pull totals
   int _sumScoresFromDocuments(
     List<QueryDocumentSnapshot<Map<String, dynamic>>>? docs,
   ) {
     if (docs == null || docs.isEmpty) return 0;
     int total = 0;
     for (var doc in docs) {
-      // Looks for a field key called 'wins' inside each game's logging document record
       total += (doc.data()['wins'] as int? ?? 0);
     }
     return total;
@@ -326,20 +332,28 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
 
   Widget _buildScoreColumn(
     BuildContext context,
-    String value,
+    int targetValue,
     String label,
     Color color,
   ) {
     return Column(
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontFamily: 'CormorantGaramond',
-            fontSize: 38,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+        TweenAnimationBuilder<double>(
+          key: ValueKey(targetValue),
+          tween: Tween<double>(begin: 0.0, end: targetValue.toDouble()),
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedVal, _) {
+            return Text(
+              '${animatedVal.round()}',
+              style: TextStyle(
+                fontFamily: 'CormorantGaramond',
+                fontSize: 38,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            );
+          },
         ),
         const SizedBox(height: 4),
         Text(
@@ -434,4 +448,18 @@ class _GamesDashboardTabState extends State<GamesDashboardTab> {
       ),
     );
   }
+}
+
+class _GameInfo {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _GameInfo({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
 }

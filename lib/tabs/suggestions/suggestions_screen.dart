@@ -801,32 +801,43 @@ class _SuggestionsScreenState extends State<SuggestionsScreen>
                     ),
                   ),
 
-                  // Swiper Cards Area with tighter stack spacing
-                  // Swiper Cards Area with tighter stack spacing
+                  // Swiper Cards Area with dissolve entrance animation
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: CardSwiper(
-                        controller: _swiperController,
-                        cardsCount: _suggestions.length,
-                        numberOfCardsDisplayed: _suggestions.length < 3
-                            ? _suggestions.length
-                            : 3,
-                        maxAngle: 30,
-                        scale:
-                            0.85, // Brings stacked cards closer by keeping their scale almost full size
-                        threshold: 50,
-                        cardBuilder: (context, index, _, __) {
-                          if (index < 0 || index >= _suggestions.length) {
-                            return null;
-                          }
-                          return _SuggestionCard(
-                            suggestion: _suggestions[index],
-                            cs: cs,
-                            isDark: isDark,
-                          );
+                      child: TweenAnimationBuilder<double>(
+                        key: ValueKey(
+                          _suggestions.isNotEmpty
+                              ? _suggestions.first['id']
+                              : 'empty',
+                        ),
+                        tween: Tween<double>(begin: 0.0, end: 1.0),
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                        builder: (context, opacityValue, child) {
+                          return Opacity(opacity: opacityValue, child: child);
                         },
-                        onSwipe: _onSwipe,
+                        child: CardSwiper(
+                          controller: _swiperController,
+                          cardsCount: _suggestions.length,
+                          numberOfCardsDisplayed: _suggestions.length < 3
+                              ? _suggestions.length
+                              : 3,
+                          maxAngle: 30,
+                          scale: 0.85,
+                          threshold: 50,
+                          cardBuilder: (context, index, _, __) {
+                            if (index < 0 || index >= _suggestions.length) {
+                              return null;
+                            }
+                            return _SuggestionCard(
+                              suggestion: _suggestions[index],
+                              cs: cs,
+                              isDark: isDark,
+                            );
+                          },
+                          onSwipe: _onSwipe,
+                        ),
                       ),
                     ),
                   ),
