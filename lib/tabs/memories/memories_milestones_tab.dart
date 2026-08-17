@@ -2,14 +2,88 @@
 part of 'memories_screen.dart';
 
 class MemoriesMilestonesTab extends StatelessWidget {
-  const MemoriesMilestonesTab({super.key});
+  final int userCoins;
+  final int nextRewardTarget;
+  final String nextAccessoryName;
+  final List<Map<String, dynamic>>? customNudges;
+  final List<Map<String, dynamic>> coupleGoals;
+  final List<Map<String, dynamic>> personalGoals;
+  final List<Map<String, dynamic>> achievements;
+  final ValueChanged<Map<String, dynamic>>? onGoalAdded;
+  final ValueChanged<Map<String, dynamic>>? onGoalToggled;
+  final ValueChanged<Map<String, dynamic>>? onNudgeAdded;
+  final ValueChanged<Map<String, dynamic>>? onNudgeRemoved;
+  final void Function(String title, IconData icon)? onNudgeSent;
+
+  const MemoriesMilestonesTab({
+    super.key,
+    this.userCoins = 0,
+    this.nextRewardTarget = 100,
+    this.nextAccessoryName = 'Next Reward',
+    this.customNudges,
+    this.coupleGoals = const [],
+    this.personalGoals = const [],
+    this.achievements = const [],
+    this.onGoalAdded,
+    this.onGoalToggled,
+    this.onNudgeAdded,
+    this.onNudgeRemoved,
+    this.onNudgeSent,
+  });
 
   @override
-  Widget build(BuildContext context) => const _MilestonesGoalsContentTab();
+  Widget build(BuildContext context) => _MilestonesGoalsContentTab(
+    initialCoins: userCoins,
+    rewardTarget: nextRewardTarget,
+    accessoryName: nextAccessoryName,
+    initialNudges:
+        customNudges ??
+        const [
+          {'icon': Icons.water_drop_rounded, 'label': 'Water'},
+          {'icon': Icons.medication_rounded, 'label': 'Vitamins'},
+          {'icon': Icons.restaurant_rounded, 'label': 'Snack'},
+          {'icon': Icons.volunteer_activism_rounded, 'label': 'Hug'},
+          {'icon': Icons.bedtime_rounded, 'label': 'Sleep'},
+        ],
+    initialCoupleGoals: coupleGoals,
+    initialPersonalGoals: personalGoals,
+    initialAchievements: achievements,
+    onGoalAdded: onGoalAdded,
+    onGoalToggled: onGoalToggled,
+    onNudgeAdded: onNudgeAdded,
+    onNudgeRemoved: onNudgeRemoved,
+    onNudgeSent: onNudgeSent,
+  );
 }
 
 class _MilestonesGoalsContentTab extends StatefulWidget {
-  const _MilestonesGoalsContentTab();
+  final int initialCoins;
+  final int rewardTarget;
+  final String accessoryName;
+  final List<Map<String, dynamic>> initialNudges;
+  final List<Map<String, dynamic>> initialCoupleGoals;
+  final List<Map<String, dynamic>> initialPersonalGoals;
+  final List<Map<String, dynamic>> initialAchievements;
+  final ValueChanged<Map<String, dynamic>>? onGoalAdded;
+  final ValueChanged<Map<String, dynamic>>? onGoalToggled;
+  final ValueChanged<Map<String, dynamic>>? onNudgeAdded;
+  final ValueChanged<Map<String, dynamic>>? onNudgeRemoved;
+  final void Function(String title, IconData icon)? onNudgeSent;
+
+  const _MilestonesGoalsContentTab({
+    required this.initialCoins,
+    required this.rewardTarget,
+    required this.accessoryName,
+    required this.initialNudges,
+    required this.initialCoupleGoals,
+    required this.initialPersonalGoals,
+    required this.initialAchievements,
+    this.onGoalAdded,
+    this.onGoalToggled,
+    this.onNudgeAdded,
+    this.onNudgeRemoved,
+    this.onNudgeSent,
+  });
 
   @override
   State<_MilestonesGoalsContentTab> createState() =>
@@ -20,9 +94,14 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     with TickerProviderStateMixin {
   int _selectedTabIndex = 0; // 0: For Us, 1: For Me, 2: Badges
 
-  int userCoins = 140;
-  final int nextRewardTarget = 300;
-  final String nextAccessoryName = 'Party Hat';
+  late int userCoins;
+  late int nextRewardTarget;
+  late String nextAccessoryName;
+
+  late List<Map<String, dynamic>> customNudges;
+  late List<Map<String, dynamic>> coupleGoals;
+  late List<Map<String, dynamic>> personalGoals;
+  late List<Map<String, dynamic>> achievements;
 
   late AnimationController _celebrationController;
   late Animation<double> _scaleAnimation;
@@ -30,122 +109,23 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   bool _showCelebration = false;
   String _celebrationTitle = '';
 
-  // Burst animation controllers & particles
   late AnimationController _burstAnimController;
   bool _showNudgeBurst = false;
   IconData? _burstIcon;
   final List<_ParticleTrajectory> _particles = [];
 
-  List<Map<String, dynamic>> customNudges = [
-    {'icon': Icons.water_drop_rounded, 'label': 'Water'},
-    {'icon': Icons.medication_rounded, 'label': 'Vitamins'},
-    {'icon': Icons.restaurant_rounded, 'label': 'Snack'},
-    {'icon': Icons.volunteer_activism_rounded, 'label': 'Hug'},
-    {'icon': Icons.bedtime_rounded, 'label': 'Sleep'},
-  ];
-
-  final List<Map<String, dynamic>> coupleGoals = [
-    {
-      'id': '1',
-      'title': 'Cook a homemade pasta dinner',
-      'category': 'Date Night',
-      'points': 10,
-      'isCompleted': false,
-      'icon': Icons.dinner_dining_rounded,
-    },
-    {
-      'id': '2',
-      'title': 'Stargazing picnic in the park',
-      'category': 'Adventure',
-      'points': 8,
-      'isCompleted': true,
-      'icon': Icons.nightlight_round,
-    },
-    {
-      'id': '3',
-      'title': 'Complete a 1000-piece puzzle',
-      'category': 'Cozy',
-      'points': 10,
-      'isCompleted': false,
-      'icon': Icons.extension_rounded,
-    },
-  ];
-
-  final List<Map<String, dynamic>> personalGoals = [
-    {
-      'id': 'p1',
-      'title': 'Drink 2L of water daily',
-      'category': 'Self-Care',
-      'points': 3,
-      'isCompleted': false,
-      'icon': Icons.water_drop_rounded,
-    },
-    {
-      'id': 'p2',
-      'title': 'Daily 30 min workout or walk',
-      'category': 'Fitness',
-      'points': 5,
-      'isCompleted': false,
-      'icon': Icons.fitness_center_rounded,
-    },
-    {
-      'id': 'p3',
-      'title': 'Read 10 pages before bed',
-      'category': 'Mindfulness',
-      'points': 5,
-      'isCompleted': true,
-      'icon': Icons.auto_stories_rounded,
-    },
-  ];
-
-  final List<Map<String, dynamic>> achievements = [
-    {
-      'id': 'a1',
-      'title': 'Memory Keeper',
-      'description': 'Add 5 entries to your shared scrapbook',
-      'progress': 3,
-      'target': 5,
-      'points': 100,
-      'isUnlocked': false,
-      'icon': Icons.photo_library_rounded,
-    },
-    {
-      'id': 'a2',
-      'title': 'Love Notes',
-      'description': 'Send 10 love letters or notes',
-      'progress': 10,
-      'target': 10,
-      'points': 150,
-      'isUnlocked': true,
-      'icon': Icons.mark_email_read_rounded,
-    },
-    {
-      'id': 'a3',
-      'title': 'Week of Harmony',
-      'description': 'Maintain a 7-day active goal streak',
-      'progress': 4,
-      'target': 7,
-      'points': 120,
-      'isUnlocked': false,
-      'icon': Icons.local_fire_department_rounded,
-    },
-    {
-      'id': 'a4',
-      'title': 'Duo Explorers',
-      'description': 'Complete 5 shared couple bucket list items',
-      'progress': 5,
-      'target': 5,
-      'points': 200,
-      'isUnlocked': true,
-      'icon': Icons.explore_rounded,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
+    userCoins = widget.initialCoins;
+    nextRewardTarget = widget.rewardTarget;
+    nextAccessoryName = widget.accessoryName;
 
-    // Goal set celebration
+    customNudges = List.from(widget.initialNudges);
+    coupleGoals = List.from(widget.initialCoupleGoals);
+    personalGoals = List.from(widget.initialPersonalGoals);
+    achievements = List.from(widget.initialAchievements);
+
     _celebrationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -186,7 +166,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       }
     });
 
-    // Icon Burst Animation Setup
     _burstAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -197,6 +176,32 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
         setState(() => _showNudgeBurst = false);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant _MilestonesGoalsContentTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCoins != widget.initialCoins) {
+      userCoins = widget.initialCoins;
+    }
+    if (oldWidget.rewardTarget != widget.rewardTarget) {
+      nextRewardTarget = widget.rewardTarget;
+    }
+    if (oldWidget.accessoryName != widget.accessoryName) {
+      nextAccessoryName = widget.accessoryName;
+    }
+    if (oldWidget.initialNudges != widget.initialNudges) {
+      customNudges = List.from(widget.initialNudges);
+    }
+    if (oldWidget.initialCoupleGoals != widget.initialCoupleGoals) {
+      coupleGoals = List.from(widget.initialCoupleGoals);
+    }
+    if (oldWidget.initialPersonalGoals != widget.initialPersonalGoals) {
+      personalGoals = List.from(widget.initialPersonalGoals);
+    }
+    if (oldWidget.initialAchievements != widget.initialAchievements) {
+      achievements = List.from(widget.initialAchievements);
+    }
   }
 
   @override
@@ -245,6 +250,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       _showNudgeBurst = true;
     });
     _burstAnimController.forward(from: 0.0);
+
+    widget.onNudgeSent?.call(title, icon);
   }
 
   @override
@@ -294,13 +301,21 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       return Column(
         key: const ValueKey('couple_tab'),
         children: [
-          ...coupleGoals.map(
-            (g) => _buildGoalCard(
-              goal: g,
-              isCoupleGoal: true,
+          if (coupleGoals.isEmpty)
+            _buildEmptyState(
+              icon: Icons.favorite_outline_rounded,
+              title: 'No couple goals yet',
+              subtitle: 'Add shared milestones to complete together!',
               colorScheme: colorScheme,
+            )
+          else
+            ...coupleGoals.map(
+              (g) => _buildGoalCard(
+                goal: g,
+                isCoupleGoal: true,
+                colorScheme: colorScheme,
+              ),
             ),
-          ),
           const SizedBox(height: 8),
           _buildAddGoalButton(
             label: 'Add Couple Goal',
@@ -312,13 +327,21 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       return Column(
         key: const ValueKey('personal_tab'),
         children: [
-          ...personalGoals.map(
-            (g) => _buildGoalCard(
-              goal: g,
-              isCoupleGoal: false,
+          if (personalGoals.isEmpty)
+            _buildEmptyState(
+              icon: Icons.person_outline_rounded,
+              title: 'No personal goals yet',
+              subtitle: 'Track your personal daily self-care habits!',
               colorScheme: colorScheme,
+            )
+          else
+            ...personalGoals.map(
+              (g) => _buildGoalCard(
+                goal: g,
+                isCoupleGoal: false,
+                colorScheme: colorScheme,
+              ),
             ),
-          ),
           const SizedBox(height: 8),
           _buildAddGoalButton(
             label: 'Add Personal Goal',
@@ -329,22 +352,69 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     } else {
       return Column(
         key: const ValueKey('badges_tab'),
-        children: achievements
-            .map(
-              (a) => _buildAchievementCard(
-                achievement: a,
-                colorScheme: colorScheme,
-              ),
-            )
-            .toList(),
+        children: achievements.isEmpty
+            ? [
+                _buildEmptyState(
+                  icon: Icons.military_tech_outlined,
+                  title: 'No achievements available',
+                  subtitle: 'Complete goals and activities to unlock badges!',
+                  colorScheme: colorScheme,
+                ),
+              ]
+            : achievements
+                  .map(
+                    (a) => _buildAchievementCard(
+                      achievement: a,
+                      colorScheme: colorScheme,
+                    ),
+                  )
+                  .toList(),
       );
     }
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required ColorScheme colorScheme,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 40,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPetHeroCard(ColorScheme colors) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final progress = (userCoins / nextRewardTarget).clamp(0.0, 1.0);
+    final progress = nextRewardTarget > 0
+        ? (userCoins / nextRewardTarget).clamp(0.0, 1.0)
+        : 0.0;
     final pointsRemaining = (nextRewardTarget - userCoins).clamp(
       0,
       nextRewardTarget,
@@ -402,7 +472,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            "MOCHI'S ACCESSORY",
+                            "REWARD PROGRESS",
                             style: theme.textTheme.labelSmall?.copyWith(
                               letterSpacing: 1.3,
                               fontWeight: FontWeight.bold,
@@ -489,7 +559,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: colors.primary.withValues(alpha: 0.8),
+                            color: colors.primary,
                           ),
                         ),
                       ],
@@ -625,8 +695,9 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
               }
 
               final nudge = customNudges[index];
-              final iconData = nudge['icon'] as IconData;
-              final label = nudge['label'] as String;
+              final iconData =
+                  nudge['icon'] as IconData? ?? Icons.favorite_rounded;
+              final label = nudge['label'] as String? ?? 'Nudge';
 
               return Container(
                 decoration: BoxDecoration(
@@ -789,7 +860,11 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     required ColorScheme colorScheme,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isCompleted = goal['isCompleted'] as bool;
+    final isCompleted = goal['isCompleted'] as bool? ?? false;
+    final points = (goal['points'] as num?)?.toInt() ?? 0;
+    final title = goal['title'] as String? ?? '';
+    final category = goal['category'] as String? ?? 'General';
+    final iconData = goal['icon'] as IconData? ?? Icons.star_rounded;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -800,11 +875,12 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
           setState(() {
             goal['isCompleted'] = !isCompleted;
             if (goal['isCompleted']) {
-              userCoins += (goal['points'] as int);
+              userCoins += points;
             } else {
-              userCoins -= (goal['points'] as int);
+              userCoins -= points;
             }
           });
+          widget.onGoalToggled?.call(goal);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
@@ -856,11 +932,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   ],
                 ),
                 child: Center(
-                  child: Icon(
-                    goal['icon'] as IconData,
-                    size: 22,
-                    color: colorScheme.primary,
-                  ),
+                  child: Icon(iconData, size: 22, color: colorScheme.primary),
                 ),
               ),
               const SizedBox(width: 16),
@@ -869,7 +941,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      goal['title'] as String,
+                      title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -890,7 +962,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                     Row(
                       children: [
                         Text(
-                          goal['category'] as String,
+                          category,
                           style: TextStyle(
                             fontSize: 11,
                             color: colorScheme.onSurfaceVariant,
@@ -906,7 +978,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          '+${goal['points']} pts',
+                          '+$points pts',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -926,10 +998,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   ),
                   color: colorScheme.primary,
                   tooltip: 'Remind partner',
-                  onPressed: () => _sendNudge(
-                    goal['title'] as String,
-                    icon: goal['icon'] as IconData,
-                  ),
+                  onPressed: () => _sendNudge(title, icon: iconData),
                 ),
               const SizedBox(width: 4),
               AnimatedContainer(
@@ -975,9 +1044,15 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     required ColorScheme colorScheme,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isUnlocked = achievement['isUnlocked'] as bool;
-    final progress =
-        (achievement['progress'] as int) / (achievement['target'] as int);
+    final isUnlocked = achievement['isUnlocked'] as bool? ?? false;
+    final progressVal = (achievement['progress'] as num?)?.toInt() ?? 0;
+    final targetVal = (achievement['target'] as num?)?.toInt() ?? 1;
+    final points = (achievement['points'] as num?)?.toInt() ?? 0;
+    final title = achievement['title'] as String? ?? 'Achievement';
+    final description = achievement['description'] as String? ?? '';
+    final iconData =
+        achievement['icon'] as IconData? ?? Icons.military_tech_rounded;
+    final progress = targetVal > 0 ? (progressVal / targetVal) : 0.0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1031,11 +1106,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                 ],
               ),
               child: Center(
-                child: Icon(
-                  achievement['icon'] as IconData,
-                  size: 22,
-                  color: colorScheme.primary,
-                ),
+                child: Icon(iconData, size: 22, color: colorScheme.primary),
               ),
             ),
             const SizedBox(width: 16),
@@ -1046,11 +1117,14 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        achievement['title'] as String,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
                         ),
                       ),
                       Container(
@@ -1065,7 +1139,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '+${achievement['points']} pts',
+                          '+$points pts',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -1075,14 +1149,16 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    achievement['description'] as String,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurfaceVariant,
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   TweenAnimationBuilder<double>(
                     tween: Tween<double>(
@@ -1111,7 +1187,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      '${achievement['progress']}/${achievement['target']}',
+                      '$progressVal/$targetVal',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -1447,12 +1523,14 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                 ),
                 onPressed: () {
                   if (labelCtrl.text.trim().isEmpty) return;
+                  final newNudge = {
+                    'icon': selectedIcon,
+                    'label': labelCtrl.text.trim(),
+                  };
                   setState(() {
-                    customNudges.add({
-                      'icon': selectedIcon,
-                      'label': labelCtrl.text.trim(),
-                    });
+                    customNudges.add(newNudge);
                   });
+                  widget.onNudgeAdded?.call(newNudge);
                   Navigator.pop(dlgCtx);
                 },
                 child: const Text('Save Nudge'),
@@ -1743,6 +1821,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           'points': selectedPoints,
                           'isCompleted': false,
                           'icon': selectedIcon,
+                          'isCouple': _selectedTabIndex == 0,
                         };
 
                         setState(() {
@@ -1753,6 +1832,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           }
                         });
 
+                        widget.onGoalAdded?.call(newGoal);
                         Navigator.pop(modalCtx);
                         _triggerAddGoalCelebration(newGoal['title'] as String);
                       },
@@ -1804,41 +1884,56 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   ],
                 ),
                 const SizedBox(height: 8),
-                ...customNudges.map((nudge) {
-                  return ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        nudge['icon'] as IconData,
-                        size: 18,
-                        color: colors.primary,
+                if (customNudges.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Text(
+                        'No custom nudges yet. Tap + to add one!',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ),
-                    title: Text(
-                      nudge['label'] as String,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        size: 18,
-                        color: Colors.redAccent,
+                  )
+                else
+                  ...customNudges.map((nudge) {
+                    final iconData =
+                        nudge['icon'] as IconData? ?? Icons.favorite_rounded;
+                    final label = nudge['label'] as String? ?? 'Nudge';
+
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(iconData, size: 18, color: colors.primary),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          customNudges.remove(nudge);
-                        });
-                        setModalState(() {});
-                      },
-                    ),
-                  );
-                }),
+                      title: Text(
+                        label,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            customNudges.remove(nudge);
+                          });
+                          widget.onNudgeRemoved?.call(nudge);
+                          setModalState(() {});
+                        },
+                      ),
+                    );
+                  }),
                 const SizedBox(height: 12),
               ],
             ),
