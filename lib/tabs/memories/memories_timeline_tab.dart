@@ -131,9 +131,16 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab>
     return StreamBuilder<List<TimelineEntry>>(
       stream: _timelineStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+        // Wait for the stream's first (always complete) result. No
+        // spinner -- just a blank frame that the AnimatedSwitcher below
+        // dissolves into the real content.
+        if (!snapshot.hasData) {
+          return const AnimatedSwitcher(
+            duration: Duration(milliseconds: 320),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: SizedBox.shrink(key: ValueKey('timeline_loading')),
+          );
         }
 
         final entries = snapshot.data ?? const <TimelineEntry>[];
@@ -202,146 +209,165 @@ class _MemoriesTimelineTabState extends State<MemoriesTimelineTab>
                           width: 1,
                         ),
                       ),
-                      child: entries.isEmpty
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'TIMELINE SUMMARY',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        letterSpacing: 1.3,
-                                        fontWeight: FontWeight.bold,
-                                        color: cs.primary,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Your timeline is empty right now.',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        color: cs.onSurface,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Log a scrapbook date, finish a quest, or watch something together to start building it.',
-                                  style: TextStyle(
-                                    fontFamily: 'DMSans',
-                                    fontSize: 14,
-                                    height: 1.45,
-                                    color: cs.onSurfaceVariant,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 500),
+                        switchInCurve: Curves.easeInOutCubic,
+                        switchOutCurve: Curves.easeInOutCubic,
+                        transitionBuilder: (child, animation) =>
+                            FadeTransition(opacity: animation, child: child),
+                        child: entries.isEmpty
+                            ? Column(
+                                key: const ValueKey('top_empty'),
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'TIMELINE SUMMARY',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          letterSpacing: 1.3,
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.primary,
+                                        ),
                                   ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'TIMELINE STATS',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        letterSpacing: 1.3,
-                                        fontWeight: FontWeight.bold,
-                                        color: cs.primary,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                TweenAnimationBuilder<double>(
-                                  key: ValueKey(entries.length),
-                                  tween: Tween<double>(
-                                    begin: 0.0,
-                                    end: entries.length.toDouble(),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Your timeline is empty right now.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: cs.onSurface,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                   ),
-                                  duration: const Duration(milliseconds: 350),
-                                  curve: Curves.easeOutCubic,
-                                  builder: (context, animatedCount, _) {
-                                    return Text(
-                                      '${animatedCount.round()} Moments Logged',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            color: cs.onSurface,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 18),
-                                Row(
-                                  children: stats.map((stat) {
-                                    return Expanded(
-                                      child: Container(
-                                        margin: const EdgeInsets.only(right: 8),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                          horizontal: 12,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Log a scrapbook date, finish a quest, or watch something together to start building it.',
+                                    style: TextStyle(
+                                      fontFamily: 'DMSans',
+                                      fontSize: 14,
+                                      height: 1.45,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                key: const ValueKey('top_stats'),
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'TIMELINE STATS',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          letterSpacing: 1.3,
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.primary,
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: isDark
-                                              ? cs.surfaceContainerLowest
-                                                    .withOpacity(0.5)
-                                              : Colors.white.withOpacity(0.5),
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                          border: Border.all(
-                                            color: cs.primary.withOpacity(0.2),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            TweenAnimationBuilder<double>(
-                                              key: ValueKey(stat.value),
-                                              tween: Tween<double>(
-                                                begin: 0.0,
-                                                end: stat.value.toDouble(),
-                                              ),
-                                              duration: const Duration(
-                                                milliseconds: 350,
-                                              ),
-                                              curve: Curves.easeOutCubic,
-                                              builder:
-                                                  (context, animatedVal, _) {
-                                                    return Text(
-                                                      '${animatedVal.round()}',
-                                                      style: TextStyle(
-                                                        fontFamily: 'DMSans',
-                                                        fontSize: 20,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: cs.primary,
-                                                      ),
-                                                    );
-                                                  },
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TweenAnimationBuilder<double>(
+                                    key: ValueKey(entries.length),
+                                    tween: Tween<double>(
+                                      begin: 0.0,
+                                      end: entries.length.toDouble(),
+                                    ),
+                                    duration: const Duration(milliseconds: 350),
+                                    curve: Curves.easeOutCubic,
+                                    builder: (context, animatedCount, _) {
+                                      return Text(
+                                        '${animatedCount.round()} Moments Logged',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge
+                                            ?.copyWith(
+                                              color: cs.onSurface,
+                                              fontWeight: FontWeight.w800,
                                             ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              stat.label,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontFamily: 'DMSans',
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: cs.onSurfaceVariant
-                                                    .withOpacity(0.9),
-                                              ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Row(
+                                    children: stats.map((stat) {
+                                      return Expanded(
+                                        child: Container(
+                                          margin: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                            horizontal: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? cs.surfaceContainerLowest
+                                                      .withOpacity(0.5)
+                                                : Colors.white.withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(
+                                              16,
                                             ),
-                                          ],
+                                            border: Border.all(
+                                              color: cs.primary.withOpacity(
+                                                0.2,
+                                              ),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              TweenAnimationBuilder<double>(
+                                                key: ValueKey(stat.value),
+                                                tween: Tween<double>(
+                                                  begin: 0.0,
+                                                  end: stat.value.toDouble(),
+                                                ),
+                                                duration: const Duration(
+                                                  milliseconds: 350,
+                                                ),
+                                                curve: Curves.easeOutCubic,
+                                                builder:
+                                                    (context, animatedVal, _) {
+                                                      return Text(
+                                                        '${animatedVal.round()}',
+                                                        style: TextStyle(
+                                                          fontFamily: 'DMSans',
+                                                          fontSize: 20,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          color: cs.primary,
+                                                        ),
+                                                      );
+                                                    },
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                stat.label,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontFamily: 'DMSans',
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: cs.onSurfaceVariant
+                                                      .withOpacity(0.9),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                      ),
                     ),
                   ),
                 ),
