@@ -17,10 +17,10 @@ class _MilestonesGoalsContentTab extends StatefulWidget {
 }
 
 class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   int _selectedTabIndex = 0; // 0: For Us, 1: For Me, 2: Badges
 
-  int userCoins = 240;
+  int userCoins = 140;
   final int nextRewardTarget = 300;
   final String nextAccessoryName = 'Party Hat';
 
@@ -29,6 +29,12 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   late Animation<double> _fadeAnimation;
   bool _showCelebration = false;
   String _celebrationTitle = '';
+
+  // Burst animation controllers & particles
+  late AnimationController _burstAnimController;
+  bool _showNudgeBurst = false;
+  IconData? _burstIcon;
+  final List<_ParticleTrajectory> _particles = [];
 
   List<Map<String, dynamic>> customNudges = [
     {'icon': Icons.water_drop_rounded, 'label': 'Water'},
@@ -43,7 +49,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       'id': '1',
       'title': 'Cook a homemade pasta dinner',
       'category': 'Date Night',
-      'points': 50,
+      'points': 10,
       'isCompleted': false,
       'icon': Icons.dinner_dining_rounded,
     },
@@ -51,7 +57,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       'id': '2',
       'title': 'Stargazing picnic in the park',
       'category': 'Adventure',
-      'points': 40,
+      'points': 8,
       'isCompleted': true,
       'icon': Icons.nightlight_round,
     },
@@ -59,7 +65,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       'id': '3',
       'title': 'Complete a 1000-piece puzzle',
       'category': 'Cozy',
-      'points': 60,
+      'points': 10,
       'isCompleted': false,
       'icon': Icons.extension_rounded,
     },
@@ -70,7 +76,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       'id': 'p1',
       'title': 'Drink 2L of water daily',
       'category': 'Self-Care',
-      'points': 15,
+      'points': 3,
       'isCompleted': false,
       'icon': Icons.water_drop_rounded,
     },
@@ -78,7 +84,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       'id': 'p2',
       'title': 'Daily 30 min workout or walk',
       'category': 'Fitness',
-      'points': 20,
+      'points': 5,
       'isCompleted': false,
       'icon': Icons.fitness_center_rounded,
     },
@@ -86,7 +92,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       'id': 'p3',
       'title': 'Read 10 pages before bed',
       'category': 'Mindfulness',
-      'points': 15,
+      'points': 5,
       'isCompleted': true,
       'icon': Icons.auto_stories_rounded,
     },
@@ -138,6 +144,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   @override
   void initState() {
     super.initState();
+
+    // Goal set celebration
     _celebrationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -177,11 +185,24 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
         setState(() => _showCelebration = false);
       }
     });
+
+    // Icon Burst Animation Setup
+    _burstAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    _burstAnimController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() => _showNudgeBurst = false);
+      }
+    });
   }
 
   @override
   void dispose() {
     _celebrationController.dispose();
+    _burstAnimController.dispose();
     super.dispose();
   }
 
@@ -191,6 +212,39 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       _showCelebration = true;
     });
     _celebrationController.forward(from: 0.0);
+  }
+
+  void _sendNudge(
+    String title, {
+    IconData icon = Icons.volunteer_activism_rounded,
+  }) {
+    HapticFeedback.lightImpact();
+
+    final random = math.Random();
+    _particles.clear();
+
+    for (int i = 0; i < 10; i++) {
+      final angle =
+          (i * (2 * math.pi / 10)) + (random.nextDouble() * 0.4 - 0.2);
+      final distance = 90.0 + random.nextDouble() * 110.0;
+      final targetOffset = Offset(
+        math.cos(angle) * distance,
+        math.sin(angle) * distance - 30.0,
+      );
+      _particles.add(
+        _ParticleTrajectory(
+          targetOffset: targetOffset,
+          size: 26.0 + random.nextDouble() * 18.0,
+          rotation: (random.nextDouble() - 0.5) * 1.2,
+        ),
+      );
+    }
+
+    setState(() {
+      _burstIcon = icon;
+      _showNudgeBurst = true;
+    });
+    _burstAnimController.forward(from: 0.0);
   }
 
   @override
@@ -211,26 +265,25 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             _buildSegmentedTab(colorScheme),
             const SizedBox(height: 16),
             AnimatedSwitcher(
-              duration: const Duration(milliseconds: 260),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.02, 0.0),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
+              duration: const Duration(milliseconds: 220),
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  alignment: Alignment.topCenter,
+                  children: <Widget>[
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
                 );
+              },
+              transitionBuilder: (child, animation) {
+                return FadeTransition(opacity: animation, child: child);
               },
               child: _buildActiveTabContent(colorScheme),
             ),
             const SizedBox(height: 40),
           ],
         ),
+        if (_showNudgeBurst) _buildIconBurstOverlay(colorScheme),
         if (_showCelebration) _buildCelebrationOverlay(colorScheme),
       ],
     );
@@ -302,15 +355,14 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withValues(alpha: 0.07),
-            blurRadius: 26,
-            offset: const Offset(0, 14),
+            color: colors.shadow.withValues(alpha: isDark ? 0.3 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
           BoxShadow(
-            color: colors.primary.withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-            spreadRadius: -4,
+            color: colors.primary.withValues(alpha: isDark ? 0.18 : 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -378,7 +430,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                             decoration: BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
-                                  color: colors.primary.withValues(alpha: 0.05),
+                                  color: colors.primary.withValues(alpha: 0.08),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -464,18 +516,26 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             Row(
               children: [
                 Container(
-                  width: 5,
-                  height: 5,
+                  width: 6,
+                  height: 6,
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
                     color: colors.primary,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: colors.primary.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
                 Text(
                   'CARE & NUDGES',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     letterSpacing: 1.1,
+                    fontWeight: FontWeight.w700,
                     color: colors.onSurfaceVariant,
                   ),
                 ),
@@ -523,9 +583,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       BoxShadow(
                         color: isDark
                             ? Colors.black.withValues(alpha: 0.35)
-                            : Colors.black.withValues(alpha: 0.05),
+                            : colors.primary.withValues(alpha: 0.08),
                         blurRadius: 8,
-                        spreadRadius: 0,
                         offset: const Offset(0, 3),
                       ),
                     ],
@@ -566,6 +625,9 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
               }
 
               final nudge = customNudges[index];
+              final iconData = nudge['icon'] as IconData;
+              final label = nudge['label'] as String;
+
               return Container(
                 decoration: BoxDecoration(
                   color: isDark ? colors.surfaceContainerLow : Colors.white,
@@ -578,9 +640,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                     BoxShadow(
                       color: isDark
                           ? Colors.black.withValues(alpha: 0.35)
-                          : Colors.black.withValues(alpha: 0.05),
+                          : Colors.black.withValues(alpha: 0.06),
                       blurRadius: 8,
-                      spreadRadius: 0,
                       offset: const Offset(0, 3),
                     ),
                   ],
@@ -588,7 +649,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => _sendNudge(nudge['label'] as String),
+                    onTap: () => _sendNudge(label, icon: iconData),
                     borderRadius: BorderRadius.circular(16),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -598,14 +659,10 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            nudge['icon'] as IconData,
-                            size: 16,
-                            color: colors.primary,
-                          ),
+                          Icon(iconData, size: 16, color: colors.primary),
                           const SizedBox(width: 6),
                           Text(
-                            nudge['label'] as String,
+                            label,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -626,6 +683,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   }
 
   Widget _buildSegmentedTab(ColorScheme colors) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final tabs = [
       ('For Us', Icons.favorite_rounded),
       ('For Me', Icons.person_rounded),
@@ -639,12 +697,21 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
         : Alignment.centerRight;
 
     return Container(
-      height: 44,
+      height: 46,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: colors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Stack(
         children: [
@@ -660,9 +727,9 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: colors.primary.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: colors.primary.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
@@ -729,6 +796,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
+          HapticFeedback.selectionClick();
           setState(() {
             goal['isCompleted'] = !isCompleted;
             if (goal['isCompleted']) {
@@ -758,11 +826,11 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             boxShadow: [
               BoxShadow(
                 color: isCompleted
-                    ? Colors.transparent
+                    ? colorScheme.primary.withValues(alpha: 0.05)
                     : (isDark
                           ? Colors.black.withValues(alpha: 0.3)
-                          : Colors.black.withValues(alpha: 0.04)),
-                blurRadius: 10,
+                          : Colors.black.withValues(alpha: 0.06)),
+                blurRadius: 12,
                 spreadRadius: 0,
                 offset: const Offset(0, 4),
               ),
@@ -779,6 +847,13 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       ? colorScheme.primaryContainer.withValues(alpha: 0.85)
                       : colorScheme.primaryContainer.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Icon(
@@ -851,7 +926,10 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   ),
                   color: colorScheme.primary,
                   tooltip: 'Remind partner',
-                  onPressed: () => _sendNudge(goal['title'] as String),
+                  onPressed: () => _sendNudge(
+                    goal['title'] as String,
+                    icon: goal['icon'] as IconData,
+                  ),
                 ),
               const SizedBox(width: 4),
               AnimatedContainer(
@@ -867,6 +945,15 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                         : colorScheme.outline.withValues(alpha: 0.6),
                     width: 2,
                   ),
+                  boxShadow: isCompleted
+                      ? [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: isCompleted
                     ? Icon(
@@ -913,11 +1000,11 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
           boxShadow: [
             BoxShadow(
               color: isUnlocked
-                  ? Colors.transparent
+                  ? colorScheme.primary.withValues(alpha: 0.05)
                   : (isDark
                         ? Colors.black.withValues(alpha: 0.3)
-                        : Colors.black.withValues(alpha: 0.04)),
-              blurRadius: 10,
+                        : Colors.black.withValues(alpha: 0.06)),
+              blurRadius: 12,
               spreadRadius: 0,
               offset: const Offset(0, 4),
             ),
@@ -935,6 +1022,13 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                     ? colorScheme.primaryContainer.withValues(alpha: 0.85)
                     : colorScheme.primaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Center(
                 child: Icon(
@@ -1038,16 +1132,128 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     required String label,
     required ColorScheme colorScheme,
   }) {
-    return OutlinedButton.icon(
-      onPressed: () => _openAddGoalModal(context),
-      icon: const Icon(Icons.add_rounded),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        side: BorderSide(
-          color: colorScheme.primary.withValues(alpha: 0.3),
-          width: 1.5,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: FilledButton.icon(
+        onPressed: () => _openAddGoalModal(context),
+        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconBurstOverlay(ColorScheme colors) {
+    if (_burstIcon == null) return const SizedBox.shrink();
+
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _burstAnimController,
+          builder: (context, child) {
+            final t = _burstAnimController.value;
+            final curvedT = Curves.easeOutCubic.transform(t);
+            final fadeOut = (1.0 - t).clamp(0.0, 1.0);
+
+            return Center(
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Transform.scale(
+                    scale: 1.0 + (curvedT * 0.8),
+                    child: Opacity(
+                      opacity: fadeOut,
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colors.primary.withValues(alpha: 0.15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors.primary.withValues(
+                                alpha: 0.35 * fadeOut,
+                              ),
+                              blurRadius: 30,
+                              spreadRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          _burstIcon,
+                          size: 52,
+                          color: colors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ..._particles.map((p) {
+                    final particleOffset = Offset(
+                      p.targetOffset.dx * curvedT,
+                      p.targetOffset.dy * curvedT,
+                    );
+                    final particleScale = (1.0 - (t * 0.4)).clamp(0.0, 1.0);
+
+                    return Transform.translate(
+                      offset: particleOffset,
+                      child: Transform.rotate(
+                        angle: p.rotation * curvedT,
+                        child: Transform.scale(
+                          scale: particleScale,
+                          child: Opacity(
+                            opacity: fadeOut,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: colors.primary.withValues(
+                                      alpha: 0.25 * fadeOut,
+                                    ),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                _burstIcon,
+                                size: p.size,
+                                color: colors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1077,8 +1283,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: colors.primary.withValues(alpha: 0.18),
-                          blurRadius: 24,
+                          color: colors.primary.withValues(alpha: 0.25),
+                          blurRadius: 28,
                           spreadRadius: 4,
                           offset: const Offset(0, 8),
                         ),
@@ -1125,23 +1331,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             );
           },
         ),
-      ),
-    );
-  }
-
-  void _sendNudge(String title) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.send_rounded, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Sent reminder to partner for: "$title"')),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -1252,6 +1441,10 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                 child: const Text('Cancel'),
               ),
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () {
                   if (labelCtrl.text.trim().isEmpty) return;
                   setState(() {
@@ -1276,10 +1469,11 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     final categoryController = TextEditingController(
       text: _selectedTabIndex == 0 ? 'Date Night' : 'Self-Care',
     );
-    int selectedPoints = 20;
+    int selectedPoints = 5;
     IconData selectedIcon = _selectedTabIndex == 0
         ? Icons.favorite_rounded
         : Icons.star_rounded;
+    String? titleError;
 
     final selectableGoalIcons = [
       Icons.favorite_rounded,
@@ -1305,6 +1499,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       builder: (ctx) => StatefulBuilder(
         builder: (modalCtx, setModalState) {
           final colors = Theme.of(modalCtx).colorScheme;
+          final isDark = Theme.of(modalCtx).brightness == Brightness.dark;
 
           return Padding(
             padding: EdgeInsets.only(
@@ -1341,10 +1536,16 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   const SizedBox(height: 16),
                   TextField(
                     controller: titleController,
-                    decoration: const InputDecoration(
+                    onChanged: (val) {
+                      if (titleError != null && val.trim().isNotEmpty) {
+                        setModalState(() => titleError = null);
+                      }
+                    },
+                    decoration: InputDecoration(
                       labelText: 'Goal Title',
                       hintText: 'e.g. Try a new coffee shop',
-                      border: OutlineInputBorder(
+                      errorText: titleError,
+                      border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(14)),
                       ),
                     ),
@@ -1353,7 +1554,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   TextField(
                     controller: categoryController,
                     decoration: const InputDecoration(
-                      labelText: 'Category',
+                      labelText: 'Category (Optional)',
                       hintText: 'e.g. Adventure, Wellness',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(14)),
@@ -1389,45 +1590,148 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Reward Points',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [15, 25, 40, 60, 100].map((pts) {
-                      final isChosen = selectedPoints == pts;
-                      return ChoiceChip(
-                        label: Text('+$pts pts'),
-                        selected: isChosen,
-                        selectedColor: colors.primary,
-                        labelStyle: TextStyle(
-                          color: isChosen ? Colors.white : colors.onSurface,
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Reward Points',
+                        style: TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          fontSize: 12,
                         ),
-                        onSelected: (_) =>
-                            setModalState(() => selectedPoints = pts),
+                      ),
+                      Text(
+                        'Max 10 pts',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [2, 3, 5, 8, 10].map((pts) {
+                      final isChosen = selectedPoints == pts;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: InkWell(
+                            onTap: () =>
+                                setModalState(() => selectedPoints = pts),
+                            borderRadius: BorderRadius.circular(14),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isChosen
+                                    ? colors.primary
+                                    : (isDark
+                                          ? colors.surfaceContainerHighest
+                                          : colors.surface),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isChosen
+                                      ? colors.primary
+                                      : colors.outlineVariant.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                  width: isChosen ? 1.5 : 1.0,
+                                ),
+                                boxShadow: isChosen
+                                    ? [
+                                        BoxShadow(
+                                          color: colors.primary.withValues(
+                                            alpha: 0.35,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ]
+                                    : [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.03,
+                                          ),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '+$pts',
+                                    style: TextStyle(
+                                      color: isChosen
+                                          ? Colors.white
+                                          : colors.onSurface,
+                                      fontWeight: isChosen
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    'pts',
+                                    style: TextStyle(
+                                      color: isChosen
+                                          ? Colors.white.withValues(alpha: 0.85)
+                                          : colors.onSurfaceVariant,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 24),
-                  SizedBox(
+                  Container(
                     width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.primary.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
                     child: FilledButton.icon(
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Add Goal'),
+                      icon: const Icon(Icons.add_rounded, color: Colors.white),
+                      label: const Text(
+                        'Add Goal',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       style: FilledButton.styleFrom(
+                        backgroundColor: colors.primary,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       onPressed: () {
-                        if (titleController.text.trim().isEmpty) return;
+                        if (titleController.text.trim().isEmpty) {
+                          setModalState(() {
+                            titleError = 'Please enter a goal title';
+                          });
+                          return;
+                        }
 
                         final newGoal = {
                           'id': DateTime.now().millisecondsSinceEpoch
@@ -1543,4 +1847,16 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
       ),
     );
   }
+}
+
+class _ParticleTrajectory {
+  final Offset targetOffset;
+  final double size;
+  final double rotation;
+
+  _ParticleTrajectory({
+    required this.targetOffset,
+    required this.size,
+    required this.rotation,
+  });
 }
