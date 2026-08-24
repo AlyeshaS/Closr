@@ -7,6 +7,7 @@ import '../auth/auth_service.dart';
 import '../theme_provider.dart';
 import '../services/notifications_service.dart';
 import '../services/companion_rewards_service.dart';
+import '../services/badge_service.dart';
 import 'preferences/preferences_service.dart';
 
 // ── Companion data ─────────────────────────────────────────────────────────────
@@ -144,6 +145,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   final CompanionRewardsService _companionRewardsService =
       CompanionRewardsService();
+  final BadgeService _badgeService = BadgeService();
 
   // partner state
   String _partnerEmail = '';
@@ -192,6 +194,206 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       _companionLoading = false;
     });
+  }
+
+  Future<void> _showCompletedBadgesSheet() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final cs = Theme.of(context).colorScheme;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.military_tech_rounded,
+                    color: cs.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Completed Badges',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Badges you and your partner have successfully unlocked together.',
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _badgeService.streamBadges(user.uid),
+                  builder: (context, snapshot) {
+                    final allLiveBadges = snapshot.data ?? [];
+                    final completedBadges = allLiveBadges
+                        .where((b) => b['isUnlocked'] == true)
+                        .toList();
+
+                    if (completedBadges.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock_outline_rounded,
+                                size: 40,
+                                color: cs.onSurfaceVariant.withOpacity(0.4),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No completed badges yet',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: cs.onSurface,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Work together on shared activities to earn your first badge!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: completedBadges.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, idx) {
+                        final badge = completedBadges[idx];
+                        final icon =
+                            badge['icon'] as IconData? ??
+                            Icons.military_tech_rounded;
+                        final points = badge['points'] ?? 50;
+
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(ctx).brightness == Brightness.dark
+                                ? const Color(0xFF231519)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: cs.primary.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    icon,
+                                    color: cs.primary,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      badge['title'] ?? 'Badge',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      badge['description'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '+$points pts',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openCompanionShop() async {
@@ -491,9 +693,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── Companion picker ──────────────────────────────────────────────────────────
-  // ── Partner email dialog ───────────────────────────────────────────────────────
-
   Future<void> _showAddPartnerDialog() async {
     final cs = Theme.of(context).colorScheme;
     final controller = TextEditingController(text: _partnerEmail);
@@ -553,8 +752,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _showSetAnniversaryDialog() async {
-    final cs = Theme.of(context).colorScheme;
-
     final selected = await showDatePicker(
       context: context,
       initialDate: _anniversaryDate ?? DateTime.now(),
@@ -732,8 +929,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── Interests editor ──────────────────────────────────────────────────────────
-
   Future<void> _showInterestsEditor(
     String key,
     String label,
@@ -855,8 +1050,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -876,7 +1069,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Text('You', style: Theme.of(context).textTheme.displayMedium),
           const SizedBox(height: 20),
 
-          // ── Profile card (ORIGINAL — unchanged) ──────────────────────
+          // ── Profile card ──────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -946,7 +1139,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 24),
 
-          // ── Your Companion (NEW) ──────────────────────────────────────
+          // ── Your Companion ──────────────────────────────────────────
           _GroupLabel(text: 'Your Companion', cs: cs),
           const SizedBox(height: 8),
           Container(
@@ -1020,7 +1213,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 20),
 
-          // ── Relationship group (ORIGINAL — unchanged) ─────────────────
+          // ── Relationship group ──────────────────────────────────────
           _GroupLabel(text: 'Relationship', cs: cs),
           const SizedBox(height: 8),
           _SettingsGroup(
@@ -1067,11 +1260,17 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               ),
+              _SettingsRowData(
+                icon: Icons.military_tech_rounded,
+                label: 'Completed Badges',
+                onTap: _showCompletedBadgesSheet,
+                trailing: const _TrailingArrow(),
+              ),
             ],
           ),
           const SizedBox(height: 20),
 
-          // ── Preferences group (ORIGINAL — toggles now functional) ─────
+          // ── Preferences group ───────────────────────────────────────
           _GroupLabel(text: 'Preferences', cs: cs),
           const SizedBox(height: 8),
           _SettingsGroup(
@@ -1103,7 +1302,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 20),
 
-          // ── Interests (NEW) ───────────────────────────────────────────
+          // ── Interests ───────────────────────────────────────────────
           _GroupLabel(text: 'Interests', cs: cs),
           const SizedBox(height: 8),
           FutureBuilder<Map<String, dynamic>?>(
@@ -1119,7 +1318,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 20),
 
-          // ── Support group (ORIGINAL — unchanged) ─────────────────────
+          // ── Support group ───────────────────────────────────────────
           _GroupLabel(text: 'Support', cs: cs),
           const SizedBox(height: 8),
           _SettingsGroup(
@@ -1147,7 +1346,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 28),
 
-          // ── Sign out ──────────────────────────────────────────────────
+          // ── Sign out ────────────────────────────────────────────────
           ElevatedButton(
             onPressed: () async {
               await AuthService().signOut();
@@ -1181,7 +1380,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-// ── Interests collapsible widget (NEW) ────────────────────────────────────────
+// ── Interests collapsible widget ─────────────────────────────────────────────
 
 class _CollapsibleInterests extends StatefulWidget {
   final Map<String, dynamic> prefs;
@@ -1244,7 +1443,6 @@ class _CollapsibleInterestsState extends State<_CollapsibleInterests> {
                 ),
                 child: Row(
                   children: [
-                    // expand/collapse tap on label
                     Expanded(
                       child: GestureDetector(
                         onTap: () =>
@@ -1278,7 +1476,6 @@ class _CollapsibleInterestsState extends State<_CollapsibleInterests> {
                         ),
                       ),
                     ),
-                    // Edit button
                     TextButton(
                       onPressed: () => widget.onEdit(key, label, items),
                       style: TextButton.styleFrom(
@@ -1295,7 +1492,6 @@ class _CollapsibleInterestsState extends State<_CollapsibleInterests> {
                   ],
                 ),
               ),
-              // chips when expanded
               AnimatedCrossFade(
                 duration: const Duration(milliseconds: 200),
                 crossFadeState: isExpanded
@@ -1346,7 +1542,7 @@ class _CollapsibleInterestsState extends State<_CollapsibleInterests> {
   }
 }
 
-// ── Private widgets (ORIGINAL — unchanged) ────────────────────────────────────
+// ── Private widgets ───────────────────────────────────────────────────────────
 
 class _GroupLabel extends StatelessWidget {
   final String text;
@@ -1447,7 +1643,6 @@ class _TrailingArrow extends StatelessWidget {
   }
 }
 
-// Fixed: thumb is cs.surface (cream/dark bg) so it contrasts the rose track
 class _ToggleSwitch extends StatelessWidget {
   final ColorScheme cs;
   final bool value;
@@ -1464,7 +1659,7 @@ class _ToggleSwitch extends StatelessWidget {
       value: value,
       onChanged: onChanged,
       activeTrackColor: cs.primary,
-      activeColor: cs.surface, // thumb = cream/dark bg when ON
+      activeColor: cs.surface,
       inactiveThumbColor: cs.onSurfaceVariant.withOpacity(0.4),
       inactiveTrackColor: cs.outlineVariant,
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
