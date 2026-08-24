@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'doodle_clues_controller.dart';
 import '../../../services/streaks_service.dart';
+import '../../../services/badge_service.dart';
 
 class DoodleCluesGameScreen extends StatefulWidget {
   const DoodleCluesGameScreen({super.key});
@@ -39,9 +40,13 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   Timer? _countdownTimer;
   Timer? _liveSyncTimer;
 
-  Future<void> _logGameCompleted() async {
+  Future<void> _logGameCompleted(bool isWin) async {
     try {
       await _streaksService.recordActivity('game_completed');
+      await BadgeService().incrementStat(statKey: 'games_played', by: 1);
+      if (isWin) {
+        await BadgeService().incrementStat(statKey: 'total_game_wins', by: 1);
+      }
     } catch (_) {}
   }
 
@@ -327,7 +332,7 @@ class _DoodleCluesGameScreenState extends State<DoodleCluesGameScreen> {
   void _showGameEndedAlert(bool isWin, BuildContext screenContext) {
     if (_endDialogShown) return;
     _endDialogShown = true;
-    unawaited(_logGameCompleted());
+    unawaited(_logGameCompleted(isWin));
 
     final cs = Theme.of(screenContext).colorScheme;
     final Color statusColor = cs.primary;

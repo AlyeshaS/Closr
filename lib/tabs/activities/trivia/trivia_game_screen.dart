@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trivia_controller.dart';
 import '../../../services/streaks_service.dart';
+import '../../../services/badge_service.dart';
 
 class TriviaGameScreen extends StatefulWidget {
   const TriviaGameScreen({super.key});
@@ -17,6 +18,7 @@ class TriviaGameScreen extends StatefulWidget {
 class _TriviaGameScreenState extends State<TriviaGameScreen> {
   final TriviaController _controller = TriviaController();
   final StreaksService _streaksService = StreaksService();
+  final BadgeService _badgeService = BadgeService();
   int? _selectedAnswerIndex;
   int _currentQuestionIndex = 0;
 
@@ -195,9 +197,24 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
     }
   }
 
-  Future<void> _logGameCompleted() async {
+  Future<void> _logGameCompleted({
+    required bool isWinner,
+    required bool isPerfectMatch,
+  }) async {
     try {
       await _streaksService.recordActivity('game_completed');
+      await _badgeService.incrementStat(statKey: 'games_played', by: 1);
+
+      if (isWinner) {
+        await _badgeService.incrementStat(statKey: 'total_game_wins', by: 1);
+      }
+
+      if (isPerfectMatch) {
+        await _badgeService.incrementStat(
+          statKey: 'perfect_quiz_matches',
+          by: 1,
+        );
+      }
     } catch (_) {}
   }
 
@@ -413,16 +430,20 @@ class _TriviaGameScreenState extends State<TriviaGameScreen> {
               height: 54,
               child: FilledButton(
                 onPressed: () async {
-                  await _logGameCompleted();
+                  final bool isWinner = myScore >= partnerScore;
+                  final bool isPerfect = myScore == 10;
 
-                  // 🏆 CENTRALIZED SCORE CHECK: Increments winner directly on complete action
+                  await _logGameCompleted(
+                    isWinner: isWinner,
+                    isPerfectMatch: isPerfect,
+                  );
+
                   if (myScore > partnerScore) {
                     await _controller.rewardTriviaWinner(_myUid);
                   } else if (partnerScore > myScore && _partnerUid.isNotEmpty) {
                     await _controller.rewardTriviaWinner(_partnerUid);
                   } else if (myScore == partnerScore &&
                       _partnerUid.isNotEmpty) {
-                    // Tie-breaker default parameters: Reward both!
                     await _controller.rewardTriviaWinner(_myUid);
                     await _controller.rewardTriviaWinner(_partnerUid);
                   }

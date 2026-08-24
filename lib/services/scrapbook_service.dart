@@ -1,13 +1,16 @@
+// lib/services/scrapbook_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/scrapbook_entry.dart';
+import './badge_service.dart';
 
 class ScrapbookService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final BadgeService _badgeService = BadgeService();
 
   Stream<List<ScrapbookEntry>> streamForCurrentUser() {
     final user = FirebaseAuth.instance.currentUser;
@@ -23,17 +26,11 @@ class ScrapbookService {
 
   Future<String?> _getPartnerUid() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print('🔗 Partner lookup: no current user');
-      return null;
-    }
+    if (user == null) return null;
 
     final userDoc = await _db.collection('users').doc(user.uid).get();
     final userData = userDoc.data();
-    if (userData == null) {
-      print('🔗 Partner lookup: user doc not found');
-      return null;
-    }
+    if (userData == null) return null;
 
     final partnerEmail =
         ((userData['partnerEmailLower'] as String?) ??
@@ -41,21 +38,15 @@ class ScrapbookService {
                 '')
             .trim()
             .toLowerCase();
-    if (partnerEmail.isEmpty) {
-      print('🔗 Partner lookup: no partnerEmail in user profile');
-      return null;
-    }
+    if (partnerEmail.isEmpty) return null;
 
-    print('🔗 Looking for partner with email: $partnerEmail');
     final partnerQuery = await _db
         .collection('users')
         .where('emailLower', isEqualTo: partnerEmail)
         .get();
 
     if (partnerQuery.docs.isNotEmpty) {
-      final partnerId = partnerQuery.docs.first.id;
-      print('✅ Partner lookup: found partner $partnerId');
-      return partnerId;
+      return partnerQuery.docs.first.id;
     }
 
     final fallbackQuery = await _db
@@ -63,29 +54,20 @@ class ScrapbookService {
         .where('email', isEqualTo: partnerEmail)
         .get();
 
-    if (fallbackQuery.docs.isEmpty) {
-      final allUsers = await _db.collection('users').limit(250).get();
-      for (final doc in allUsers.docs) {
-        final data = doc.data();
-        final email =
-            ((data['emailLower'] as String?) ??
-                    (data['email'] as String?) ??
-                    '')
-                .trim()
-                .toLowerCase();
-        if (email == partnerEmail) {
-          final partnerId = doc.id;
-          print('✅ Partner lookup: found partner $partnerId');
-          return partnerId;
-        }
-      }
-      print('❌ Partner lookup: no user found with email $partnerEmail');
-      return null;
+    if (fallbackQuery.docs.isNotEmpty) {
+      return fallbackQuery.docs.first.id;
     }
 
-    final partnerId = fallbackQuery.docs.first.id;
-    print('✅ Partner lookup: found partner $partnerId');
-    return partnerId;
+    final allUsers = await _db.collection('users').limit(250).get();
+    for (final doc in allUsers.docs) {
+      final data = doc.data();
+      final email =
+          ((data['emailLower'] as String?) ?? (data['email'] as String?) ?? '')
+              .trim()
+              .toLowerCase();
+      if (email == partnerEmail) return doc.id;
+    }
+    return null;
   }
 
   Future<String> _uploadImage({
@@ -94,38 +76,21 @@ class ScrapbookService {
     required String uploadStamp,
     required XFile imageFile,
   }) async {
-    try {
-      final storageRef = _storage
-          .ref()
-          .child('scrapbook')
-          .child(ownerUid)
-          .child(dateKey)
-          .child('$uploadStamp.jpg');
+    final storageRef = _storage
+        .ref()
+        .child('scrapbook')
+        .child(ownerUid)
+        .child(dateKey)
+        .child('$uploadStamp.jpg');
 
-      print('📸 Uploading to: ${storageRef.fullPath}');
-      print('📸 File size: ${await imageFile.length()} bytes');
+    final bytes = await imageFile.readAsBytes();
+    final contentType = imageFile.name.toLowerCase().endsWith('.png')
+        ? 'image/png'
+        : 'image/jpeg';
 
-      final bytes = await imageFile.readAsBytes();
-      final contentType = imageFile.name.toLowerCase().endsWith('.png')
-          ? 'image/png'
-          : 'image/jpeg';
+    await storageRef.putData(bytes, SettableMetadata(contentType: contentType));
 
-      print('📸 Content type: $contentType');
-
-      await storageRef.putData(
-        bytes,
-        SettableMetadata(contentType: contentType),
-      );
-
-      print('📸 Upload successful');
-
-      final downloadUrl = await storageRef.getDownloadURL();
-      print('📸 Download URL: $downloadUrl');
-      return downloadUrl;
-    } catch (e) {
-      print('❌ Upload error: $e');
-      rethrow;
-    }
+    return await storageRef.getDownloadURL();
   }
 
   Future<void> _saveEntryForUser({
@@ -146,10 +111,7 @@ class ScrapbookService {
     required String existingImagePath,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print('❌ No user logged in');
-      return;
-    }
+    if (user == null) return;
 
     final date = DateTime(entryDate.year, entryDate.month, entryDate.day);
     final dateKey = ScrapbookEntry.dateKeyFor(date);
@@ -158,10 +120,7 @@ class ScrapbookService {
     if (existingImagePath.isNotEmpty) {
       try {
         await _storage.ref(existingImagePath).delete();
-        print('🗑️ Deleted image from storage: $existingImagePath');
-      } catch (error) {
-        print('⚠️ Storage delete skipped: $error');
-      }
+      } catch (_) {}
     }
 
     final updateData = <String, Object?>{
@@ -195,10 +154,7 @@ class ScrapbookService {
     XFile? pickedImage,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      print('❌ No user logged in');
-      return;
-    }
+    if (user == null) return;
 
     final date = DateTime(entryDate.year, entryDate.month, entryDate.day);
     final dateKey = ScrapbookEntry.dateKeyFor(date);
@@ -207,29 +163,23 @@ class ScrapbookService {
 
     var imageUrl = existingImageUrl;
     var imagePath = existingImagePath;
+    final isNewImageUpload = pickedImage != null;
 
     if (pickedImage != null) {
       final uploadStamp = now.microsecondsSinceEpoch.toString();
-      try {
-        print('🔼 Starting image upload...');
-        imageUrl = await _uploadImage(
-          ownerUid: user.uid,
-          dateKey: dateKey,
-          uploadStamp: uploadStamp,
-          imageFile: pickedImage,
-        );
-        imagePath = _storage
-            .ref()
-            .child('scrapbook')
-            .child(user.uid)
-            .child(dateKey)
-            .child('$uploadStamp.jpg')
-            .fullPath;
-        print('✅ Image uploaded successfully');
-      } catch (e) {
-        print('❌ Image upload failed: $e');
-        rethrow;
-      }
+      imageUrl = await _uploadImage(
+        ownerUid: user.uid,
+        dateKey: dateKey,
+        uploadStamp: uploadStamp,
+        imageFile: pickedImage,
+      );
+      imagePath = _storage
+          .ref()
+          .child('scrapbook')
+          .child(user.uid)
+          .child(dateKey)
+          .child('$uploadStamp.jpg')
+          .fullPath;
     }
 
     final entry = ScrapbookEntry(
@@ -244,11 +194,18 @@ class ScrapbookService {
       updatedAt: now,
     );
 
-    print('💾 Saving entry to Firestore...');
     await _saveEntryForUser(uid: user.uid, dateKey: dateKey, entry: entry);
     if (partnerUid != null) {
       await _saveEntryForUser(uid: partnerUid, dateKey: dateKey, entry: entry);
     }
-    print('✅ Entry saved to Firestore');
+
+    // Increment photo badge progress for this user
+    if (isNewImageUpload) {
+      try {
+        await _badgeService.incrementStat(statKey: 'photos_count', by: 1);
+      } catch (e) {
+        // Continue silently without blocking entry creation
+      }
+    }
   }
 }

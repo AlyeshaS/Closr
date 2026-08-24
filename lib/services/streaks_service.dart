@@ -1,10 +1,13 @@
+// lib/services/streaks_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/timeline_event.dart';
+import './badge_service.dart';
 
 class StreaksService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final BadgeService _badgeService = BadgeService();
 
   Future<String?> _resolvePartnerUid(String userId) async {
     final userDoc = await _firestore.collection('users').doc(userId).get();
@@ -104,17 +107,19 @@ class StreaksService {
       return diff == 1 && a.isAfter(b);
     }
 
+    bool streakIncremented = false;
+
     if (lastActive == null) {
-      // first activity
       current = 1;
+      streakIncremented = true;
     } else if (sameDay(lastActive, now)) {
       // already active today — no change
     } else if (isYesterday(now, lastActive)) {
-      // consecutive day
       current = current + 1;
+      streakIncremented = true;
     } else {
-      // gap — reset
       current = 1;
+      streakIncremented = true;
     }
 
     if (current > best) best = current;
@@ -134,6 +139,15 @@ class StreaksService {
       await partnerRef.set(payload, SetOptions(merge: true));
     }
 
+    if (streakIncremented) {
+      try {
+        await _badgeService.incrementStat(
+          statKey: 'current_streak_days',
+          by: 1,
+        );
+      } catch (_) {}
+    }
+
     try {
       await userRef
           .collection('timelineEvents')
@@ -147,10 +161,7 @@ class StreaksService {
             ),
             SetOptions(merge: true),
           );
-      print('🧭 Timeline event saved for activity: $activity');
-    } catch (error) {
-      print('⚠️ Timeline event write failed for $activity: $error');
-    }
+    } catch (_) {}
   }
 
   Future<int> getCurrentStreak() async {

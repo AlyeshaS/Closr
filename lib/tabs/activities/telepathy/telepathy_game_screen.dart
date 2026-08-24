@@ -5,6 +5,8 @@ import '../../../models/telepathy_game_model.dart';
 import '../../../services/telepathy_service.dart';
 import '../../../services/word_generator_service.dart';
 import 'emoji_pool.dart';
+import '../../../services/streaks_service.dart';
+import '../../../services/badge_service.dart';
 
 class TelepathyGameScreen extends StatefulWidget {
   final String myUid;
@@ -50,6 +52,12 @@ class _TelepathyGameScreenState extends State<TelepathyGameScreen> {
     }, SetOptions(merge: true));
 
     await scoreBatch.commit();
+
+    try {
+      await StreaksService().recordActivity('game_completed');
+      await BadgeService().incrementStat(statKey: 'games_played', by: 1);
+      await BadgeService().incrementStat(statKey: 'total_game_wins', by: 1);
+    } catch (_) {}
   }
 
   @override

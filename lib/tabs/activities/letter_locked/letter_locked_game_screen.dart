@@ -1,12 +1,11 @@
-// lib/play/letter_locked/letter_locked_game_screen.dart
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/dictionary_service.dart';
 import '../../../services/streaks_service.dart';
 import 'letter_locked_controller.dart';
 import '../../../models/letter_locked_models.dart';
+import '../../../services/badge_service.dart';
 
 class LetterLockedGameScreen extends StatefulWidget {
   final String myUid;
@@ -155,23 +154,28 @@ class _LetterLockedGameScreenState extends State<LetterLockedGameScreen> {
     if (_endDialogShown) return;
     _endDialogShown = true;
 
-    Future<void> _logGameCompleted() async {
-      try {
-        await _streaksService.recordActivity('game_completed');
-      } catch (_) {}
-    }
-
-    unawaited(_logGameCompleted());
-
     final bool isCoop = game.gameMode == 'coop';
     final String calculatedWinner = game.scores.keys.firstWhere(
       (uid) => uid != game.turn,
       orElse: () => '',
     );
 
-    final bool iWon =
-        game.winnerUid == _myUid ||
-        (game.winnerUid.isEmpty && calculatedWinner == _myUid);
+    final bool iWon = isCoop
+        ? game.winnerUid == 'TEAM_WIN'
+        : (game.winnerUid == _myUid ||
+              (game.winnerUid.isEmpty && calculatedWinner == _myUid));
+
+    Future<void> _logGameCompleted() async {
+      try {
+        await _streaksService.recordActivity('game_completed');
+        await BadgeService().incrementStat(statKey: 'games_played', by: 1);
+        if (iWon) {
+          await BadgeService().incrementStat(statKey: 'total_game_wins', by: 1);
+        }
+      } catch (_) {}
+    }
+
+    unawaited(_logGameCompleted());
 
     final cs = Theme.of(screenContext).colorScheme;
 
