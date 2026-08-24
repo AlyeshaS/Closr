@@ -1,15 +1,23 @@
+// lib/services/love_letter_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/love_letter.dart';
+import './badge_service.dart';
 
 class LoveLetterService {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
+  final BadgeService _badgeService;
 
-  LoveLetterService({FirebaseFirestore? db, FirebaseAuth? auth})
-    : _db = db ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  LoveLetterService({
+    FirebaseFirestore? db,
+    FirebaseAuth? auth,
+    BadgeService? badgeService,
+  }) : _db = db ?? FirebaseFirestore.instance,
+       _auth = auth ?? FirebaseAuth.instance,
+       _badgeService = badgeService ?? BadgeService();
 
+  /// Streams love letters from users/{uid}/love_letters
   Stream<List<LoveLetter>> streamForCurrentUser() {
     final user = _auth.currentUser;
     if (user == null) return Stream.value([]);
@@ -27,6 +35,7 @@ class LoveLetterService {
         });
   }
 
+  /// Saves the love letter to both user subcollections and increments badge progress
   Future<String> sendLoveLetter({
     String? letterId,
     required String title,
@@ -73,6 +82,7 @@ class LoveLetterService {
       }
     }
 
+    final isNewLetter = letterId == null;
     final resolvedLetterId =
         letterId ??
         _db
@@ -97,6 +107,7 @@ class LoveLetterService {
 
     final batch = _db.batch();
 
+    // 1. Write to current user's subcollection
     final myDocRef = _db
         .collection('users')
         .doc(user.uid)
@@ -108,6 +119,7 @@ class LoveLetterService {
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
+    // 2. Write to partner's subcollection
     if (partnerUid.isNotEmpty && partnerUid != user.uid) {
       final partnerDocRef = _db
           .collection('users')
@@ -122,9 +134,16 @@ class LoveLetterService {
     }
 
     await batch.commit();
+
+    // 3. Increment the badge statistic for new letters
+    if (isNewLetter) {
+      await _badgeService.incrementStat(statKey: 'letters_sent', by: 1);
+    }
+
     return resolvedLetterId;
   }
 
+  /// Deletes the love letter from both subcollections
   Future<void> deleteLoveLetter(String letterId) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('No signed-in user found.');
