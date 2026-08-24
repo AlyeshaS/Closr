@@ -1188,7 +1188,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     } else if (!userDone && partnerDone) {
       statusText = 'Partner finished! Your turn!';
       statusIcon = Icons.priority_high_rounded;
-      statusColor = colorScheme.primary;
+      statusColor = Colors.orangeAccent;
     } else {
       statusText = 'Both partners must complete this';
       statusIcon = Icons.people_outline_rounded;
@@ -1334,7 +1334,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           valueColor: AlwaysStoppedAnimation<Color>(
                             isUnlocked
                                 ? colorScheme.primary
-                                : (userDone
+                                : ((userDone || partnerDone)
                                       ? Colors.orangeAccent
                                       : colorScheme.primary),
                           ),
