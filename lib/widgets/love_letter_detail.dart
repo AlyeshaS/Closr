@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/love_letter.dart';
+import '../../../services/love_letter_service.dart';
 
 class LoveLetterDetailPage extends StatefulWidget {
   final LoveLetter letter;
@@ -13,6 +13,7 @@ class LoveLetterDetailPage extends StatefulWidget {
 
 class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
     with SingleTickerProviderStateMixin {
+  final LoveLetterService _loveLetterService = LoveLetterService();
   late final AnimationController _fadeController;
   late final Animation<double> _fadeAnimation;
   bool _isDeleting = false;
@@ -38,43 +39,10 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
   }
 
   Future<void> _deleteLetter() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    // Double-check pairing fields to build the correct path string
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    if (!userDoc.exists || userDoc.data() == null) return;
-
-    final String myEmail = (userDoc.data()?['emailLower'] ?? user.email ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-    final String partnerEmail =
-        (userDoc.data()?['partnerEmailLower'] ??
-                userDoc.data()?['partnerEmail'] ??
-                '')
-            .toString()
-            .trim()
-            .toLowerCase();
-
-    if (myEmail.isEmpty || partnerEmail.isEmpty) return;
-
-    final List<String> coupleEmails = [myEmail, partnerEmail]..sort();
-    final String coupleGroupId = '${coupleEmails[0]}_${coupleEmails[1]}';
-
     setState(() => _isDeleting = true);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('couples')
-          .doc(coupleGroupId)
-          .collection('love_letters')
-          .doc(widget.letter.id)
-          .delete();
+      await _loveLetterService.deleteLoveLetter(widget.letter.id);
 
       if (mounted) {
         Navigator.pop(context);
@@ -96,7 +64,6 @@ class _LoveLetterDetailPageState extends State<LoveLetterDetailPage>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final currentUser = FirebaseAuth.instance.currentUser;
-    // Only allow deletion if the current user sent it
     final bool isSender = widget.letter.senderId == currentUser?.uid;
 
     return Scaffold(

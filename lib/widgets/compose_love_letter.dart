@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 import '../../../models/love_letter.dart';
+import '../../../services/love_letter_service.dart';
 
 class ComposeLoveLetterPage extends StatefulWidget {
   final LoveLetter? editingLetter;
@@ -15,6 +14,7 @@ class ComposeLoveLetterPage extends StatefulWidget {
 class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final LoveLetterService _loveLetterService = LoveLetterService();
   late final TextEditingController _titleController;
   late final TextEditingController _textController;
 
@@ -24,12 +24,10 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
   bool _isSaving = false;
   bool _isDeleting = false;
 
-  // Typing background hearts
   late final AnimationController _heartController;
   final List<_FloatingHeart> _hearts = [];
   final _random = math.Random();
 
-  // Send animation controller
   late final AnimationController _sendAnimController;
   late final Animation<double> _heartScaleAnimation;
   late final Animation<double> _heartYAnimation;
@@ -64,7 +62,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     _titleFocusNode.addListener(() => setState(() {}));
     _textFocusNode.addListener(() => setState(() {}));
 
-    // Flying animation configuration
     _sendAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -136,44 +133,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     setState(() => _isDeleting = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      final uid = user?.uid ?? '';
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-
-      if (!userDoc.exists || userDoc.data() == null) {
-        throw Exception("User profile not found.");
-      }
-
-      final String myEmail =
-          (userDoc.data()?['emailLower'] ?? user?.email ?? '')
-              .toString()
-              .trim()
-              .toLowerCase();
-      final String partnerEmail =
-          (userDoc.data()?['partnerEmailLower'] ??
-                  userDoc.data()?['partnerEmail'] ??
-                  '')
-              .toString()
-              .trim()
-              .toLowerCase();
-
-      if (myEmail.isEmpty || partnerEmail.isEmpty) {
-        throw Exception("You must be connected by email to delete letters!");
-      }
-
-      final List<String> coupleEmails = [myEmail, partnerEmail]..sort();
-      final String coupleGroupId = '${coupleEmails[0]}_${coupleEmails[1]}';
-
-      await FirebaseFirestore.instance
-          .collection('couples')
-          .doc(coupleGroupId)
-          .collection('love_letters')
-          .doc(widget.editingLetter!.id)
-          .delete();
+      await _loveLetterService.deleteLoveLetter(widget.editingLetter!.id);
 
       if (mounted) {
         Navigator.pop(context);
@@ -202,82 +162,11 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
     await _sendAnimController.forward();
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      final uid = user?.uid ?? '';
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-
-      if (!userDoc.exists || userDoc.data() == null) {
-        throw Exception("User profile not found.");
-      }
-
-      final String myEmail =
-          (userDoc.data()?['emailLower'] ?? user?.email ?? '')
-              .toString()
-              .trim()
-              .toLowerCase();
-      final String partnerEmail =
-          (userDoc.data()?['partnerEmailLower'] ??
-                  userDoc.data()?['partnerEmail'] ??
-                  '')
-              .toString()
-              .trim()
-              .toLowerCase();
-
-      if (myEmail.isEmpty || partnerEmail.isEmpty) {
-        throw Exception("You must be connected by email to send love letters!");
-      }
-
-      final List<String> coupleEmails = [myEmail, partnerEmail]..sort();
-      final String coupleGroupId = '${coupleEmails[0]}_${coupleEmails[1]}';
-
-      String recipientId = widget.editingLetter?.recipientId ?? '';
-      if (recipientId.isEmpty && partnerEmail.isNotEmpty) {
-        final partnerQuery = await FirebaseFirestore.instance
-            .collection('users')
-            .where('emailLower', isEqualTo: partnerEmail)
-            .limit(1)
-            .get();
-
-        if (partnerQuery.docs.isNotEmpty) {
-          recipientId = partnerQuery.docs.first.id;
-        } else {
-          final partnerQueryFallback = await FirebaseFirestore.instance
-              .collection('users')
-              .where('email', isEqualTo: partnerEmail)
-              .limit(1)
-              .get();
-
-          if (partnerQueryFallback.docs.isNotEmpty) {
-            recipientId = partnerQueryFallback.docs.first.id;
-          }
-        }
-      }
-
-      final CollectionReference lettersRef = FirebaseFirestore.instance
-          .collection('couples')
-          .doc(coupleGroupId)
-          .collection('love_letters');
-
-      final String docId = widget.editingLetter?.id.isNotEmpty == true
-          ? widget.editingLetter!.id
-          : lettersRef.doc().id;
-
-      final letterData = LoveLetter(
-        id: docId,
-        senderId: widget.editingLetter?.senderId ?? uid,
-        recipientId: recipientId,
+      await _loveLetterService.sendLoveLetter(
+        letterId: widget.editingLetter?.id,
         title: _titleController.text.trim(),
         text: _textController.text.trim(),
-        createdAt: widget.editingLetter?.createdAt ?? DateTime.now(),
       );
-
-      await lettersRef
-          .doc(docId)
-          .set(letterData.toMap(), SetOptions(merge: true));
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -286,9 +175,11 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
         _showSendAnimation = false;
       });
       _sendAnimController.reset();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to deliver your letter: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to deliver your letter: $e')),
+        );
+      }
     }
   }
 
@@ -389,7 +280,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
       ),
       body: Stack(
         children: [
-          // Typing floating background hearts
           ..._hearts.map((heart) {
             return Align(
               alignment: Alignment(heart.xOffset, 1.0 - (heart.progress * 1.5)),
@@ -419,8 +309,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 12),
-
-                          // Title Input Field
                           TextFormField(
                             controller: _titleController,
                             focusNode: _titleFocusNode,
@@ -451,8 +339,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                 : null,
                           ),
                           const SizedBox(height: 4),
-
-                          // Underline Animation
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             height: 1,
@@ -462,8 +348,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                 : cs.primary.withOpacity(0.12),
                           ),
                           const SizedBox(height: 20),
-
-                          // Open Body Text Input
                           Expanded(
                             child: TextFormField(
                               controller: _textController,
@@ -500,8 +384,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Seal & Send button with soft colored glow shadow
                     _isSaving
                         ? const SizedBox(
                             height: 52,
@@ -519,9 +401,7 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
                                   borderRadius: BorderRadius.circular(100),
                                 ),
                                 elevation: 4.0,
-                                shadowColor: cs.primary.withOpacity(
-                                  0.4,
-                                ), // Soft primary ambient glow
+                                shadowColor: cs.primary.withOpacity(0.4),
                               ),
                               icon: const Icon(
                                 Icons.favorite_rounded,
@@ -543,7 +423,6 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
             ),
           ),
 
-          // Sending flying heart layout
           if (_showSendAnimation)
             IgnorePointer(
               child: AnimatedBuilder(

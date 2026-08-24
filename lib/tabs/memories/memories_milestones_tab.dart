@@ -115,6 +115,14 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   IconData? _burstIcon;
   final List<_ParticleTrajectory> _particles = [];
 
+  IconData _deserializeIcon(dynamic icon) {
+    if (icon is IconData) return icon;
+    if (icon is int) {
+      return IconData(icon, fontFamily: 'MaterialIcons');
+    }
+    return Icons.star_rounded;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -353,46 +361,39 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
         ],
       );
     } else {
-      if (achievements.isEmpty) {
+      final inProgressBadges = achievements
+          .where((a) => !(a['isUnlocked'] as bool? ?? false))
+          .toList();
+
+      if (inProgressBadges.isEmpty) {
         return Column(
           key: const ValueKey('badges_tab'),
           children: [
             _buildEmptyState(
-              icon: Icons.military_tech_outlined,
-              title: 'No achievements available',
-              subtitle: 'Complete goals and activities to unlock badges!',
+              icon: Icons.military_tech_rounded,
+              title: 'All Active Badges Completed!',
+              subtitle:
+                  'You and your partner completed every badge task available.',
               colorScheme: colorScheme,
             ),
           ],
         );
       }
 
-      final completedBadges = achievements
-          .where((a) => (a['isUnlocked'] as bool? ?? false))
-          .toList();
-
-      final inProgressBadges = achievements
-          .where((a) => !(a['isUnlocked'] as bool? ?? false))
-          .toList();
-
       final hasMoreActiveToShow = inProgressBadges.length > 10;
       final visibleInProgress = _expandedBadges
           ? inProgressBadges
           : inProgressBadges.take(10).toList();
 
-      final visibleBadges = [...completedBadges, ...visibleInProgress];
-
       return Column(
         key: const ValueKey('badges_tab'),
         children: [
-          ...visibleBadges.map(
+          ...visibleInProgress.map(
             (a) =>
                 _buildAchievementCard(achievement: a, colorScheme: colorScheme),
           ),
-
           if ((hasMoreActiveToShow && !_expandedBadges) || _expandedBadges)
             const SizedBox(height: 16),
-
           if (hasMoreActiveToShow && !_expandedBadges)
             Container(
               width: double.infinity,
@@ -429,7 +430,6 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                 ),
               ),
             ),
-
           if (_expandedBadges)
             Container(
               width: double.infinity,
@@ -466,11 +466,10 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                 ),
               ),
             ),
-
           const SizedBox(height: 20),
           Center(
             child: Text(
-              'Showing completed badges and up to 10 active badge tasks at a time.',
+              'Showing up to 10 active badge tasks. Both partners must contribute to complete each badge.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'DMSans',
@@ -523,25 +522,22 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   Widget _buildPetHeroCard(ColorScheme colors) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final progress = nextRewardTarget > 0
-        ? (userCoins / nextRewardTarget).clamp(0.0, 1.0)
-        : 0.0;
-    final pointsRemaining = (nextRewardTarget - userCoins).clamp(
-      0,
-      nextRewardTarget,
-    );
+    final currentCoins = userCoins;
+    final target = nextRewardTarget > 0 ? nextRewardTarget : 100;
+    final progress = (currentCoins / target).clamp(0.0, 1.0);
+    final pointsRemaining = (target - currentCoins).clamp(0, target);
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withValues(alpha: isDark ? 0.3 : 0.08),
+            color: colors.shadow.withOpacity(isDark ? 0.3 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
           BoxShadow(
-            color: colors.primary.withValues(alpha: isDark ? 0.18 : 0.12),
+            color: colors.primary.withOpacity(isDark ? 0.18 : 0.12),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -556,15 +552,15 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  colors.primaryContainer.withValues(alpha: 0.85),
-                  colors.secondaryContainer.withValues(alpha: 0.55),
+                  colors.primaryContainer.withOpacity(0.85),
+                  colors.secondaryContainer.withOpacity(0.55),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: colors.primary.withValues(alpha: 0.35),
+                color: colors.primary.withOpacity(0.35),
                 width: 1,
               ),
             ),
@@ -602,6 +598,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       ),
                       const SizedBox(height: 14),
                       TweenAnimationBuilder<double>(
+                        key: ValueKey('progress_$currentCoins\_$target'),
                         tween: Tween<double>(begin: 0, end: progress),
                         duration: const Duration(milliseconds: 600),
                         curve: Curves.easeOutCubic,
@@ -611,7 +608,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                             decoration: BoxDecoration(
                               boxShadow: [
                                 BoxShadow(
-                                  color: colors.primary.withValues(alpha: 0.08),
+                                  color: colors.primary.withOpacity(0.08),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -623,7 +620,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                                 value: value,
                                 backgroundColor: isDark
                                     ? colors.surfaceContainerHighest
-                                    : colors.primary.withValues(alpha: 0.1),
+                                    : colors.primary.withOpacity(0.1),
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   colors.primary,
                                 ),
@@ -639,15 +636,19 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: colors.onSurfaceVariant.withValues(alpha: 0.8),
+                          color: colors.onSurfaceVariant.withOpacity(0.8),
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 20),
-                TweenAnimationBuilder<int>(
-                  tween: IntTween(begin: 0, end: userCoins),
+                TweenAnimationBuilder<double>(
+                  key: ValueKey('coins_$currentCoins'),
+                  tween: Tween<double>(
+                    begin: 0.0,
+                    end: currentCoins.toDouble(),
+                  ),
                   duration: const Duration(milliseconds: 600),
                   curve: Curves.easeOutCubic,
                   builder: (context, val, _) {
@@ -656,7 +657,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '$val',
+                          '${val.round()}',
                           style: TextStyle(
                             fontFamily: 'CormorantGaramond',
                             fontSize: 34,
@@ -670,7 +671,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: colors.primary,
+                            color: colors.primary.withOpacity(0.8),
                           ),
                         ),
                       ],
@@ -806,8 +807,9 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
               }
 
               final nudge = customNudges[index];
-              final iconData =
-                  nudge['icon'] as IconData? ?? Icons.favorite_rounded;
+              final iconData = _deserializeIcon(
+                nudge['icon'] ?? nudge['iconCodePoint'],
+              );
               final label = nudge['label'] as String? ?? 'Nudge';
 
               return Container(
@@ -975,7 +977,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     final points = (goal['points'] as num?)?.toInt() ?? 0;
     final title = goal['title'] as String? ?? '';
     final category = goal['category'] as String? ?? 'General';
-    final iconData = goal['icon'] as IconData? ?? Icons.star_rounded;
+    final iconData = _deserializeIcon(goal['icon'] ?? goal['iconCodePoint']);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1156,14 +1158,42 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isUnlocked = achievement['isUnlocked'] as bool? ?? false;
+    final userDone = achievement['userDone'] as bool? ?? false;
+    final partnerDone = achievement['partnerDone'] as bool? ?? false;
+
     final progressVal = (achievement['progress'] as num?)?.toInt() ?? 0;
-    final targetVal = (achievement['target'] as num?)?.toInt() ?? 1;
+    final targetVal = (achievement['target'] as num?)?.toInt() ?? 2;
     final points = (achievement['points'] as num?)?.toInt() ?? 0;
     final title = achievement['title'] as String? ?? 'Achievement';
     final description = achievement['description'] as String? ?? '';
-    final iconData =
-        achievement['icon'] as IconData? ?? Icons.military_tech_rounded;
-    final progress = targetVal > 0 ? (progressVal / targetVal) : 0.0;
+    final iconData = _deserializeIcon(
+      achievement['icon'] ?? achievement['iconCodePoint'],
+    );
+    final progress = targetVal > 0
+        ? (progressVal / targetVal).clamp(0.0, 1.0)
+        : 0.0;
+
+    String statusText;
+    IconData statusIcon;
+    Color statusColor;
+
+    if (isUnlocked) {
+      statusText = 'Both completed ✓';
+      statusIcon = Icons.people_alt_rounded;
+      statusColor = colorScheme.primary;
+    } else if (userDone && !partnerDone) {
+      statusText = 'You did your part! Waiting on partner...';
+      statusIcon = Icons.hourglass_top_rounded;
+      statusColor = Colors.orangeAccent;
+    } else if (!userDone && partnerDone) {
+      statusText = 'Partner finished! Your turn!';
+      statusIcon = Icons.priority_high_rounded;
+      statusColor = colorScheme.primary;
+    } else {
+      statusText = 'Both partners must complete this';
+      statusIcon = Icons.people_outline_rounded;
+      statusColor = colorScheme.onSurfaceVariant.withOpacity(0.6);
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1270,12 +1300,26 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(statusIcon, size: 13, color: statusColor),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   TweenAnimationBuilder<double>(
-                    tween: Tween<double>(
-                      begin: 0,
-                      end: progress.clamp(0.0, 1.0),
-                    ),
+                    tween: Tween<double>(begin: 0, end: progress),
                     duration: const Duration(milliseconds: 700),
                     curve: Curves.easeOutCubic,
                     builder: (context, value, _) {
@@ -1288,7 +1332,11 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                               ? colorScheme.surfaceContainerHighest
                               : colorScheme.primary.withValues(alpha: 0.1),
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            colorScheme.primary,
+                            isUnlocked
+                                ? colorScheme.primary
+                                : (userDone
+                                      ? Colors.orangeAccent
+                                      : colorScheme.primary),
                           ),
                         ),
                       );
@@ -1636,6 +1684,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   if (labelCtrl.text.trim().isEmpty) return;
                   final newNudge = {
                     'icon': selectedIcon,
+                    'iconCodePoint': selectedIcon.codePoint,
                     'label': labelCtrl.text.trim(),
                   };
                   setState(() {
@@ -1932,6 +1981,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                           'points': selectedPoints,
                           'isCompleted': false,
                           'icon': selectedIcon,
+                          'iconCodePoint': selectedIcon.codePoint,
                           'isCouple': _selectedTabIndex == 0,
                         };
 
@@ -2010,8 +2060,9 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                   )
                 else
                   ...customNudges.map((nudge) {
-                    final iconData =
-                        nudge['icon'] as IconData? ?? Icons.favorite_rounded;
+                    final iconData = _deserializeIcon(
+                      nudge['icon'] ?? nudge['iconCodePoint'],
+                    );
                     final label = nudge['label'] as String? ?? 'Nudge';
 
                     return ListTile(

@@ -25,9 +25,7 @@ part 'memories_scrapbook_tab.dart';
 part 'memories_timeline_tab.dart';
 
 class MemoriesScreen extends StatefulWidget {
-  final String? coupleId;
-
-  const MemoriesScreen({super.key, this.coupleId});
+  const MemoriesScreen({super.key});
 
   @override
   State<MemoriesScreen> createState() => _MemoriesScreenState();
@@ -37,20 +35,18 @@ class _MemoriesScreenState extends State<MemoriesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final BadgeService _badgeService = BadgeService();
-  String? _resolvedCoupleId;
+  String? _partnerUid;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _resolvedCoupleId = widget.coupleId;
-    if (_resolvedCoupleId == null) {
-      _fetchUserCoupleId();
-    }
+    _fetchPartnerUid();
   }
 
-  Future<void> _fetchUserCoupleId() async {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+  Future<void> _fetchPartnerUid() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final currentUid = user?.uid;
     if (currentUid == null) return;
 
     try {
@@ -60,13 +56,41 @@ class _MemoriesScreenState extends State<MemoriesScreen>
           .get();
 
       if (mounted && userDoc.exists) {
-        setState(() {
-          _resolvedCoupleId =
-              userDoc.data()?['couple_id'] as String? ??
-              userDoc.data()?['coupleId'] as String?;
-        });
+        final data = userDoc.data() ?? {};
+        final partnerEmail =
+            (data['partnerEmailLower'] ?? data['partnerEmail'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
+
+        if (partnerEmail.isNotEmpty) {
+          final partnerQuery = await FirebaseFirestore.instance
+              .collection('users')
+              .where('emailLower', isEqualTo: partnerEmail)
+              .get();
+
+          if (partnerQuery.docs.isNotEmpty) {
+            setState(() {
+              _partnerUid = partnerQuery.docs.first.id;
+            });
+            return;
+          }
+
+          final fallbackQuery = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: partnerEmail)
+              .get();
+
+          if (fallbackQuery.docs.isNotEmpty) {
+            setState(() {
+              _partnerUid = fallbackQuery.docs.first.id;
+            });
+          }
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error fetching partner UID: $e');
+    }
   }
 
   @override
@@ -123,9 +147,9 @@ class _MemoriesScreenState extends State<MemoriesScreen>
   }
 
   Widget _buildMilestonesTab() {
-    final coupleId = _resolvedCoupleId;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
-    if (coupleId == null || coupleId.isEmpty) {
+    if (currentUid == null) {
       final defaultBadges = allBadges
           .map(
             (badgeDef) => {
@@ -145,61 +169,208 @@ class _MemoriesScreenState extends State<MemoriesScreen>
       return MemoriesMilestonesTab(achievements: defaultBadges);
     }
 
+    final achievementsDocRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUid)
+        .collection('achievements')
+        .doc('data');
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('couples')
-          .doc(coupleId)
-          .snapshots(),
-      builder: (context, coupleSnapshot) {
-        final coupleData = coupleSnapshot.data?.data() ?? {};
-        final stats = Map<String, dynamic>.from(coupleData['stats'] ?? {});
-        final sharedCoins = (stats['total_shared_coins'] as num? ?? 0).toInt();
+      stream: achievementsDocRef.snapshots(),
+      builder: (context, achSnapshot) {
+        final achData = achSnapshot.data?.data() ?? {};
+        final totalPoints = (achData['totalPoints'] as num? ?? 0).toInt();
         final nextRewardTarget =
-            (coupleData['next_reward_target'] as num? ?? 300).toInt();
+            (achData['nextRewardTarget'] as num? ?? 300).toInt();
         final nextAccessoryName =
-            coupleData['next_accessory_name'] as String? ?? 'Party Hat';
+            achData['nextAccessoryName'] as String? ?? 'Party Hat';
 
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _badgeService.streamCoupleBadges(coupleId),
-          builder: (context, badgeSnapshot) {
-            final liveBadges =
-                badgeSnapshot.data ??
-                allBadges.map((badgeDef) {
-                  final progress = (stats[badgeDef.statKey] as num? ?? 0)
-                      .toInt();
-                  return {
-                    'id': badgeDef.id,
-                    'title': badgeDef.title,
-                    'description': badgeDef.description,
-                    'progress': progress.clamp(0, badgeDef.target),
-                    'target': badgeDef.target,
-                    'points': badgeDef.points,
-                    'isUnlocked': progress >= badgeDef.target,
-                    'icon': badgeDef.icon,
-                    'category': badgeDef.category.name,
-                  };
-                }).toList();
+        final rawNudges = (achData['customNudges'] as List?) ?? [];
+        final customNudges = rawNudges.map((n) {
+          final map = Map<String, dynamic>.from(n as Map);
+          return {
+            'label': map['label'] ?? 'Nudge',
+            'iconCodePoint': map['iconCodePoint'] ?? Icons.favorite_rounded.codePoint,
+          };
+        }).toList();
 
-            return MemoriesMilestonesTab(
-              userCoins: sharedCoins,
-              nextRewardTarget: nextRewardTarget,
-              nextAccessoryName: nextAccessoryName,
-              achievements: liveBadges,
-              onNudgeSent: (title, icon) {
-                _badgeService.incrementCoupleStat(
-                  coupleId: coupleId,
-                  statKey: 'nudges_sent',
-                  by: 1,
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: achievementsDocRef.collection('goals').snapshots(),
+          builder: (context, goalsSnapshot) {
+            final goalDocs = goalsSnapshot.data?.docs ?? [];
+            final coupleGoals = <Map<String, dynamic>>[];
+            final personalGoals = <Map<String, dynamic>>[];
+
+            for (final doc in goalDocs) {
+              final data = doc.data();
+              final goalMap = {
+                'id': doc.id,
+                'title': data['title'] ?? '',
+                'category': data['category'] ?? 'General',
+                'points': (data['points'] as num? ?? 0).toInt(),
+                'isCompleted': data['isCompleted'] == true,
+                'isCouple': data['isCouple'] == true,
+                'iconCodePoint': data['iconCodePoint'] ?? Icons.star_rounded.codePoint,
+              };
+
+              if (goalMap['isCouple'] == true) {
+                coupleGoals.add(goalMap);
+              } else {
+                personalGoals.add(goalMap);
+              }
+            }
+
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _badgeService.streamBadges(currentUid),
+              builder: (context, badgeSnapshot) {
+                final liveBadges =
+                    badgeSnapshot.data ??
+                    allBadges
+                        .map(
+                          (b) => {
+                            'id': b.id,
+                            'title': b.title,
+                            'description': b.description,
+                            'progress': 0,
+                            'target': b.target * 2,
+                            'points': b.points,
+                            'isUnlocked': false,
+                            'icon': b.icon,
+                            'category': b.category.name,
+                          },
+                        )
+                        .toList();
+
+                return MemoriesMilestonesTab(
+                  userCoins: totalPoints,
+                  nextRewardTarget: nextRewardTarget,
+                  nextAccessoryName: nextAccessoryName,
+                  customNudges: customNudges.isNotEmpty ? customNudges : null,
+                  coupleGoals: coupleGoals,
+                  personalGoals: personalGoals,
+                  achievements: liveBadges,
+                  onNudgeSent: (title, icon) {
+                    _badgeService.incrementStat(
+                      statKey: 'nudges_sent',
+                      by: 1,
+                    );
+                  },
+                  onNudgeAdded: (nudge) async {
+                    await achievementsDocRef.set({
+                      'customNudges': FieldValue.arrayUnion([
+                        {
+                          'label': nudge['label'],
+                          'iconCodePoint': nudge['iconCodePoint'] ??
+                              (nudge['icon'] as IconData?)?.codePoint ??
+                              Icons.favorite_rounded.codePoint,
+                        }
+                      ]),
+                    }, SetOptions(merge: true));
+                  },
+                  onNudgeRemoved: (nudge) async {
+                    await achievementsDocRef.set({
+                      'customNudges': FieldValue.arrayRemove([
+                        {
+                          'label': nudge['label'],
+                          'iconCodePoint': nudge['iconCodePoint'] ??
+                              (nudge['icon'] as IconData?)?.codePoint ??
+                              Icons.favorite_rounded.codePoint,
+                        }
+                      ]),
+                    }, SetOptions(merge: true));
+                  },
+                  onGoalAdded: (goal) async {
+                    final goalId = goal['id'] as String;
+                    final isCouple = goal['isCouple'] == true;
+                    final iconCodePoint = goal['iconCodePoint'] ??
+                        (goal['icon'] as IconData?)?.codePoint ??
+                        Icons.star_rounded.codePoint;
+
+                    final goalData = {
+                      'title': goal['title'],
+                      'category': goal['category'],
+                      'points': goal['points'],
+                      'isCouple': isCouple,
+                      'isCompleted': false,
+                      'iconCodePoint': iconCodePoint,
+                      'createdAt': FieldValue.serverTimestamp(),
+                    };
+
+                    final batch = FirebaseFirestore.instance.batch();
+                    batch.set(
+                      achievementsDocRef.collection('goals').doc(goalId),
+                      goalData,
+                    );
+
+                    if (isCouple && _partnerUid != null && _partnerUid!.isNotEmpty) {
+                      final partnerGoalDoc = FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(_partnerUid)
+                          .collection('achievements')
+                          .doc('data')
+                          .collection('goals')
+                          .doc(goalId);
+                      batch.set(partnerGoalDoc, goalData);
+                    }
+
+                    await batch.commit();
+                  },
+                  onGoalToggled: (goal) async {
+                    final goalId = goal['id'] as String;
+                    final points = (goal['points'] as num?)?.toInt() ?? 0;
+                    final isCompleted = goal['isCompleted'] == true;
+                    final isCouple = goal['isCouple'] == true;
+
+                    final batch = FirebaseFirestore.instance.batch();
+
+                    // Update current user's goal and totalPoints
+                    batch.update(
+                      achievementsDocRef.collection('goals').doc(goalId),
+                      {'isCompleted': isCompleted},
+                    );
+                    batch.set(
+                      achievementsDocRef,
+                      {
+                        'totalPoints': FieldValue.increment(
+                          isCompleted ? points : -points,
+                        ),
+                      },
+                      SetOptions(merge: true),
+                    );
+
+                    // Dual write couple goal status to partner
+                    if (isCouple && _partnerUid != null && _partnerUid!.isNotEmpty) {
+                      final partnerDocRef = FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(_partnerUid)
+                          .collection('achievements')
+                          .doc('data');
+
+                      batch.update(
+                        partnerDocRef.collection('goals').doc(goalId),
+                        {'isCompleted': isCompleted},
+                      );
+                      batch.set(
+                        partnerDocRef,
+                        {
+                          'totalPoints': FieldValue.increment(
+                            isCompleted ? points : -points,
+                          ),
+                        },
+                        SetOptions(merge: true),
+                      );
+                    }
+
+                    await batch.commit();
+
+                    if (isCompleted && isCouple) {
+                      await _badgeService.incrementStat(
+                        statKey: 'couple_goals_completed',
+                        by: 1,
+                      );
+                    }
+                  },
                 );
-              },
-              onGoalToggled: (goal) {
-                if (goal['isCompleted'] == true && goal['isCouple'] == true) {
-                  _badgeService.incrementCoupleStat(
-                    coupleId: coupleId,
-                    statKey: 'couple_goals_completed',
-                    by: 1,
-                  );
-                }
               },
             );
           },

@@ -1,67 +1,218 @@
 // lib/services/badge_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/badge_model.dart';
 
 class BadgeService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Stream<List<Map<String, dynamic>>> streamCoupleBadges(String coupleId) {
-    return _db.collection('couples').doc(coupleId).snapshots().map((snapshot) {
-      final data = snapshot.data() ?? {};
-      final stats = Map<String, dynamic>.from(data['stats'] ?? {});
+  // Resolve partner UID via user document
+  Future<String?> _resolvePartnerUid(String currentUid) async {
+    try {
+      final userDoc = await _db.collection('users').doc(currentUid).get();
+      if (!userDoc.exists) return null;
 
-      return allBadges.map((badgeDef) {
-        final currentProgress = (stats[badgeDef.statKey] as num? ?? 0).toInt();
-        final isUnlocked = currentProgress >= badgeDef.target;
+      final data = userDoc.data() ?? {};
+      final partnerEmail =
+          (data['partnerEmailLower'] ?? data['partnerEmail'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
 
-        return {
-          'id': badgeDef.id,
-          'title': badgeDef.title,
-          'description': badgeDef.description,
-          'progress': currentProgress.clamp(0, badgeDef.target),
-          'target': badgeDef.target,
-          'points': badgeDef.points,
-          'isUnlocked': isUnlocked,
-          'icon': badgeDef.icon,
-          'category': badgeDef.category.name,
-        };
-      }).toList();
-    });
-  }
+      if (partnerEmail.isEmpty) return null;
 
-  Future<void> incrementCoupleStat({
-    required String coupleId,
-    required String statKey,
-    int by = 1,
-  }) async {
-    final coupleRef = _db.collection('couples').doc(coupleId);
+      final partnerQuery = await _db
+          .collection('users')
+          .where('emailLower', isEqualTo: partnerEmail)
+          .get();
 
-    await _db.runTransaction((transaction) async {
-      final doc = await transaction.get(coupleRef);
-      if (!doc.exists) return;
-
-      final data = doc.data() ?? {};
-      final stats = Map<String, dynamic>.from(data['stats'] ?? {});
-      final currentVal = (stats[statKey] as num? ?? 0).toInt();
-      final newVal = currentVal + by;
-      stats[statKey] = newVal;
-
-      int newlyAwardedCoins = 0;
-
-      for (final badge in allBadges.where((b) => b.statKey == statKey)) {
-        final hadBadgeBefore = currentVal >= badge.target;
-        final hasBadgeNow = newVal >= badge.target;
-
-        if (!hadBadgeBefore && hasBadgeNow) {
-          newlyAwardedCoins += badge.points;
-        }
+      if (partnerQuery.docs.isNotEmpty) {
+        return partnerQuery.docs.first.id;
       }
 
-      transaction.update(coupleRef, {
-        'stats': stats,
-        if (newlyAwardedCoins > 0)
-          'stats.total_shared_coins': FieldValue.increment(newlyAwardedCoins),
-      });
-    });
+      final fallbackQuery = await _db
+          .collection('users')
+          .where('email', isEqualTo: partnerEmail)
+          .get();
+
+      if (fallbackQuery.docs.isNotEmpty) {
+        return fallbackQuery.docs.first.id;
+      }
+    } catch (e) {
+      debugPrint('Error resolving partner UID: $e');
+    }
+    return null;
+  }
+
+  // Stream badges from users/{userId}/achievements/data/badges
+  Stream<List<Map<String, dynamic>>> streamBadges(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('achievements')
+        .doc('data')
+        .collection('badges')
+        .snapshots()
+        .map((snapshot) {
+          final savedBadgesMap = {
+            for (var doc in snapshot.docs) doc.id: doc.data(),
+          };
+
+          return allBadges.map((badgeDef) {
+            final saved = savedBadgesMap[badgeDef.id] ?? <String, dynamic>{};
+            final userCounts = Map<String, dynamic>.from(
+              saved['user_contributions'] ?? {},
+            );
+
+            final myCount = (userCounts[userId] as num? ?? 0).toInt();
+            final partnerCount = userCounts.entries
+                .where((e) => e.key != userId)
+                .fold<int>(
+                  0,
+                  (sum, e) => sum + ((e.value as num?)?.toInt() ?? 0),
+                );
+
+            final perPersonTarget = badgeDef.target <= 1 ? 1 : badgeDef.target;
+            final totalTarget = perPersonTarget * 2;
+
+            final userCapped = myCount.clamp(0, perPersonTarget);
+            final partnerCapped = partnerCount.clamp(0, perPersonTarget);
+            final combinedProgress = userCapped + partnerCapped;
+
+            final userDone = userCapped >= perPersonTarget;
+            final partnerDone = partnerCapped >= perPersonTarget;
+            final isUnlocked =
+                saved['isUnlocked'] == true || (userDone && partnerDone);
+
+            return {
+              'id': badgeDef.id,
+              'title': badgeDef.title,
+              'description': badgeDef.description,
+              'progress': combinedProgress,
+              'target': totalTarget,
+              'userDone': userDone,
+              'partnerDone': partnerDone,
+              'points': badgeDef.points,
+              'isUnlocked': isUnlocked,
+              'icon': badgeDef.icon,
+              'category': badgeDef.category.name,
+            };
+          }).toList();
+        });
+  }
+
+  // Increment badge progress and update users/{uid}/achievements
+  Future<void> incrementStat({required String statKey, int by = 1}) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final partnerUid = await _resolvePartnerUid(currentUid);
+
+    try {
+      final matchingBadges = allBadges
+          .where((b) => b.statKey == statKey)
+          .toList();
+
+      for (final badge in matchingBadges) {
+        final badgeDocRef = _db
+            .collection('users')
+            .doc(currentUid)
+            .collection('achievements')
+            .doc('data')
+            .collection('badges')
+            .doc(badge.id);
+
+        final docSnap = await badgeDocRef.get();
+        final badgeData = docSnap.data() ?? {};
+        final userCounts = Map<String, dynamic>.from(
+          badgeData['user_contributions'] ?? {},
+        );
+
+        final myPrev = (userCounts[currentUid] as num? ?? 0).toInt();
+        final myNew = myPrev + by;
+        userCounts[currentUid] = myNew;
+
+        final partnerTotal = userCounts.entries
+            .where((e) => e.key != currentUid)
+            .fold<int>(0, (sum, e) => sum + ((e.value as num?)?.toInt() ?? 0));
+
+        final perPersonReq = badge.target <= 1 ? 1 : badge.target;
+        final totalTarget = perPersonReq * 2;
+        final combinedProgress =
+            myNew.clamp(0, perPersonReq) + partnerTotal.clamp(0, perPersonReq);
+
+        final wasUnlocked = badgeData['isUnlocked'] == true;
+        final isNowUnlocked =
+            (myNew >= perPersonReq) && (partnerTotal >= perPersonReq);
+
+        final updatedBadgeMap = {
+          'id': badge.id,
+          'title': badge.title,
+          'statKey': badge.statKey,
+          'points': badge.points,
+          'target': totalTarget,
+          'progress': combinedProgress,
+          'userDone': myNew >= perPersonReq,
+          'partnerDone': partnerTotal >= perPersonReq,
+          'isUnlocked': isNowUnlocked,
+          'user_contributions': userCounts,
+          'iconCodePoint': badge.icon.codePoint,
+          if (isNowUnlocked && badgeData['unlockedAt'] == null)
+            'unlockedAt': FieldValue.serverTimestamp(),
+        };
+
+        final batch = _db.batch();
+
+        // 1. Update current user's achievement badge
+        batch.set(badgeDocRef, updatedBadgeMap, SetOptions(merge: true));
+
+        // 2. Award points if unlocked
+        if (!wasUnlocked && isNowUnlocked) {
+          final userAchDoc = _db
+              .collection('users')
+              .doc(currentUid)
+              .collection('achievements')
+              .doc('data');
+
+          batch.set(userAchDoc, {
+            'totalPoints': FieldValue.increment(badge.points),
+          }, SetOptions(merge: true));
+        }
+
+        // 3. Dual-write to partner if linked
+        if (partnerUid != null && partnerUid.isNotEmpty) {
+          final partnerBadgeDoc = _db
+              .collection('users')
+              .doc(partnerUid)
+              .collection('achievements')
+              .doc('data')
+              .collection('badges')
+              .doc(badge.id);
+
+          final partnerBadgeMap = Map<String, dynamic>.from(updatedBadgeMap);
+          partnerBadgeMap['userDone'] = partnerTotal >= perPersonReq;
+          partnerBadgeMap['partnerDone'] = myNew >= perPersonReq;
+
+          batch.set(partnerBadgeDoc, partnerBadgeMap, SetOptions(merge: true));
+
+          if (!wasUnlocked && isNowUnlocked) {
+            final partnerAchDoc = _db
+                .collection('users')
+                .doc(partnerUid)
+                .collection('achievements')
+                .doc('data');
+
+            batch.set(partnerAchDoc, {
+              'totalPoints': FieldValue.increment(badge.points),
+            }, SetOptions(merge: true));
+          }
+        }
+
+        await batch.commit();
+      }
+    } catch (e, stack) {
+      debugPrint('Error updating achievement badge: $e\n$stack');
+    }
   }
 }
