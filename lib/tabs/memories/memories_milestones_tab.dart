@@ -94,6 +94,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     with TickerProviderStateMixin {
   int _selectedTabIndex = 0; // 0: For Us, 1: For Me, 2: Badges
   bool _expandedBadges = false;
+  bool _hasInitializedRewardsAnim = false;
 
   late int userCoins;
   late int nextRewardTarget;
@@ -527,6 +528,11 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
     final progress = (currentCoins / target).clamp(0.0, 1.0);
     final pointsRemaining = (target - currentCoins).clamp(0, target);
 
+    final initialProgress = _hasInitializedRewardsAnim ? progress : 0.0;
+    final initialCoins = _hasInitializedRewardsAnim
+        ? currentCoins.toDouble()
+        : 0.0;
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -565,10 +571,12 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
               ),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         children: [
@@ -591,6 +599,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       const SizedBox(height: 6),
                       Text(
                         'Unlock $nextAccessoryName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: colors.onSurface,
                           fontWeight: FontWeight.w800,
@@ -598,9 +608,13 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       ),
                       const SizedBox(height: 14),
                       TweenAnimationBuilder<double>(
-                        key: ValueKey('progress_$currentCoins\_$target'),
-                        tween: Tween<double>(begin: 0, end: progress),
-                        duration: const Duration(milliseconds: 600),
+                        tween: Tween<double>(
+                          begin: initialProgress,
+                          end: progress,
+                        ),
+                        duration: _hasInitializedRewardsAnim
+                            ? const Duration(milliseconds: 300)
+                            : const Duration(milliseconds: 600),
                         curve: Curves.easeOutCubic,
                         builder: (context, value, _) {
                           return Container(
@@ -617,7 +631,7 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: LinearProgressIndicator(
-                                value: value,
+                                value: value.clamp(0.0, 1.0),
                                 backgroundColor: isDark
                                     ? colors.surfaceContainerHighest
                                     : colors.primary.withOpacity(0.1),
@@ -633,6 +647,8 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                       const SizedBox(height: 6),
                       Text(
                         '$pointsRemaining pts until $nextAccessoryName is unlocked',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -642,41 +658,53 @@ class _MilestonesGoalsContentTabState extends State<_MilestonesGoalsContentTab>
                     ],
                   ),
                 ),
-                const SizedBox(width: 20),
-                TweenAnimationBuilder<double>(
-                  key: ValueKey('coins_$currentCoins'),
-                  tween: Tween<double>(
-                    begin: 0.0,
-                    end: currentCoins.toDouble(),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 70,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(
+                      begin: initialCoins,
+                      end: currentCoins.toDouble(),
+                    ),
+                    duration: _hasInitializedRewardsAnim
+                        ? const Duration(milliseconds: 300)
+                        : const Duration(milliseconds: 600),
+                    curve: Curves.easeOutCubic,
+                    onEnd: () {
+                      if (!_hasInitializedRewardsAnim) {
+                        _hasInitializedRewardsAnim = true;
+                      }
+                    },
+                    builder: (context, val, _) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${val.round()}',
+                            style: TextStyle(
+                              fontFamily: 'CormorantGaramond',
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              fontSize: 34,
+                              height: 1.0,
+                              fontWeight: FontWeight.bold,
+                              color: colors.primary,
+                            ),
+                          ),
+                          Text(
+                            'points',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: colors.primary.withOpacity(0.8),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, val, _) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${val.round()}',
-                          style: TextStyle(
-                            fontFamily: 'CormorantGaramond',
-                            fontSize: 34,
-                            height: 1.0,
-                            fontWeight: FontWeight.bold,
-                            color: colors.primary,
-                          ),
-                        ),
-                        Text(
-                          'points',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colors.primary.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
                 ),
               ],
             ),
