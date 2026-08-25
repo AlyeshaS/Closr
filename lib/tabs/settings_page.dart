@@ -12,30 +12,38 @@ import '../services/badge_service.dart';
 import '../widgets/sprite_animator.dart';
 import 'preferences/preferences_service.dart';
 
-// ── Companion Data with Local Asset & Sprite Support ──────────────────────────
+// ── Companion Data with Frame Counts ────────────────────────────────────────
 
 class _CompanionOption {
   final String emoji;
   final String defaultName;
   final String species;
   final String assetPath;
+  final int totalFrames;
   const _CompanionOption(
     this.emoji,
     this.defaultName,
     this.species,
     this.assetPath,
+    this.totalFrames,
   );
 }
 
 const _kCompanions = [
-  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png'),
-  _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/animations/dog.json'),
-  _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/animations/turtle.json'),
-  _CompanionOption('🐼', 'Bao', 'Panda', 'assets/animations/panda.json'),
-  _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/animations/bear.json'),
-  _CompanionOption('🦁', 'Simba', 'Lion', 'assets/animations/lion.json'),
-  _CompanionOption('🐧', 'Pippin', 'Penguin', 'assets/animations/penguin.json'),
-  _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json'),
+  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png', 7),
+  // _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10),
+  _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/images/turtle.png', 8),
+  // _CompanionOption('🐼', 'Bao', 'Panda', 'assets/images/panda.png', 4),
+  // _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/images/bear.png', 7),
+  // _CompanionOption('🦁', 'Simba', 'Lion', 'assets/images/lion.png', 7),
+  // _CompanionOption(
+  //   '🐧',
+  //   'Pippin',
+  //   'Penguin',
+  //   'assets/animations/penguin.json',
+  //   7,
+  // ),
+  // _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json', 7),
 ];
 
 class _CompanionShopItem {
@@ -921,7 +929,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                       scale: 1.2,
                                       child: SpriteAnimator(
                                         imagePath: c.assetPath,
-                                        totalFrames: 7,
+                                        totalFrames: c.totalFrames,
                                         displayWidth: 32.0,
                                         displayHeight: 32.0,
                                         duration: const Duration(
@@ -1229,7 +1237,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 24),
 
-          // ── Companion group (Renamed from Relationship) ─────────────────
+          // ── Companion group ─────────────────────────────────────────
           _GroupLabel(text: 'Companion', cs: cs),
           const SizedBox(height: 8),
           _SettingsGroup(
@@ -1432,7 +1440,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-// ── Interests collapsible widget ─────────────────────────────────────────────
+// ── Interests collapsible widget & helper classes ────────────────────────────
 
 class _CollapsibleInterests extends StatefulWidget {
   final Map<String, dynamic> prefs;
@@ -1593,8 +1601,6 @@ class _CollapsibleInterestsState extends State<_CollapsibleInterests> {
     );
   }
 }
-
-// ── Private widgets ───────────────────────────────────────────────────────────
 
 class _GroupLabel extends StatelessWidget {
   final String text;

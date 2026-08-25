@@ -8,6 +8,45 @@ import '../gemini_service.dart';
 import '../_expandable_match_tile.dart';
 import '../widgets/sprite_animator.dart';
 
+// Companion option helper to support dynamic frame counts per sprite sheet
+class _CompanionOption {
+  final String emoji;
+  final String defaultName;
+  final String species;
+  final String assetPath;
+  final int totalFrames;
+  const _CompanionOption(
+    this.emoji,
+    this.defaultName,
+    this.species,
+    this.assetPath,
+    this.totalFrames,
+  );
+}
+
+const _kCompanions = [
+  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png', 7),
+  _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10),
+  _CompanionOption(
+    '🐢',
+    'Shelly',
+    'Turtle',
+    'assets/animations/turtle.json',
+    7,
+  ),
+  _CompanionOption('🐼', 'Bao', 'Panda', 'assets/animations/panda.json', 7),
+  _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/animations/bear.json', 7),
+  _CompanionOption('🦁', 'Simba', 'Lion', 'assets/animations/lion.json', 7),
+  _CompanionOption(
+    '🐧',
+    'Pippin',
+    'Penguin',
+    'assets/animations/penguin.json',
+    7,
+  ),
+  _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json', 7),
+];
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -496,13 +535,17 @@ class _CharacterOrb extends StatelessWidget {
     const orbSize = 108.0;
     final isSpriteSheet = source.endsWith('.png');
 
+    final matchingOption = _kCompanions.firstWhere(
+      (c) => c.assetPath == source,
+      orElse: () => _kCompanions.first,
+    );
+
     return SizedBox(
       width: orbSize + 24,
       height: orbSize + 24,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Ambient Outer Pulse Glow
           RepaintBoundary(
             child: AnimatedBuilder(
               animation: pulse,
@@ -531,8 +574,6 @@ class _CharacterOrb extends StatelessWidget {
               },
             ),
           ),
-
-          // Glass Base
           Container(
             width: orbSize,
             height: orbSize,
@@ -552,7 +593,6 @@ class _CharacterOrb extends StatelessWidget {
             ),
           ),
 
-          // Animated Companion (Sprite Sheet PNG or Emoji Fallback)
           ClipOval(
             child: SizedBox(
               width: orbSize - 16,
@@ -563,7 +603,7 @@ class _CharacterOrb extends StatelessWidget {
                         scale: 2.2,
                         child: SpriteAnimator(
                           imagePath: source,
-                          totalFrames: 7,
+                          totalFrames: matchingOption.totalFrames,
                           displayWidth: 32.0,
                           displayHeight: 32.0,
                           duration: const Duration(milliseconds: 800),
@@ -578,8 +618,6 @@ class _CharacterOrb extends StatelessWidget {
                     ),
             ),
           ),
-
-          // ── Layered Accessories (Equipped from Shop) ─────────────────
           if (equippedAccessories.contains('cloud_blanket'))
             Positioned(
               bottom: 12,
@@ -592,7 +630,6 @@ class _CharacterOrb extends StatelessWidget {
                 child: const Text('☁️', style: TextStyle(fontSize: 12)),
               ),
             ),
-
           if (equippedAccessories.contains('moon_halo'))
             Positioned(
               top: 10,
@@ -605,13 +642,11 @@ class _CharacterOrb extends StatelessWidget {
                 child: const Text('🌙', style: TextStyle(fontSize: 14)),
               ),
             ),
-
           if (equippedAccessories.contains('star_collar'))
             const Positioned(
               bottom: 18,
               child: Text('✨', style: TextStyle(fontSize: 13)),
             ),
-
           if (equippedAccessories.contains('heart_tag'))
             const Positioned(
               bottom: 8,
@@ -623,7 +658,7 @@ class _CharacterOrb extends StatelessWidget {
   }
 }
 
-// ── Tip of the Day ────────────────────────────────────────────────────────
+// ── Tip of the Day & Remaining Components ─────────────────────────────────
 
 class _TipLoading extends StatelessWidget {
   final ColorScheme cs;
@@ -741,8 +776,6 @@ class _TipLoaded extends StatelessWidget {
   }
 }
 
-// ── Recent Matches ───────────────────────────────────────────────────────
-
 class _RecentMatchesSection extends StatefulWidget {
   final User? user;
   final ColorScheme cs;
@@ -819,7 +852,6 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   AnimatedSize(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
@@ -840,7 +872,6 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
                       },
                     ),
                   ),
-
                   if (docs.length > 2) ...[
                     const SizedBox(height: 14),
                     const Divider(height: 1, color: Colors.white24),
@@ -884,8 +915,6 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
     );
   }
 }
-
-// ── Matched Dates & Streak Cards with Mirror Counter ──────────────────────
 
 class _MatchedDatesCard extends StatelessWidget {
   final ColorScheme cs;
