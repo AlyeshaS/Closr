@@ -4,9 +4,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lottie/lottie.dart';
 import '../gemini_service.dart';
 import '../_expandable_match_tile.dart';
+import '../widgets/sprite_animator.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -28,7 +28,6 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    // One-time entrance animation
     _entrance = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -125,14 +124,13 @@ class _HomePageState extends State<HomePage>
                             final data =
                                 snapshot.data?.data() as Map<String, dynamic>?;
 
-                            // Read asset path, fallback to lottie url, fallback to default
                             final companionSource =
                                 (data?['companionAsset'] as String?) ??
                                 (data?['companionLottie'] as String?) ??
-                                'assets/animations/fox.json';
+                                'assets/images/IdleCattt.png';
 
                             final companionEmoji =
-                                (data?['companionEmoji'] as String?) ?? '🦊';
+                                (data?['companionEmoji'] as String?) ?? '🐱';
 
                             final equipped = List<String>.from(
                               (data?['equippedAccessories'] as List?) ??
@@ -475,7 +473,7 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ── Companion Orb with Universal Local/Network Support ─────────────────────
+// ── Companion Orb with Sprite Sheet Support ─────────────────────────────────
 
 class _CharacterOrb extends StatelessWidget {
   final ColorScheme cs;
@@ -489,15 +487,14 @@ class _CharacterOrb extends StatelessWidget {
     required this.cs,
     required this.pulse,
     required this.source,
-    this.fallbackEmoji = '🦊',
+    this.fallbackEmoji = '🐱',
     this.equippedAccessories = const [],
   });
 
   @override
   Widget build(BuildContext context) {
     const orbSize = 108.0;
-    final isNetwork =
-        source.startsWith('http://') || source.startsWith('https://');
+    final isSpriteSheet = source.endsWith('.png');
 
     return SizedBox(
       width: orbSize + 24,
@@ -555,30 +552,28 @@ class _CharacterOrb extends StatelessWidget {
             ),
           ),
 
-          // Animated Vector Companion (Asset or Network with Emoji Fallback)
+          // Animated Companion (Sprite Sheet PNG or Emoji Fallback)
           ClipOval(
             child: SizedBox(
               width: orbSize - 16,
               height: orbSize - 16,
-              child: isNetwork
-                  ? Lottie.network(
-                      source,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Center(
-                        child: Text(
-                          fallbackEmoji,
-                          style: const TextStyle(fontSize: 34),
+              child: isSpriteSheet
+                  ? Center(
+                      child: Transform.scale(
+                        scale: 2.2,
+                        child: SpriteAnimator(
+                          imagePath: source,
+                          totalFrames: 7,
+                          displayWidth: 32.0,
+                          displayHeight: 32.0,
+                          duration: const Duration(milliseconds: 800),
                         ),
                       ),
                     )
-                  : Lottie.asset(
-                      source,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Center(
-                        child: Text(
-                          fallbackEmoji,
-                          style: const TextStyle(fontSize: 34),
-                        ),
+                  : Center(
+                      child: Text(
+                        fallbackEmoji,
+                        style: const TextStyle(fontSize: 34),
                       ),
                     ),
             ),

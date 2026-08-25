@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../auth/auth_service.dart';
 import '../theme_provider.dart';
 import '../services/notifications_service.dart';
 import '../services/companion_rewards_service.dart';
 import '../services/badge_service.dart';
+import '../widgets/sprite_animator.dart';
 import 'preferences/preferences_service.dart';
 
-// ── Companion Data with Local Asset Paths ──────────────────────────────────────
+// ── Companion Data with Local Asset & Sprite Support ──────────────────────────
 
 class _CompanionOption {
   final String emoji;
@@ -28,8 +28,8 @@ class _CompanionOption {
 }
 
 const _kCompanions = [
+  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png'),
   _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/animations/dog.json'),
-  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/animations/cat.json'),
   _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/animations/turtle.json'),
   _CompanionOption('🐼', 'Bao', 'Panda', 'assets/animations/panda.json'),
   _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/animations/bear.json'),
@@ -147,9 +147,9 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   // Companion state
-  String _companionEmoji = '🐶';
-  String _companionName = 'Biscuit';
-  String _companionAsset = 'assets/animations/dog.json';
+  String _companionEmoji = '🐱';
+  String _companionName = 'Mochi';
+  String _companionAsset = 'assets/images/IdleCattt.png';
   int _companionPoints = 0;
   Set<String> _ownedShopItemIds = <String>{};
   Set<String> _equippedAccessories = <String>{};
@@ -187,15 +187,13 @@ class _SettingsPageState extends State<SettingsPage> {
     final data = doc.data() ?? {};
     setState(() {
       _companionEmoji =
-          normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🐶';
+          normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🐱';
       _companionName =
-          normalized?['name'] ??
-          (data['companionName'] as String?) ??
-          'Biscuit';
+          normalized?['name'] ?? (data['companionName'] as String?) ?? 'Mochi';
       _companionAsset =
           (data['companionAsset'] as String?) ??
           (data['companionLottie'] as String?) ??
-          'assets/animations/dog.json';
+          'assets/images/IdleCattt.png';
       _companionPoints = (data['companionPoints'] as int?) ?? 0;
       _ownedShopItemIds = Set<String>.from(
         List<String>.from((data['companionShopOwnedIds'] as List?) ?? const []),
@@ -888,6 +886,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: List.generate(_kCompanions.length, (i) {
                   final c = _kCompanions[i];
                   final selected = i == selectedIdx;
+                  final isSprite = c.assetPath.endsWith('.png');
 
                   return GestureDetector(
                     onTap: () {
@@ -916,16 +915,27 @@ class _SettingsPageState extends State<SettingsPage> {
                           SizedBox(
                             width: 38,
                             height: 38,
-                            child: Lottie.asset(
-                              c.assetPath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: Text(
-                                  c.emoji,
-                                  style: const TextStyle(fontSize: 28),
-                                ),
-                              ),
-                            ),
+                            child: isSprite
+                                ? Center(
+                                    child: Transform.scale(
+                                      scale: 1.2,
+                                      child: SpriteAnimator(
+                                        imagePath: c.assetPath,
+                                        totalFrames: 7,
+                                        displayWidth: 32.0,
+                                        displayHeight: 32.0,
+                                        duration: const Duration(
+                                          milliseconds: 800,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      c.emoji,
+                                      style: const TextStyle(fontSize: 28),
+                                    ),
+                                  ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -1219,88 +1229,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 24),
 
-          // ── Your Companion ──────────────────────────────────────────
-          _GroupLabel(text: 'Your Companion', cs: cs),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF231519)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: cs.outlineVariant),
-            ),
-            child: InkWell(
-              onTap: _companionLoading ? null : _showCompanionPicker,
-              borderRadius: BorderRadius.circular(18),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: _companionLoading
-                          ? const CircularProgressIndicator(strokeWidth: 2)
-                          : Lottie.asset(
-                              _companionAsset,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: Text(
-                                  _companionEmoji,
-                                  style: const TextStyle(fontSize: 20),
-                                ),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        _companionLoading ? '' : _companionName,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ),
-                    const _TrailingArrow(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // ── Companion shop ──────────────────────────────────────────
-          _GroupLabel(text: 'Companion shop', cs: cs),
-          const SizedBox(height: 8),
-          _SettingsGroup(
-            cs: cs,
-            rows: [
-              _SettingsRowData(
-                icon: Icons.storefront_rounded,
-                label: 'Open shop',
-                onTap: _openCompanionShop,
-                trailing: const _TrailingArrow(),
-              ),
-              _SettingsRowData(
-                icon: Icons.stars_rounded,
-                label: 'Points balance',
-                trailing: Text(
-                  '$_companionPoints',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // ── Relationship group ──────────────────────────────────────
-          _GroupLabel(text: 'Relationship', cs: cs),
+          // ── Companion group (Renamed from Relationship) ─────────────────
+          _GroupLabel(text: 'Companion', cs: cs),
           const SizedBox(height: 8),
           _SettingsGroup(
             cs: cs,
@@ -1336,14 +1266,22 @@ class _SettingsPageState extends State<SettingsPage> {
               _SettingsRowData(
                 icon: Icons.pets_rounded,
                 label: 'Companion name',
-                trailing: Text(
-                  _companionName,
-                  style: TextStyle(
-                    fontFamily: 'DMSans',
-                    fontSize: 14,
-                    color: cs.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                onTap: _companionLoading ? null : _showCompanionPicker,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _companionName,
+                      style: TextStyle(
+                        fontFamily: 'DMSans',
+                        fontSize: 14,
+                        color: cs.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const _TrailingArrow(),
+                  ],
                 ),
               ),
               _SettingsRowData(
@@ -1351,6 +1289,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: 'Completed Badges',
                 onTap: _showCompletedBadgesSheet,
                 trailing: const _TrailingArrow(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ── Companion shop ──────────────────────────────────────────
+          _GroupLabel(text: 'Companion shop', cs: cs),
+          const SizedBox(height: 8),
+          _SettingsGroup(
+            cs: cs,
+            rows: [
+              _SettingsRowData(
+                icon: Icons.storefront_rounded,
+                label: 'Open shop',
+                onTap: _openCompanionShop,
+                trailing: const _TrailingArrow(),
+              ),
+              _SettingsRowData(
+                icon: Icons.stars_rounded,
+                label: 'Points balance',
+                trailing: Text(
+                  '$_companionPoints',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
