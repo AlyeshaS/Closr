@@ -1,7 +1,9 @@
+// lib/tabs/settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../auth/auth_service.dart';
 import '../theme_provider.dart';
@@ -10,22 +12,30 @@ import '../services/companion_rewards_service.dart';
 import '../services/badge_service.dart';
 import 'preferences/preferences_service.dart';
 
-// ── Companion data ─────────────────────────────────────────────────────────────
+// ── Companion Data with Local Asset Paths ──────────────────────────────────────
 
 class _CompanionOption {
   final String emoji;
   final String defaultName;
   final String species;
-  const _CompanionOption(this.emoji, this.defaultName, this.species);
+  final String assetPath;
+  const _CompanionOption(
+    this.emoji,
+    this.defaultName,
+    this.species,
+    this.assetPath,
+  );
 }
 
 const _kCompanions = [
-  _CompanionOption('🦊', 'Ember', 'Fox'),
-  _CompanionOption('🐱', 'Mochi', 'Cat'),
-  _CompanionOption('🐶', 'Biscuit', 'Dog'),
-  _CompanionOption('🐼', 'Panda', 'Panda'),
-  _CompanionOption('🦋', 'Luna', 'Butterfly'),
-  _CompanionOption('🐻', 'Cosmo', 'Bear'),
+  _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/animations/dog.json'),
+  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/animations/cat.json'),
+  _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/animations/turtle.json'),
+  _CompanionOption('🐼', 'Bao', 'Panda', 'assets/animations/panda.json'),
+  _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/animations/bear.json'),
+  _CompanionOption('🦁', 'Simba', 'Lion', 'assets/animations/lion.json'),
+  _CompanionOption('🐧', 'Pippin', 'Penguin', 'assets/animations/penguin.json'),
+  _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json'),
 ];
 
 class _CompanionShopItem {
@@ -75,7 +85,7 @@ const _kCompanionShopItems = [
   ),
 ];
 
-// ── Interests data ─────────────────────────────────────────────────────────────
+// ── Interests Data ─────────────────────────────────────────────────────────────
 
 const _kInterestOptions = {
   'food': [
@@ -136,18 +146,20 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // companion state
-  String _companionEmoji = '🦊';
-  String _companionName = 'Ember';
+  // Companion state
+  String _companionEmoji = '🐶';
+  String _companionName = 'Biscuit';
+  String _companionAsset = 'assets/animations/dog.json';
   int _companionPoints = 0;
   Set<String> _ownedShopItemIds = <String>{};
+  Set<String> _equippedAccessories = <String>{};
   bool _companionLoading = true;
 
   final CompanionRewardsService _companionRewardsService =
       CompanionRewardsService();
   final BadgeService _badgeService = BadgeService();
 
-  // partner state
+  // Partner state
   String _partnerEmail = '';
   DateTime? _anniversaryDate;
 
@@ -175,12 +187,21 @@ class _SettingsPageState extends State<SettingsPage> {
     final data = doc.data() ?? {};
     setState(() {
       _companionEmoji =
-          normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🦊';
+          normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🐶';
       _companionName =
-          normalized?['name'] ?? (data['companionName'] as String?) ?? 'Ember';
+          normalized?['name'] ??
+          (data['companionName'] as String?) ??
+          'Biscuit';
+      _companionAsset =
+          (data['companionAsset'] as String?) ??
+          (data['companionLottie'] as String?) ??
+          'assets/animations/dog.json';
       _companionPoints = (data['companionPoints'] as int?) ?? 0;
       _ownedShopItemIds = Set<String>.from(
         List<String>.from((data['companionShopOwnedIds'] as List?) ?? const []),
+      );
+      _equippedAccessories = Set<String>.from(
+        List<String>.from((data['equippedAccessories'] as List?) ?? const []),
       );
       _partnerEmail =
           ((data['partnerEmailLower'] as String?) ??
@@ -194,6 +215,24 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       _companionLoading = false;
     });
+  }
+
+  Future<void> _toggleEquipAccessory(String itemId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final updated = Set<String>.from(_equippedAccessories);
+    if (updated.contains(itemId)) {
+      updated.remove(itemId);
+    } else {
+      updated.add(itemId);
+    }
+
+    setState(() => _equippedAccessories = updated);
+
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'equippedAccessories': updated.toList(),
+    }, SetOptions(merge: true));
   }
 
   Future<void> _showCompletedBadgesSheet() async {
@@ -402,6 +441,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     var points = _companionPoints;
     var ownedIds = Set<String>.from(_ownedShopItemIds);
+    var equippedIds = Set<String>.from(_equippedAccessories);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -444,7 +484,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Use achievement points to unlock shared accessories for both of your linked companions.',
+                  'Use achievement points to unlock and equip accessories on your companion.',
                   style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                   ),
@@ -491,6 +531,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     itemBuilder: (context, index) {
                       final item = _kCompanionShopItems[index];
                       final owned = ownedIds.contains(item.id);
+                      final isEquipped = equippedIds.contains(item.id);
                       final canBuy = !owned && points >= item.cost;
 
                       return Container(
@@ -545,7 +586,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                   const SizedBox(height: 8),
                                   Text(
                                     owned
-                                        ? 'Owned by both of you'
+                                        ? (isEquipped ? 'Equipped' : 'Owned')
                                         : '${item.cost} points',
                                     style: Theme.of(ctx).textTheme.labelMedium
                                         ?.copyWith(
@@ -563,48 +604,57 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                             const SizedBox(width: 12),
                             FilledButton(
-                              onPressed: owned || !canBuy
-                                  ? null
-                                  : () async {
-                                      try {
-                                        final spent =
-                                            await _companionRewardsService
-                                                .purchaseShopItem(
-                                                  userId: user.uid,
-                                                  itemId: item.id,
-                                                  cost: item.cost,
-                                                );
-                                        if (spent <= 0) return;
-                                        setSheet(() {
-                                          points -= spent;
-                                          ownedIds.add(item.id);
-                                        });
-                                        if (!mounted) return;
-                                        await _loadCompanion();
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '${item.title} unlocked for both companions',
-                                            ),
-                                          ),
-                                        );
-                                      } on StateError catch (_) {
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Not enough companion points',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                              child: Text(owned ? 'Owned' : 'Buy'),
+                              onPressed: owned
+                                  ? () async {
+                                      await _toggleEquipAccessory(item.id);
+                                      setSheet(() {
+                                        if (equippedIds.contains(item.id)) {
+                                          equippedIds.remove(item.id);
+                                        } else {
+                                          equippedIds.add(item.id);
+                                        }
+                                      });
+                                    }
+                                  : (!canBuy
+                                        ? null
+                                        : () async {
+                                            try {
+                                              final spent =
+                                                  await _companionRewardsService
+                                                      .purchaseShopItem(
+                                                        userId: user.uid,
+                                                        itemId: item.id,
+                                                        cost: item.cost,
+                                                      );
+                                              if (spent <= 0) return;
+                                              setSheet(() {
+                                                points -= spent;
+                                                ownedIds.add(item.id);
+                                                equippedIds.add(item.id);
+                                              });
+                                              await _toggleEquipAccessory(
+                                                item.id,
+                                              );
+                                              if (!mounted) return;
+                                              await _loadCompanion();
+                                            } on StateError catch (_) {
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Not enough companion points',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          }),
+                              child: Text(
+                                owned
+                                    ? (isEquipped ? 'Unequip' : 'Equip')
+                                    : 'Buy',
+                              ),
                             ),
                           ],
                         ),
@@ -673,6 +723,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _showHelpSupport() async {
+    await _showHelpSupportDialog();
+  }
+
+  Future<void> _showHelpSupportDialog() async {
     await _showSupportDialog(
       title: 'Help & feedback',
       message:
@@ -773,7 +827,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _showCompanionPicker() async {
     final cs = Theme.of(context).colorScheme;
     int selectedIdx = _kCompanions.indexWhere(
-      (c) => c.emoji == _companionEmoji,
+      (c) => c.emoji == _companionEmoji || c.assetPath == _companionAsset,
     );
     if (selectedIdx < 0) selectedIdx = 0;
     final nameCtrl = TextEditingController(text: _companionName);
@@ -834,6 +888,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: List.generate(_kCompanions.length, (i) {
                   final c = _kCompanions[i];
                   final selected = i == selectedIdx;
+
                   return GestureDetector(
                     onTap: () {
                       setSheet(() => selectedIdx = i);
@@ -858,7 +913,20 @@ class _SettingsPageState extends State<SettingsPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(c.emoji, style: const TextStyle(fontSize: 32)),
+                          SizedBox(
+                            width: 38,
+                            height: 38,
+                            child: Lottie.asset(
+                              c.assetPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  c.emoji,
+                                  style: const TextStyle(fontSize: 28),
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             c.species,
@@ -896,6 +964,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         : nameCtrl.text.trim();
                     final user = FirebaseAuth.instance.currentUser;
                     if (user != null) {
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .set({
+                            'companionEmoji': chosen.emoji,
+                            'companionName': newName,
+                            'companionSpecies': chosen.species,
+                            'companionAsset': chosen.assetPath,
+                            'companionLottie': chosen.assetPath,
+                          }, SetOptions(merge: true));
+
                       await _companionRewardsService.syncCompanionProfile(
                         userId: user.uid,
                         emoji: chosen.emoji,
@@ -905,6 +984,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     setState(() {
                       _companionEmoji = chosen.emoji;
                       _companionName = newName;
+                      _companionAsset = chosen.assetPath;
                     });
                     if (mounted) {
                       await _loadCompanion();
@@ -1160,17 +1240,23 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.pets_rounded,
-                      size: 20,
-                      color: cs.onSurfaceVariant,
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: _companionLoading
+                          ? const CircularProgressIndicator(strokeWidth: 2)
+                          : Lottie.asset(
+                              _companionAsset,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  _companionEmoji,
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                              ),
+                            ),
                     ),
                     const SizedBox(width: 14),
-                    Text(
-                      _companionLoading ? 'Loading...' : _companionEmoji,
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _companionLoading ? '' : _companionName,

@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lottie/lottie.dart';
 import '../gemini_service.dart';
 import '../_expandable_match_tile.dart';
 
@@ -14,23 +15,30 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage>
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late final AnimationController _entrance;
   late final AnimationController _pulse;
   late final AnimationController _flicker;
   final GeminiService _geminiService = GeminiService();
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
+    // One-time entrance animation
     _entrance = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..forward();
+
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2600),
     )..repeat(reverse: true);
+
     _flicker = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -54,6 +62,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final user = FirebaseAuth.instance.currentUser;
     final cs = Theme.of(context).colorScheme;
     final firstName = user?.displayName?.split(' ').first ?? 'there';
@@ -98,25 +107,75 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 30),
 
-                // ── Character Orb ─────────────────────────────────────────
+                // ── Companion Orb (Syncs with Settings & Equipped Accessories) ──
                 Center(
                   child: Column(
                     children: [
                       _Reveal(
                         animation: _seg(0.1, 0.65),
-                        beginScale: 0.75,
-                        child: _CharacterOrb(cs: cs, pulse: _pulse),
+                        beginOffset: const Offset(0, 0.06),
+                        child: StreamBuilder<DocumentSnapshot>(
+                          stream: user != null
+                              ? FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user.uid)
+                                    .snapshots()
+                              : null,
+                          builder: (context, snapshot) {
+                            final data =
+                                snapshot.data?.data() as Map<String, dynamic>?;
+
+                            // Read asset path, fallback to lottie url, fallback to default
+                            final companionSource =
+                                (data?['companionAsset'] as String?) ??
+                                (data?['companionLottie'] as String?) ??
+                                'assets/animations/fox.json';
+
+                            final companionEmoji =
+                                (data?['companionEmoji'] as String?) ?? '🦊';
+
+                            final equipped = List<String>.from(
+                              (data?['equippedAccessories'] as List?) ??
+                                  const [],
+                            );
+
+                            return _CharacterOrb(
+                              cs: cs,
+                              pulse: _pulse,
+                              source: companionSource,
+                              fallbackEmoji: companionEmoji,
+                              equippedAccessories: equipped,
+                            );
+                          },
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _Reveal(
                         animation: _seg(0.18, 0.65),
-                        child: Text(
-                          'YOUR COMPANION',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                letterSpacing: 1.2,
-                                color: cs.onSurfaceVariant,
-                              ),
+                        beginOffset: const Offset(0, 0.06),
+                        child: StreamBuilder<DocumentSnapshot>(
+                          stream: user != null
+                              ? FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user.uid)
+                                    .snapshots()
+                              : null,
+                          builder: (context, snapshot) {
+                            final data =
+                                snapshot.data?.data() as Map<String, dynamic>?;
+                            final name =
+                                (data?['companionName'] as String?) ??
+                                'YOUR COMPANION';
+
+                            return Text(
+                              name.toUpperCase(),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    letterSpacing: 1.2,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -234,7 +293,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 }
 
-// ── Entrance / interaction helpers ───────────────────────────────────────
+// ── Original Entrance & Design Components ─────────────────────────────────
 
 class _Reveal extends StatelessWidget {
   final Animation<double> animation;
@@ -416,56 +475,160 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ── Companion Orb ────────────────────────────────────────────────────────
+// ── Companion Orb with Universal Local/Network Support ─────────────────────
 
 class _CharacterOrb extends StatelessWidget {
   final ColorScheme cs;
   final Animation<double> pulse;
-  const _CharacterOrb({required this.cs, required this.pulse});
+  final String source;
+  final String fallbackEmoji;
+  final List<String> equippedAccessories;
+
+  const _CharacterOrb({
+    super.key,
+    required this.cs,
+    required this.pulse,
+    required this.source,
+    this.fallbackEmoji = '🦊',
+    this.equippedAccessories = const [],
+  });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: pulse,
-      builder: (context, _) {
-        final t = pulse.value;
-        final scale = 1.0 + (t * 0.05);
-        final glowAlpha = 0.10 + (t * 0.14);
+    const orbSize = 108.0;
+    final isNetwork =
+        source.startsWith('http://') || source.startsWith('https://');
 
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 96,
-            height: 96,
+    return SizedBox(
+      width: orbSize + 24,
+      height: orbSize + 24,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Ambient Outer Pulse Glow
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: pulse,
+              builder: (context, _) {
+                final t = pulse.value;
+                final scale = 1.0 + (t * 0.05);
+                final glowAlpha = 0.12 + (t * 0.16);
+
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: orbSize,
+                    height: orbSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: cs.primary.withOpacity(glowAlpha),
+                          blurRadius: 26,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Glass Base
+          Container(
+            width: orbSize,
+            height: orbSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              color: cs.primaryContainer,
               gradient: RadialGradient(
                 colors: [
                   cs.primaryContainer,
-                  cs.primaryContainer.withOpacity(0.75),
+                  cs.primaryContainer.withOpacity(0.65),
                 ],
               ),
               border: Border.all(
-                color: cs.primary.withOpacity(0.28),
-                width: 2.5,
+                color: cs.primary.withOpacity(0.35),
+                width: 2.2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: cs.primary.withOpacity(glowAlpha),
-                  blurRadius: 28,
-                  spreadRadius: 6,
-                ),
-              ],
             ),
-            child: Icon(Icons.pets_rounded, size: 46, color: cs.primary),
           ),
-        );
-      },
+
+          // Animated Vector Companion (Asset or Network with Emoji Fallback)
+          ClipOval(
+            child: SizedBox(
+              width: orbSize - 16,
+              height: orbSize - 16,
+              child: isNetwork
+                  ? Lottie.network(
+                      source,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Center(
+                        child: Text(
+                          fallbackEmoji,
+                          style: const TextStyle(fontSize: 34),
+                        ),
+                      ),
+                    )
+                  : Lottie.asset(
+                      source,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Center(
+                        child: Text(
+                          fallbackEmoji,
+                          style: const TextStyle(fontSize: 34),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+
+          // ── Layered Accessories (Equipped from Shop) ─────────────────
+          if (equippedAccessories.contains('cloud_blanket'))
+            Positioned(
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text('☁️', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+
+          if (equippedAccessories.contains('moon_halo'))
+            Positioned(
+              top: 10,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.4),
+                ),
+                child: const Text('🌙', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+
+          if (equippedAccessories.contains('star_collar'))
+            const Positioned(
+              bottom: 18,
+              child: Text('✨', style: TextStyle(fontSize: 13)),
+            ),
+
+          if (equippedAccessories.contains('heart_tag'))
+            const Positioned(
+              bottom: 8,
+              child: Text('💗', style: TextStyle(fontSize: 11)),
+            ),
+        ],
+      ),
     );
   }
 }
 
-// ── Tip of the Day States ────────────────────────────────────────────────
+// ── Tip of the Day ────────────────────────────────────────────────────────
 
 class _TipLoading extends StatelessWidget {
   final ColorScheme cs;
@@ -727,7 +890,7 @@ class _RecentMatchesSectionState extends State<_RecentMatchesSection> {
   }
 }
 
-// ── Stat + Streak Cards ──────────────────────────────────────────────────
+// ── Matched Dates & Streak Cards with Mirror Counter ──────────────────────
 
 class _MatchedDatesCard extends StatelessWidget {
   final ColorScheme cs;
