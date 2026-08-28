@@ -535,95 +535,103 @@ class _ScrapbookTabState extends State<_ScrapbookTab>
           _galleryIndex = 0;
         }
 
+        final polaroidsCount = imageEntries.length;
+        final isCalendar = _viewMode == _ScrapbookViewMode.calendar;
+
         return Stack(
           children: [
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (entries.isEmpty)
-                    _EmptyScrapbookState(
-                      cs: cs,
-                      hasUser: user != null,
-                      onAdd: () => _openEntryEditor(presetDate: DateTime.now()),
-                    )
-                  else
-                    const SizedBox.shrink(),
-                  if (entries.isNotEmpty)
-                    const SizedBox(height: 16)
-                  else
-                    const SizedBox(height: 24),
-                  _ViewModeSwitch(
-                    cs: cs,
-                    viewMode: _viewMode,
-                    onCalendar: () =>
-                        _switchViewMode(_ScrapbookViewMode.calendar),
-                    onGallery: () =>
-                        _switchViewMode(_ScrapbookViewMode.polaroids),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_viewMode == _ScrapbookViewMode.polaroids)
-                    FadeTransition(
-                      opacity: _dissolveAnimation,
-                      child: Text(
-                        'Swipe left/right or tap to flip through polaroids. Long-press to edit.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (entries.isEmpty)
+                        _EmptyScrapbookState(
+                          cs: cs,
+                          hasUser: user != null,
+                          onAdd: () =>
+                              _openEntryEditor(presetDate: DateTime.now()),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      if (entries.isNotEmpty)
+                        const SizedBox(height: 0)
+                      else
+                        const SizedBox(height: 24),
+                      _ScrapbookToggle(
+                        cs: cs,
+                        showCalendar: isCalendar,
+                        polaroidsCount: polaroidsCount,
+                        onChanged: (value) => _switchViewMode(
+                          value
+                              ? _ScrapbookViewMode.calendar
+                              : _ScrapbookViewMode.polaroids,
                         ),
                       ),
-                    ),
-                  if (_viewMode == _ScrapbookViewMode.polaroids)
-                    const SizedBox(height: 12),
-                  FadeTransition(
-                    opacity: _dissolveAnimation,
-                    child: _viewMode == _ScrapbookViewMode.calendar
-                        ? _CalendarScrapbookView(
-                            cs: cs,
-                            monthLabel: _monthLabel(_focusedMonth),
-                            onMonthLabelTap: _pickFocusedMonth,
-                            onPreviousMonth: () {
-                              setState(() {
-                                _focusedMonth = DateTime(
-                                  _focusedMonth.year,
-                                  _focusedMonth.month - 1,
-                                );
-                              });
-                            },
-                            onNextMonth: () {
-                              setState(() {
-                                _focusedMonth = DateTime(
-                                  _focusedMonth.year,
-                                  _focusedMonth.month + 1,
-                                );
-                              });
-                            },
-                            days: _buildMonthCells(_focusedMonth),
-                            weekdayLabel: _weekdayLabel,
-                            entryForDate: (date) =>
-                                _entryForDate(entries, date),
-                            onTapDate: (date) => _openEntryEditor(
-                              existingEntry: _entryForDate(entries, date),
-                              presetDate: date,
-                            ),
-                            isDateEnabled: (date) => !date.isAfter(todayKey),
-                          )
-                        : _GalleryScrapbookView(
-                            cs: cs,
-                            entries: imageEntries,
-                            controller: _galleryController,
-                            currentIndex: _galleryIndex,
-                            onPageChanged: (index) =>
-                                setState(() => _galleryIndex = index),
-                            onTapCard: () =>
-                                _jumpToNextImage(imageEntries.length),
-                            onEditEntry: (entry) =>
-                                _openEntryEditor(existingEntry: entry),
+                      const SizedBox(height: 16),
+                      if (_viewMode == _ScrapbookViewMode.polaroids)
+                        FadeTransition(
+                          opacity: _dissolveAnimation,
+                          child: Text(
+                            'Swipe left/right or tap to flip through polaroids. Long-press to edit.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
                           ),
+                        ),
+                      if (_viewMode == _ScrapbookViewMode.polaroids)
+                        const SizedBox(height: 12),
+                      FadeTransition(
+                        opacity: _dissolveAnimation,
+                        child: isCalendar
+                            ? _CalendarScrapbookView(
+                                cs: cs,
+                                monthLabel: _monthLabel(_focusedMonth),
+                                onMonthLabelTap: _pickFocusedMonth,
+                                onPreviousMonth: () {
+                                  setState(() {
+                                    _focusedMonth = DateTime(
+                                      _focusedMonth.year,
+                                      _focusedMonth.month - 1,
+                                    );
+                                  });
+                                },
+                                onNextMonth: () {
+                                  setState(() {
+                                    _focusedMonth = DateTime(
+                                      _focusedMonth.year,
+                                      _focusedMonth.month + 1,
+                                    );
+                                  });
+                                },
+                                days: _buildMonthCells(_focusedMonth),
+                                weekdayLabel: _weekdayLabel,
+                                entryForDate: (date) =>
+                                    _entryForDate(entries, date),
+                                onTapDate: (date) => _openEntryEditor(
+                                  existingEntry: _entryForDate(entries, date),
+                                  presetDate: date,
+                                ),
+                                isDateEnabled: (date) =>
+                                    !date.isAfter(todayKey),
+                              )
+                            : _GalleryScrapbookView(
+                                cs: cs,
+                                entries: imageEntries,
+                                controller: _galleryController,
+                                currentIndex: _galleryIndex,
+                                onPageChanged: (index) =>
+                                    setState(() => _galleryIndex = index),
+                                onEditEntry: (entry) =>
+                                    _openEntryEditor(existingEntry: entry),
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                ],
+                ),
               ),
             ),
             Positioned(
@@ -644,70 +652,77 @@ class _ScrapbookTabState extends State<_ScrapbookTab>
   }
 }
 
-class _ViewModeSwitch extends StatelessWidget {
+class _ScrapbookToggle extends StatelessWidget {
   final ColorScheme cs;
-  final _ScrapbookViewMode viewMode;
-  final VoidCallback onCalendar;
-  final VoidCallback onGallery;
+  final bool showCalendar;
+  final int polaroidsCount;
+  final ValueChanged<bool> onChanged;
 
-  const _ViewModeSwitch({
+  const _ScrapbookToggle({
     required this.cs,
-    required this.viewMode,
-    required this.onCalendar,
-    required this.onGallery,
+    required this.showCalendar,
+    required this.polaroidsCount,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.outlineVariant),
+        color: cs.onSurface.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: cs.onSurface.withOpacity(0.05)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final totalWidth = constraints.maxWidth;
-          final pillWidth = (totalWidth - 8) / 2;
-          final isCalendar = viewMode == _ScrapbookViewMode.calendar;
+          final tabWidth = (constraints.maxWidth - 4) / 2;
 
           return Stack(
             children: [
               AnimatedAlign(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOutCubic,
-                alignment: isCalendar
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.fastOutSlowIn,
+                alignment: showCalendar
                     ? Alignment.centerLeft
                     : Alignment.centerRight,
                 child: Container(
-                  width: pillWidth,
-                  height: 44,
+                  width: tabWidth,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: cs.primary,
-                    borderRadius: BorderRadius.circular(14),
+                    color: cs.surface,
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cs.primary.withOpacity(0.12),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                 ),
               ),
               Row(
                 children: [
                   Expanded(
-                    child: _ModePill(
-                      label: 'Calendar',
-                      selected: isCalendar,
-                      cs: cs,
+                    child: _SlidingLabelButton(
+                      active: showCalendar,
                       icon: Icons.calendar_month_rounded,
-                      onTap: onCalendar,
+                      label: 'Calendar',
+                      count: null,
+                      onTap: () => onChanged(true),
+                      cs: cs,
                     ),
                   ),
-                  const SizedBox(width: 6),
                   Expanded(
-                    child: _ModePill(
-                      label: 'Polaroids',
-                      selected: !isCalendar,
-                      cs: cs,
+                    child: _SlidingLabelButton(
+                      active: !showCalendar,
                       icon: Icons.photo_library_outlined,
-                      onTap: onGallery,
+                      label: 'Polaroids',
+                      count: polaroidsCount,
+                      onTap: () => onChanged(false),
+                      cs: cs,
                     ),
                   ),
                 ],
@@ -720,44 +735,73 @@ class _ViewModeSwitch extends StatelessWidget {
   }
 }
 
-class _ModePill extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final ColorScheme cs;
+class _SlidingLabelButton extends StatelessWidget {
+  final bool active;
   final IconData icon;
+  final String label;
+  final int? count;
   final VoidCallback onTap;
+  final ColorScheme cs;
 
-  const _ModePill({
-    required this.label,
-    required this.selected,
-    required this.cs,
+  const _SlidingLabelButton({
+    required this.active,
     required this.icon,
+    required this.label,
+    required this.count,
     required this.onTap,
+    required this.cs,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: 38,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
-              size: 18,
-              color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+              size: 15,
+              color: active ? cs.primary : cs.onSurfaceVariant.withOpacity(0.6),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: selected ? cs.onPrimary : cs.onSurface,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w400 : FontWeight.w300,
+                color: active
+                    ? cs.onSurface
+                    : cs.onSurfaceVariant.withOpacity(0.8),
+                letterSpacing: 0.1,
               ),
             ),
+            if (count != null) ...[
+              const SizedBox(width: 6),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: active
+                      ? cs.primaryContainer.withOpacity(0.6)
+                      : cs.onSurface.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: active ? FontWeight.w500 : FontWeight.w300,
+                    color: active
+                        ? cs.primary
+                        : cs.onSurfaceVariant.withOpacity(0.7),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -800,13 +844,6 @@ class _CalendarScrapbookView extends StatelessWidget {
         color: const Color(0xFFFFFBF4),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: cs.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: cs.primary.withValues(alpha: 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -951,7 +988,6 @@ class _GalleryScrapbookView extends StatelessWidget {
   final PageController controller;
   final int currentIndex;
   final ValueChanged<int> onPageChanged;
-  final VoidCallback onTapCard;
   final ValueChanged<ScrapbookEntry> onEditEntry;
 
   const _GalleryScrapbookView({
@@ -960,7 +996,6 @@ class _GalleryScrapbookView extends StatelessWidget {
     required this.controller,
     required this.currentIndex,
     required this.onPageChanged,
-    required this.onTapCard,
     required this.onEditEntry,
   });
 
@@ -975,7 +1010,7 @@ class _GalleryScrapbookView extends StatelessWidget {
     return Column(
       children: [
         SizedBox(
-          height: 480,
+          height: 520,
           child: PageView.builder(
             controller: controller,
             itemCount: entries.length,
@@ -1001,8 +1036,8 @@ class _GalleryScrapbookView extends StatelessWidget {
                       : (1.0 - (absDiff * 0.1)).clamp(0.9, 1.0);
 
                   final translateY = isPast
-                      ? (-absDiff * 120.0)
-                      : (absDiff * 35.0);
+                      ? (-absDiff * 100.0)
+                      : (absDiff * 15.0);
                   final opacity = isPast
                       ? (1.0 - absDiff).clamp(0.0, 1.0)
                       : 1.0;
@@ -1011,20 +1046,29 @@ class _GalleryScrapbookView extends StatelessWidget {
                     transform: Matrix4.identity()
                       ..translate(0.0, translateY)
                       ..scale(scale, scale),
-                    alignment: Alignment.center,
+                    alignment: Alignment.topCenter,
                     child: Opacity(opacity: opacity, child: child),
                   );
                 },
                 child: Center(
                   child: GestureDetector(
-                    onTap: onTapCard,
+                    onTap: () {
+                      if (entries.length <= 1) return;
+                      final nextIndex = (currentIndex + 1) % entries.length;
+                      controller.animateToPage(
+                        nextIndex,
+                        duration: const Duration(milliseconds: 320),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
                     onLongPress: () => onEditEntry(entry),
                     child: Container(
-                      width: 270,
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                      width: 280,
+                      height: 480,
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFFBF4),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: cs.primary, width: 2.0),
                         boxShadow: [
                           BoxShadow(
@@ -1039,7 +1083,7 @@ class _GalleryScrapbookView extends StatelessWidget {
                         children: [
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
@@ -1115,7 +1159,7 @@ class _GalleryScrapbookView extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
