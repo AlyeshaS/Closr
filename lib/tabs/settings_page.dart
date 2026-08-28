@@ -1074,49 +1074,30 @@ class _SettingsPageState extends State<SettingsPage> {
                           await _loadCompanion();
                         }
 
-                        // Close the bottom sheet modal first
+                        // Close the bottom sheet modal cleanly
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                         }
 
-                        // Trigger the heart animation overlay on the main screen
+                        // Show a responsive confirmation snackbar with a heart icon
                         if (context.mounted) {
-                          showGeneralDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            barrierColor: Colors.transparent,
-                            transitionDuration: const Duration(
-                              milliseconds: 200,
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(
+                                    Icons.favorite_rounded,
+                                    color: cs.primary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Text('Companion saved successfully!'),
+                                ],
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
                             ),
-                            pageBuilder: (dialogContext, anim1, anim2) {
-                              return TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0.0, end: 1.0),
-                                duration: const Duration(milliseconds: 900),
-                                builder: (context, value, child) {
-                                  return Opacity(
-                                    opacity: (1.0 - value).clamp(0.0, 1.0),
-                                    child: Center(
-                                      child: Transform.scale(
-                                        scale: 0.5 + (value * 2.5),
-                                        child: Icon(
-                                          Icons.favorite_rounded,
-                                          size: 64,
-                                          color: cs.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
                           );
-
-                          // Dismiss the heart overlay after the animation finishes
-                          Future.delayed(const Duration(milliseconds: 800), () {
-                            if (Navigator.canPop(context)) {
-                              Navigator.pop(context);
-                            }
-                          });
                         }
                       },
                       style: ElevatedButton.styleFrom(
