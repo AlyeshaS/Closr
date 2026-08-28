@@ -27,24 +27,12 @@ class _CompanionOption {
 const _kCompanions = [
   _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png', 7),
   _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10),
-  _CompanionOption(
-    '🐢',
-    'Shelly',
-    'Turtle',
-    'assets/animations/turtle.json',
-    7,
-  ),
-  _CompanionOption('🐼', 'Bao', 'Panda', 'assets/animations/panda.json', 7),
-  _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/animations/bear.json', 7),
-  _CompanionOption('🦁', 'Simba', 'Lion', 'assets/animations/lion.json', 7),
-  _CompanionOption(
-    '🐧',
-    'Pippin',
-    'Penguin',
-    'assets/animations/penguin.json',
-    7,
-  ),
-  _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json', 7),
+  _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/images/turtle.png', 7),
+  // _CompanionOption('🐼', 'Bao', 'Panda', 'assets/images/panda.png', 7),
+  _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/images/bear.png', 6),
+  _CompanionOption('🦁', 'Simba', 'Lion', 'assets/images/lion.png', 7),
+  _CompanionOption('🐧', 'Pippin', 'Penguin', 'assets/images/penguin.png', 7),
+  _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/images/koala.png', 7),
 ];
 
 class HomePage extends StatefulWidget {

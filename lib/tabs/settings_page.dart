@@ -12,7 +12,7 @@ import '../services/badge_service.dart';
 import '../widgets/sprite_animator.dart';
 import 'preferences/preferences_service.dart';
 
-// ── Companion Data with Frame Counts ────────────────────────────────────────
+// ── Companion Data with Frame Counts & Dimensions ──────────────────────────
 
 class _CompanionOption {
   final String emoji;
@@ -20,30 +20,68 @@ class _CompanionOption {
   final String species;
   final String assetPath;
   final int totalFrames;
+  final double frameWidth;
+  final double frameHeight;
   const _CompanionOption(
     this.emoji,
     this.defaultName,
     this.species,
     this.assetPath,
     this.totalFrames,
+    this.frameWidth,
+    this.frameHeight,
   );
 }
 
 const _kCompanions = [
-  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png', 7),
-  // _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10),
-  _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/images/turtle.png', 8),
-  // _CompanionOption('🐼', 'Bao', 'Panda', 'assets/images/panda.png', 4),
-  // _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/images/bear.png', 7),
-  // _CompanionOption('🦁', 'Simba', 'Lion', 'assets/images/lion.png', 7),
+  _CompanionOption(
+    '🐱',
+    'Mochi',
+    'Cat',
+    'assets/images/IdleCattt.png',
+    7,
+    32.0,
+    32.0,
+  ),
+  // _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10, 32.0, 32.0),
+  _CompanionOption(
+    '🐢',
+    'Shelly',
+    'Turtle',
+    'assets/images/turtle.png',
+    8,
+    32.0,
+    32.0,
+  ),
+  // _CompanionOption(
+  //   '🐼',
+  //   'Bao',
+  //   'Panda',
+  //   'assets/images/panda.png',
+  //   4,
+  //   64.0,
+  //   64.0,
+  // ),
+  _CompanionOption(
+    '🐻',
+    'Cosmo',
+    'Bear',
+    'assets/images/bear.png',
+    6,
+    32.0,
+    32.0,
+  ),
+  // _CompanionOption('🦁', 'Simba', 'Lion', 'assets/images/lion.png', 7, 32.0, 32.0),
   // _CompanionOption(
   //   '🐧',
   //   'Pippin',
   //   'Penguin',
   //   'assets/animations/penguin.json',
   //   7,
+  //   32.0,
+  //   32.0,
   // ),
-  // _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json', 7),
+  // _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json', 7, 32.0, 32.0),
 ];
 
 class _CompanionShopItem {
@@ -921,20 +959,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           SizedBox(
-                            width: 38,
-                            height: 38,
+                            width: 44,
+                            height: 44,
                             child: isSprite
                                 ? Center(
-                                    child: Transform.scale(
-                                      scale: 1.2,
-                                      child: SpriteAnimator(
-                                        imagePath: c.assetPath,
-                                        totalFrames: c.totalFrames,
-                                        displayWidth: 32.0,
-                                        displayHeight: 32.0,
-                                        duration: const Duration(
-                                          milliseconds: 800,
-                                        ),
+                                    child: SpriteAnimator(
+                                      imagePath: c.assetPath,
+                                      totalFrames: c.totalFrames,
+                                      displayWidth: c.frameWidth,
+                                      displayHeight: c.frameHeight,
+                                      duration: const Duration(
+                                        milliseconds: 800,
                                       ),
                                     ),
                                   )
