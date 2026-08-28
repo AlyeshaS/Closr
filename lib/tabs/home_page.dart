@@ -78,7 +78,7 @@ const _kCompanions = [
     '🐦',
     'Lilac',
     'Bird',
-    'assets/images/bird.png',
+    'assets/images/IdleBird.png',
     6,
     16.0,
     16.0,
@@ -656,7 +656,9 @@ class _CharacterOrb extends StatelessWidget {
               child: isSpriteSheet
                   ? Center(
                       child: Transform.scale(
-                        scale: matchingOption.frameWidth == 16.0 ? 3.5 : 2.2,
+                        scale: matchingOption.frameWidth == 64.0
+                            ? 1.2
+                            : (matchingOption.frameWidth == 16.0 ? 3.5 : 2.2),
                         child: SpriteAnimator(
                           imagePath: source,
                           totalFrames: matchingOption.totalFrames,
