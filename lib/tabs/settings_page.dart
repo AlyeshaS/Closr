@@ -80,6 +80,15 @@ const _kCompanions = [
     16.0, // Match single frame width (or 48.0 if scaled)
     16.0,
   ),
+  _CompanionOption(
+    '🐰',
+    'Brownie',
+    'Bunny',
+    'assets/images/bunny.png',
+    12,
+    32.0,
+    32.0,
+  ),
   // _CompanionOption(
   //   '🐧',
   //   'Pippin',
