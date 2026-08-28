@@ -38,7 +38,7 @@ const _kCompanions = [
     '🐱',
     'Mochi',
     'Cat',
-    'assets/images/IdleCattt.png',
+    'assets/images/cat.png',
     7,
     32.0,
     32.0,
@@ -195,7 +195,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // Companion state
   String _companionEmoji = '🐱';
   String _companionName = 'Mochi';
-  String _companionAsset = 'assets/images/IdleCattt.png';
+  String _companionAsset = 'assets/images/cat.png';
   int _companionPoints = 0;
   Set<String> _ownedShopItemIds = <String>{};
   Set<String> _equippedAccessories = <String>{};
@@ -239,7 +239,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _companionAsset =
           (data['companionAsset'] as String?) ??
           (data['companionLottie'] as String?) ??
-          'assets/images/IdleCattt.png';
+          'assets/images/cat.png';
       _companionPoints = (data['companionPoints'] as int?) ?? 0;
       _ownedShopItemIds = Set<String>.from(
         List<String>.from((data['companionShopOwnedIds'] as List?) ?? const []),

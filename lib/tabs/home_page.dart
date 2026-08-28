@@ -25,7 +25,7 @@ class _CompanionOption {
 }
 
 const _kCompanions = [
-  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/IdleCattt.png', 7),
+  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/cat.png', 7),
   _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10),
   _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/images/turtle.png', 7),
   // _CompanionOption('🐼', 'Bao', 'Panda', 'assets/images/panda.png', 7),
