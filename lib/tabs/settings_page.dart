@@ -898,181 +898,243 @@ class _SettingsPageState extends State<SettingsPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(ctx).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.fromLTRB(
-            24,
-            16,
-            24,
-            MediaQuery.of(ctx).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+        builder: (ctx, setSheet) => DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Choose your companion',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Your companion grows with your relationship.',
-                style: Theme.of(
-                  ctx,
-                ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 20),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1,
-                children: List.generate(_kCompanions.length, (i) {
-                  final c = _kCompanions[i];
-                  final selected = i == selectedIdx;
-                  final isSprite = c.assetPath.endsWith('.png');
-
-                  return GestureDetector(
-                    onTap: () {
-                      setSheet(() => selectedIdx = i);
-                      if (_kCompanions.any(
-                        (x) => x.defaultName == nameCtrl.text,
-                      )) {
-                        nameCtrl.text = c.defaultName;
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              16,
+              24,
+              MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              controller: scrollController,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? cs.primaryContainer
-                            : cs.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: selected ? cs.primary : Colors.transparent,
-                          width: 2,
-                        ),
+                        color: cs.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 44,
-                            height: 44,
-                            child: isSprite
-                                ? Center(
-                                    child: SpriteAnimator(
-                                      imagePath: c.assetPath,
-                                      totalFrames: c.totalFrames,
-                                      displayWidth: c.frameWidth,
-                                      displayHeight: c.frameHeight,
-                                      duration: const Duration(
-                                        milliseconds: 800,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Choose your companion',
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Your companion grows with your relationship.',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1,
+                    children: List.generate(_kCompanions.length, (i) {
+                      final c = _kCompanions[i];
+                      final selected = i == selectedIdx;
+                      final isSprite = c.assetPath.endsWith('.png');
+
+                      return GestureDetector(
+                        onTap: () {
+                          setSheet(() => selectedIdx = i);
+                          if (_kCompanions.any(
+                            (x) => x.defaultName == nameCtrl.text,
+                          )) {
+                            nameCtrl.text = c.defaultName;
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? cs.primaryContainer
+                                : cs.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: selected ? cs.primary : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: isSprite
+                                    ? Center(
+                                        child: Transform.scale(
+                                          scale: c.frameWidth == 64.0
+                                              ? 0.55
+                                              : 1.0,
+                                          child: SpriteAnimator(
+                                            imagePath: c.assetPath,
+                                            totalFrames: c.totalFrames,
+                                            displayWidth: c.frameWidth,
+                                            displayHeight: c.frameHeight,
+                                            duration: const Duration(
+                                              milliseconds: 800,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : Center(
+                                        child: Text(
+                                          c.emoji,
+                                          style: const TextStyle(fontSize: 28),
+                                        ),
+                                      ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                c.species,
+                                style: Theme.of(ctx).textTheme.labelSmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Name your companion',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      hintText: 'Give them a name...',
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final chosen = _kCompanions[selectedIdx];
+                        final newName = nameCtrl.text.trim().isEmpty
+                            ? chosen.defaultName
+                            : nameCtrl.text.trim();
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .set({
+                                'companionEmoji': chosen.emoji,
+                                'companionName': newName,
+                                'companionSpecies': chosen.species,
+                                'companionAsset': chosen.assetPath,
+                                'companionLottie': chosen.assetPath,
+                              }, SetOptions(merge: true));
+
+                          await _companionRewardsService.syncCompanionProfile(
+                            userId: user.uid,
+                            emoji: chosen.emoji,
+                            name: newName,
+                          );
+                        }
+                        setState(() {
+                          _companionEmoji = chosen.emoji;
+                          _companionName = newName;
+                          _companionAsset = chosen.assetPath;
+                        });
+                        if (mounted) {
+                          await _loadCompanion();
+                        }
+
+                        // Close the bottom sheet modal first
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+
+                        // Trigger the heart animation overlay on the main screen
+                        if (context.mounted) {
+                          showGeneralDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            barrierColor: Colors.transparent,
+                            transitionDuration: const Duration(
+                              milliseconds: 200,
+                            ),
+                            pageBuilder: (dialogContext, anim1, anim2) {
+                              return TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                duration: const Duration(milliseconds: 900),
+                                builder: (context, value, child) {
+                                  return Opacity(
+                                    opacity: (1.0 - value).clamp(0.0, 1.0),
+                                    child: Center(
+                                      child: Transform.scale(
+                                        scale: 0.5 + (value * 2.5),
+                                        child: Icon(
+                                          Icons.favorite_rounded,
+                                          size: 64,
+                                          color: cs.primary,
+                                        ),
                                       ),
                                     ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      c.emoji,
-                                      style: const TextStyle(fontSize: 28),
-                                    ),
-                                  ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            c.species,
-                            style: Theme.of(ctx).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Name your companion',
-                style: Theme.of(
-                  ctx,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  hintText: 'Give them a name...',
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final chosen = _kCompanions[selectedIdx];
-                    final newName = nameCtrl.text.trim().isEmpty
-                        ? chosen.defaultName
-                        : nameCtrl.text.trim();
-                    final user = FirebaseAuth.instance.currentUser;
-                    if (user != null) {
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .set({
-                            'companionEmoji': chosen.emoji,
-                            'companionName': newName,
-                            'companionSpecies': chosen.species,
-                            'companionAsset': chosen.assetPath,
-                            'companionLottie': chosen.assetPath,
-                          }, SetOptions(merge: true));
+                                  );
+                                },
+                              );
+                            },
+                          );
 
-                      await _companionRewardsService.syncCompanionProfile(
-                        userId: user.uid,
-                        emoji: chosen.emoji,
-                        name: newName,
-                      );
-                    }
-                    setState(() {
-                      _companionEmoji = chosen.emoji;
-                      _companionName = newName;
-                      _companionAsset = chosen.assetPath;
-                    });
-                    if (mounted) {
-                      await _loadCompanion();
-                    }
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: cs.primary,
-                    foregroundColor: cs.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                          // Dismiss the heart overlay after the animation finishes
+                          Future.delayed(const Duration(milliseconds: 800), () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            }
+                          });
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      icon: const Icon(Icons.pets_rounded, size: 18),
+                      label: const Text('Save companion'),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Save companion'),
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

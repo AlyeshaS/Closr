@@ -85,7 +85,7 @@ const _kCompanions = [
   ),
   _CompanionOption(
     '🐰',
-    'Pippin',
+    'Brownie',
     'Bunny',
     'assets/images/bunny.png',
     12,
