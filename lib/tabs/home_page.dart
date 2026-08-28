@@ -15,24 +15,92 @@ class _CompanionOption {
   final String species;
   final String assetPath;
   final int totalFrames;
+  final double frameWidth;
+  final double frameHeight;
   const _CompanionOption(
     this.emoji,
     this.defaultName,
     this.species,
     this.assetPath,
     this.totalFrames,
+    this.frameWidth,
+    this.frameHeight,
   );
 }
 
 const _kCompanions = [
-  _CompanionOption('🐱', 'Mochi', 'Cat', 'assets/images/cat.png', 7),
-  _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10),
-  _CompanionOption('🐢', 'Shelly', 'Turtle', 'assets/images/turtle.png', 7),
-  // _CompanionOption('🐼', 'Bao', 'Panda', 'assets/images/panda.png', 7),
-  _CompanionOption('🐻', 'Cosmo', 'Bear', 'assets/images/bear.png', 6),
-  _CompanionOption('🦁', 'Simba', 'Lion', 'assets/images/lion.png', 7),
-  _CompanionOption('🐧', 'Pippin', 'Penguin', 'assets/images/penguin.png', 7),
-  _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/images/koala.png', 7),
+  _CompanionOption(
+    '🐱',
+    'Mochi',
+    'Cat',
+    'assets/images/cat.png',
+    7,
+    32.0,
+    32.0,
+  ),
+  _CompanionOption(
+    '🐶',
+    'Biscuit',
+    'Dog',
+    'assets/images/dog.png',
+    10,
+    32.0,
+    32.0,
+  ),
+  _CompanionOption(
+    '🐢',
+    'Shelly',
+    'Turtle',
+    'assets/images/turtle.png',
+    8,
+    32.0,
+    32.0,
+  ),
+  _CompanionOption(
+    '🐼',
+    'Bao',
+    'Panda',
+    'assets/images/panda.png',
+    4,
+    64.0,
+    64.0,
+  ),
+  _CompanionOption(
+    '🐻',
+    'Cosmo',
+    'Bear',
+    'assets/images/bear.png',
+    7,
+    32.0,
+    32.0,
+  ),
+  _CompanionOption(
+    '🐦',
+    'Lilac',
+    'Bird',
+    'assets/images/bird.png',
+    6,
+    16.0,
+    16.0,
+  ),
+  _CompanionOption(
+    '🐧',
+    'Pippin',
+    'Penguin',
+    'assets/images/penguin.png',
+    7,
+    32.0,
+    32.0,
+  ),
+  _CompanionOption(
+    '🐨',
+    'Kobi',
+    'Koala',
+    'assets/images/koala.png',
+    7,
+    32.0,
+    32.0,
+  ),
 ];
 
 class HomePage extends StatefulWidget {
@@ -588,12 +656,12 @@ class _CharacterOrb extends StatelessWidget {
               child: isSpriteSheet
                   ? Center(
                       child: Transform.scale(
-                        scale: 2.2,
+                        scale: matchingOption.frameWidth == 16.0 ? 3.5 : 2.2,
                         child: SpriteAnimator(
                           imagePath: source,
                           totalFrames: matchingOption.totalFrames,
-                          displayWidth: 32.0,
-                          displayHeight: 32.0,
+                          displayWidth: matchingOption.frameWidth,
+                          displayHeight: matchingOption.frameHeight,
                           duration: const Duration(milliseconds: 800),
                         ),
                       ),

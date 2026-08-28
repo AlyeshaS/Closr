@@ -53,15 +53,15 @@ const _kCompanions = [
     32.0,
     32.0,
   ),
-  // _CompanionOption(
-  //   '🐼',
-  //   'Bao',
-  //   'Panda',
-  //   'assets/images/panda.png',
-  //   4,
-  //   64.0,
-  //   64.0,
-  // ),
+  _CompanionOption(
+    '🐼',
+    'Bao',
+    'Panda',
+    'assets/images/panda.png',
+    4,
+    64.0,
+    64.0,
+  ),
   _CompanionOption(
     '🐻',
     'Cosmo',
@@ -71,7 +71,15 @@ const _kCompanions = [
     32.0,
     32.0,
   ),
-  // _CompanionOption('🦁', 'Simba', 'Lion', 'assets/images/lion.png', 7, 32.0, 32.0),
+  _CompanionOption(
+    '🐦',
+    'Lilac',
+    'Bird',
+    'assets/images/bird.png',
+    6, // Exact frame count from the image
+    16.0, // Match single frame width (or 48.0 if scaled)
+    16.0,
+  ),
   // _CompanionOption(
   //   '🐧',
   //   'Pippin',
