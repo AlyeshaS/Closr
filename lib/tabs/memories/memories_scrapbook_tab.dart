@@ -17,18 +17,44 @@ class _ScrapbookTab extends StatefulWidget {
   State<_ScrapbookTab> createState() => _ScrapbookTabState();
 }
 
-class _ScrapbookTabState extends State<_ScrapbookTab> {
+class _ScrapbookTabState extends State<_ScrapbookTab>
+    with SingleTickerProviderStateMixin {
   final ScrapbookService _service = ScrapbookService();
   final PageController _galleryController = PageController();
 
   _ScrapbookViewMode _viewMode = _ScrapbookViewMode.calendar;
   DateTime _focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   int _galleryIndex = 0;
+  late final AnimationController _dissolveController;
+  late final Animation<double> _dissolveAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _dissolveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _dissolveAnimation = CurvedAnimation(
+      parent: _dissolveController,
+      curve: Curves.easeInOut,
+    );
+    _dissolveController.forward();
+  }
 
   @override
   void dispose() {
     _galleryController.dispose();
+    _dissolveController.dispose();
     super.dispose();
+  }
+
+  void _switchViewMode(_ScrapbookViewMode newMode) {
+    if (_viewMode == newMode) return;
+    setState(() {
+      _viewMode = newMode;
+    });
+    _dissolveController.forward(from: 0.0);
   }
 
   String _dateKey(DateTime date) => ScrapbookEntry.dateKeyFor(date);
@@ -242,6 +268,32 @@ class _ScrapbookTabState extends State<_ScrapbookTab> {
                 ? Image.network(
                     existingImageUrl,
                     fit: BoxFit.cover,
+                    frameBuilder:
+                        (context, child, frame, wasSynchronouslyLoaded) {
+                          if (wasSynchronouslyLoaded || frame != null) {
+                            return child;
+                          }
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Container(
+                                color: cs.primaryContainer.withValues(
+                                  alpha: 0.35,
+                                ),
+                              ),
+                              Center(
+                                child: SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                     errorBuilder: (context, error, stackTrace) =>
                         _PhotoFallback(cs: cs),
                   )
@@ -345,39 +397,19 @@ class _ScrapbookTabState extends State<_ScrapbookTab> {
                                 previewWidget ??
                                     Container(
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            cs.primaryContainer.withValues(
-                                              alpha: 0.8,
-                                            ),
-                                            cs.secondaryContainer.withValues(
-                                              alpha: 0.55,
-                                            ),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
+                                        color: cs.primaryContainer.withValues(
+                                          alpha: 0.35,
                                         ),
                                       ),
                                       child: Center(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.photo_camera_outlined,
-                                              color: cs.primary,
-                                              size: 40,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              'Tap to add a photo',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodyMedium
-                                                  ?.copyWith(
-                                                    color: cs.onSurfaceVariant,
-                                                  ),
-                                            ),
-                                          ],
+                                        child: Text(
+                                          'Tap to add a photo',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: cs.onSurfaceVariant,
+                                              ),
                                         ),
                                       ),
                                     ),
@@ -507,7 +539,7 @@ class _ScrapbookTabState extends State<_ScrapbookTab> {
           children: [
             SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -527,63 +559,69 @@ class _ScrapbookTabState extends State<_ScrapbookTab> {
                     cs: cs,
                     viewMode: _viewMode,
                     onCalendar: () =>
-                        setState(() => _viewMode = _ScrapbookViewMode.calendar),
-                    onGallery: () => setState(
-                      () => _viewMode = _ScrapbookViewMode.polaroids,
-                    ),
+                        _switchViewMode(_ScrapbookViewMode.calendar),
+                    onGallery: () =>
+                        _switchViewMode(_ScrapbookViewMode.polaroids),
                   ),
                   const SizedBox(height: 16),
                   if (_viewMode == _ScrapbookViewMode.polaroids)
-                    Text(
-                      'Tap a polaroid to flip to the next memory. Long-press to edit.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
+                    FadeTransition(
+                      opacity: _dissolveAnimation,
+                      child: Text(
+                        'Swipe left/right or tap to flip through polaroids. Long-press to edit.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   if (_viewMode == _ScrapbookViewMode.polaroids)
                     const SizedBox(height: 12),
-                  if (_viewMode == _ScrapbookViewMode.calendar)
-                    _CalendarScrapbookView(
-                      cs: cs,
-                      monthLabel: _monthLabel(_focusedMonth),
-                      onMonthLabelTap: _pickFocusedMonth,
-                      onPreviousMonth: () {
-                        setState(() {
-                          _focusedMonth = DateTime(
-                            _focusedMonth.year,
-                            _focusedMonth.month - 1,
-                          );
-                        });
-                      },
-                      onNextMonth: () {
-                        setState(() {
-                          _focusedMonth = DateTime(
-                            _focusedMonth.year,
-                            _focusedMonth.month + 1,
-                          );
-                        });
-                      },
-                      days: _buildMonthCells(_focusedMonth),
-                      weekdayLabel: _weekdayLabel,
-                      entryForDate: (date) => _entryForDate(entries, date),
-                      onTapDate: (date) => _openEntryEditor(
-                        existingEntry: _entryForDate(entries, date),
-                        presetDate: date,
-                      ),
-                      isDateEnabled: (date) => !date.isAfter(todayKey),
-                    )
-                  else
-                    _GalleryScrapbookView(
-                      cs: cs,
-                      entries: imageEntries,
-                      controller: _galleryController,
-                      currentIndex: _galleryIndex,
-                      onPageChanged: (index) =>
-                          setState(() => _galleryIndex = index),
-                      onTapCard: () => _jumpToNextImage(imageEntries.length),
-                      onEditEntry: (entry) =>
-                          _openEntryEditor(existingEntry: entry),
-                    ),
+                  FadeTransition(
+                    opacity: _dissolveAnimation,
+                    child: _viewMode == _ScrapbookViewMode.calendar
+                        ? _CalendarScrapbookView(
+                            cs: cs,
+                            monthLabel: _monthLabel(_focusedMonth),
+                            onMonthLabelTap: _pickFocusedMonth,
+                            onPreviousMonth: () {
+                              setState(() {
+                                _focusedMonth = DateTime(
+                                  _focusedMonth.year,
+                                  _focusedMonth.month - 1,
+                                );
+                              });
+                            },
+                            onNextMonth: () {
+                              setState(() {
+                                _focusedMonth = DateTime(
+                                  _focusedMonth.year,
+                                  _focusedMonth.month + 1,
+                                );
+                              });
+                            },
+                            days: _buildMonthCells(_focusedMonth),
+                            weekdayLabel: _weekdayLabel,
+                            entryForDate: (date) =>
+                                _entryForDate(entries, date),
+                            onTapDate: (date) => _openEntryEditor(
+                              existingEntry: _entryForDate(entries, date),
+                              presetDate: date,
+                            ),
+                            isDateEnabled: (date) => !date.isAfter(todayKey),
+                          )
+                        : _GalleryScrapbookView(
+                            cs: cs,
+                            entries: imageEntries,
+                            controller: _galleryController,
+                            currentIndex: _galleryIndex,
+                            onPageChanged: (index) =>
+                                setState(() => _galleryIndex = index),
+                            onTapCard: () =>
+                                _jumpToNextImage(imageEntries.length),
+                            onEditEntry: (entry) =>
+                                _openEntryEditor(existingEntry: entry),
+                          ),
+                  ),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -628,28 +666,55 @@ class _ViewModeSwitch extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: cs.outlineVariant),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ModePill(
-              label: 'Calendar',
-              selected: viewMode == _ScrapbookViewMode.calendar,
-              cs: cs,
-              icon: Icons.calendar_month_rounded,
-              onTap: onCalendar,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: _ModePill(
-              label: 'Polaroids',
-              selected: viewMode == _ScrapbookViewMode.polaroids,
-              cs: cs,
-              icon: Icons.photo_library_outlined,
-              onTap: onGallery,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final totalWidth = constraints.maxWidth;
+          final pillWidth = (totalWidth - 8) / 2;
+          final isCalendar = viewMode == _ScrapbookViewMode.calendar;
+
+          return Stack(
+            children: [
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOutCubic,
+                alignment: isCalendar
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: Container(
+                  width: pillWidth,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ModePill(
+                      label: 'Calendar',
+                      selected: isCalendar,
+                      cs: cs,
+                      icon: Icons.calendar_month_rounded,
+                      onTap: onCalendar,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _ModePill(
+                      label: 'Polaroids',
+                      selected: !isCalendar,
+                      cs: cs,
+                      icon: Icons.photo_library_outlined,
+                      onTap: onGallery,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -675,14 +740,8 @@ class _ModePill extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
+      child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-        decoration: BoxDecoration(
-          color: selected ? cs.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -738,7 +797,7 @@ class _CalendarScrapbookView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: const Color(0xFFFFFBF4),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: cs.outlineVariant),
         boxShadow: [
@@ -911,71 +970,143 @@ class _GalleryScrapbookView extends StatelessWidget {
       return _EmptyGalleryCard(cs: cs);
     }
 
+    const brownTextColor = Color(0xFF6D4C41);
+
     return Column(
       children: [
         SizedBox(
-          height: 470,
+          height: 480,
           child: PageView.builder(
             controller: controller,
             itemCount: entries.length,
             onPageChanged: onPageChanged,
             itemBuilder: (context, index) {
               final entry = entries[index];
-              final rotation = index.isEven ? -0.015 : 0.015;
-              return Center(
-                child: GestureDetector(
-                  onTap: onTapCard,
-                  onLongPress: () => onEditEntry(entry),
-                  child: Transform.rotate(
-                    angle: rotation,
+
+              return AnimatedBuilder(
+                animation: controller,
+                builder: (context, child) {
+                  double page = index.toDouble();
+                  if (controller.hasClients &&
+                      controller.position.haveDimensions) {
+                    page = controller.page ?? controller.initialPage.toDouble();
+                  }
+
+                  final diff = page - index;
+                  final isPast = diff > 0;
+                  final absDiff = diff.abs();
+
+                  final scale = isPast
+                      ? (1.0 - (absDiff * 0.25)).clamp(0.65, 1.0)
+                      : (1.0 - (absDiff * 0.1)).clamp(0.9, 1.0);
+
+                  final translateY = isPast
+                      ? (-absDiff * 120.0)
+                      : (absDiff * 35.0);
+                  final opacity = isPast
+                      ? (1.0 - absDiff).clamp(0.0, 1.0)
+                      : 1.0;
+
+                  return Transform(
+                    transform: Matrix4.identity()
+                      ..translate(0.0, translateY)
+                      ..scale(scale, scale),
+                    alignment: Alignment.center,
+                    child: Opacity(opacity: opacity, child: child),
+                  );
+                },
+                child: Center(
+                  child: GestureDetector(
+                    onTap: onTapCard,
+                    onLongPress: () => onEditEntry(entry),
                     child: Container(
-                      width: 310,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                      width: 270,
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFFBF4),
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: cs.primary),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: cs.primary, width: 2.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: cs.primary.withValues(alpha: 0.15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(8),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
                                   Image.network(
                                     entry.imageUrl,
                                     fit: BoxFit.cover,
+                                    frameBuilder:
+                                        (
+                                          context,
+                                          child,
+                                          frame,
+                                          wasSynchronouslyLoaded,
+                                        ) {
+                                          if (wasSynchronouslyLoaded ||
+                                              frame != null) {
+                                            return child;
+                                          }
+                                          return Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Container(
+                                                color: cs.primaryContainer
+                                                    .withValues(alpha: 0.35),
+                                              ),
+                                              Center(
+                                                child: SizedBox(
+                                                  width: 28,
+                                                  height: 28,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2.5,
+                                                        color: cs.primary,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
                                     errorBuilder: (context, error, stackTrace) {
                                       return _PhotoFallback(cs: cs);
                                     },
                                   ),
                                   Positioned(
-                                    top: 12,
-                                    right: 12,
+                                    top: 10,
+                                    right: 10,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
+                                        horizontal: 8,
+                                        vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withValues(
-                                          alpha: 0.72,
+                                          alpha: 0.85,
                                         ),
                                         borderRadius: BorderRadius.circular(
                                           999,
                                         ),
                                       ),
                                       child: Text(
-                                        'Tap to next',
+                                        'Swipe or tap',
                                         style: Theme.of(context)
                                             .textTheme
                                             .labelSmall
                                             ?.copyWith(
-                                              color: cs.onSurface,
+                                              color: brownTextColor,
                                               fontWeight: FontWeight.w700,
+                                              fontSize: 10,
                                             ),
                                       ),
                                     ),
@@ -984,37 +1115,56 @@ class _GalleryScrapbookView extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _formatDate(entry.entryDate),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: brownTextColor,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                              ),
+                              Icon(
+                                Icons.favorite_rounded,
+                                size: 14,
+                                color: cs.primary.withValues(alpha: 0.8),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           Text(
-                            _formatDate(entry.entryDate),
-                            style: Theme.of(context).textTheme.labelSmall
+                            entry.description.isEmpty ? '' : entry.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.w700,
+                                  height: 1.3,
+                                  color: brownTextColor,
+                                  fontStyle: FontStyle.italic,
                                 ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            entry.description.isEmpty ? '' : entry.description,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodyLarge?.copyWith(height: 1.5),
-                          ),
-                          const SizedBox(height: 8),
                           Row(
                             children: [
                               Icon(
                                 Icons.touch_app_rounded,
-                                size: 14,
-                                color: cs.onSurfaceVariant,
+                                size: 12,
+                                color: brownTextColor.withValues(alpha: 0.7),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Tap photo for next, long-press to edit',
+                                'Swipe cards, long-press to edit',
                                 style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(color: cs.onSurfaceVariant),
+                                    ?.copyWith(
+                                      color: brownTextColor.withValues(
+                                        alpha: 0.7,
+                                      ),
+                                      fontSize: 10,
+                                    ),
                               ),
                             ],
                           ),
@@ -1027,7 +1177,7 @@ class _GalleryScrapbookView extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(entries.length, (index) {
@@ -1179,7 +1329,7 @@ class _PhotoFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: cs.primaryContainer,
+      color: cs.primaryContainer.withValues(alpha: 0.35),
       child: Center(
         child: Icon(
           Icons.image_not_supported_outlined,
