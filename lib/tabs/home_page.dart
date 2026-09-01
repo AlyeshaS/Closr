@@ -16,9 +16,8 @@ import '../widgets/sprite_animator.dart';
 const String kRoomBackgroundAsset = 'assets/images/room_bg.png';
 
 // How far up from the bottom of the screen the pet sits on the floor.
-// Tune this once the real room asset is in so the pet's feet line up
-// with the front edge of the floor tile.
-const double kPetFloorOffset = 96.0;
+// Lowered closer to the floor.
+const double kPetFloorOffset = 16.0;
 
 // Companion option helper to support dynamic frame counts per sprite sheet
 class _CompanionOption {
@@ -116,7 +115,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late final AnimationController _entrance;
-  late final AnimationController _pulse;
   late final AnimationController _flicker;
   late final AnimationController _floatController;
   late final Animation<double> _floatAnimation;
@@ -132,11 +130,6 @@ class _HomePageState extends State<HomePage>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..forward();
-
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    )..repeat(reverse: true);
 
     _flicker = AnimationController(
       vsync: this,
@@ -156,7 +149,6 @@ class _HomePageState extends State<HomePage>
   @override
   void dispose() {
     _entrance.dispose();
-    _pulse.dispose();
     _flicker.dispose();
     _floatController.dispose();
     super.dispose();
@@ -246,8 +238,6 @@ class _HomePageState extends State<HomePage>
               fit: BoxFit.cover,
               alignment: Alignment.bottomCenter,
               errorBuilder: (context, error, stackTrace) {
-                // Fallback gradient so the page still renders sensibly if
-                // the room asset hasn't been wired up in pubspec.yaml yet.
                 return Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -272,7 +262,6 @@ class _HomePageState extends State<HomePage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Top bar: Hello greeting on left, vertical icon column on right ──
                 _Reveal(
                   animation: _seg(0.0, 0.45),
                   child: Row(
@@ -356,7 +345,7 @@ class _HomePageState extends State<HomePage>
           ),
         ),
 
-        // ── Companion, chilling at the bottom of the room ────────────
+        // ── Companion, sitting cleanly on the floor without circle or name ────────────
         Positioned(
           left: 0,
           right: 0,
@@ -365,77 +354,34 @@ class _HomePageState extends State<HomePage>
             child: _Reveal(
               animation: _seg(0.15, 0.7),
               beginOffset: const Offset(0, 0.08),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StreamBuilder<DocumentSnapshot>(
-                    stream: user != null
-                        ? FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(user.uid)
-                              .snapshots()
-                        : null,
-                    builder: (context, snapshot) {
-                      final data =
-                          snapshot.data?.data() as Map<String, dynamic>?;
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: user != null
+                    ? FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .snapshots()
+                    : null,
+                builder: (context, snapshot) {
+                  final data = snapshot.data?.data() as Map<String, dynamic>?;
 
-                      final companionSource =
-                          (data?['companionAsset'] as String?) ??
-                          (data?['companionLottie'] as String?) ??
-                          'assets/images/IdleCattt.png';
+                  final companionSource =
+                      (data?['companionAsset'] as String?) ??
+                      (data?['companionLottie'] as String?) ??
+                      'assets/images/IdleCattt.png';
 
-                      final companionEmoji =
-                          (data?['companionEmoji'] as String?) ?? '🐱';
+                  final companionEmoji =
+                      (data?['companionEmoji'] as String?) ?? '🐱';
 
-                      final equipped = List<String>.from(
-                        (data?['equippedAccessories'] as List?) ?? const [],
-                      );
+                  final equipped = List<String>.from(
+                    (data?['equippedAccessories'] as List?) ?? const [],
+                  );
 
-                      return _CharacterOrb(
-                        cs: cs,
-                        pulse: _pulse,
-                        source: companionSource,
-                        fallbackEmoji: companionEmoji,
-                        equippedAccessories: equipped,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  StreamBuilder<DocumentSnapshot>(
-                    stream: user != null
-                        ? FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(user.uid)
-                              .snapshots()
-                        : null,
-                    builder: (context, snapshot) {
-                      final data =
-                          snapshot.data?.data() as Map<String, dynamic>?;
-                      final name =
-                          (data?['companionName'] as String?) ??
-                          'YOUR COMPANION';
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.surface.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          name.toUpperCase(),
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                letterSpacing: 1.2,
-                                color: cs.onSurfaceVariant,
-                              ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  return _CharacterSprite(
+                    source: companionSource,
+                    fallbackEmoji: companionEmoji,
+                    equippedAccessories: equipped,
+                  );
+                },
               ),
             ),
           ),
@@ -686,19 +632,15 @@ class _TopStatIcon extends StatelessWidget {
   }
 }
 
-// ── Companion Orb with Sprite Sheet Support ─────────────────────────────────
+// ── Companion Sprite without Orb background or name label ──────────────────
 
-class _CharacterOrb extends StatelessWidget {
-  final ColorScheme cs;
-  final Animation<double> pulse;
+class _CharacterSprite extends StatelessWidget {
   final String source;
   final String fallbackEmoji;
   final List<String> equippedAccessories;
 
-  const _CharacterOrb({
+  const _CharacterSprite({
     super.key,
-    required this.cs,
-    required this.pulse,
     required this.source,
     this.fallbackEmoji = '🐱',
     this.equippedAccessories = const [],
@@ -706,7 +648,6 @@ class _CharacterOrb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const orbSize = 108.0;
     final isSpriteSheet = source.endsWith('.png');
 
     final matchingOption = _kCompanions.firstWhere(
@@ -715,84 +656,35 @@ class _CharacterOrb extends StatelessWidget {
     );
 
     return SizedBox(
-      width: orbSize + 24,
-      height: orbSize + 24,
+      width: 120,
+      height: 120,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: pulse,
-              builder: (context, _) {
-                final t = pulse.value;
-                final scale = 1.0 + (t * 0.05);
-                final glowAlpha = 0.12 + (t * 0.16);
-
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: orbSize,
-                    height: orbSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.primary.withValues(alpha: glowAlpha),
-                          blurRadius: 26,
-                          spreadRadius: 4,
-                        ),
-                      ],
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: isSpriteSheet
+                ? Center(
+                    child: Transform.scale(
+                      scale: matchingOption.frameWidth == 64.0
+                          ? 1.8
+                          : (matchingOption.frameWidth == 16.0 ? 4.5 : 3.0),
+                      child: SpriteAnimator(
+                        imagePath: source,
+                        totalFrames: matchingOption.totalFrames,
+                        displayWidth: matchingOption.frameWidth,
+                        displayHeight: matchingOption.frameHeight,
+                        duration: const Duration(milliseconds: 800),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      fallbackEmoji,
+                      style: const TextStyle(fontSize: 48),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          Container(
-            width: orbSize,
-            height: orbSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: cs.primaryContainer,
-              gradient: RadialGradient(
-                colors: [
-                  cs.primaryContainer,
-                  cs.primaryContainer.withValues(alpha: 0.65),
-                ],
-              ),
-              border: Border.all(
-                color: cs.primary.withValues(alpha: 0.35),
-                width: 2.2,
-              ),
-            ),
-          ),
-
-          ClipOval(
-            child: SizedBox(
-              width: orbSize - 16,
-              height: orbSize - 16,
-              child: isSpriteSheet
-                  ? Center(
-                      child: Transform.scale(
-                        scale: matchingOption.frameWidth == 64.0
-                            ? 1.2
-                            : (matchingOption.frameWidth == 16.0 ? 3.5 : 2.2),
-                        child: SpriteAnimator(
-                          imagePath: source,
-                          totalFrames: matchingOption.totalFrames,
-                          displayWidth: matchingOption.frameWidth,
-                          displayHeight: matchingOption.frameHeight,
-                          duration: const Duration(milliseconds: 800),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Text(
-                        fallbackEmoji,
-                        style: const TextStyle(fontSize: 34),
-                      ),
-                    ),
-            ),
           ),
           if (equippedAccessories.contains('cloud_blanket'))
             Positioned(
