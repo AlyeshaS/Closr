@@ -118,6 +118,8 @@ class _HomePageState extends State<HomePage>
   late final AnimationController _entrance;
   late final AnimationController _pulse;
   late final AnimationController _flicker;
+  late final AnimationController _floatController;
+  late final Animation<double> _floatAnimation;
   final GeminiService _geminiService = GeminiService();
 
   @override
@@ -140,6 +142,15 @@ class _HomePageState extends State<HomePage>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
+
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+
+    _floatAnimation = Tween<double>(begin: -1.5, end: 1.5).animate(
+      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -147,6 +158,7 @@ class _HomePageState extends State<HomePage>
     _entrance.dispose();
     _pulse.dispose();
     _flicker.dispose();
+    _floatController.dispose();
     super.dispose();
   }
 
@@ -174,8 +186,8 @@ class _HomePageState extends State<HomePage>
             cs: cs,
             glowColor: cs.primary,
             gradientColors: [
-              cs.primaryContainer.withOpacity(0.92),
-              cs.secondaryContainer.withOpacity(0.7),
+              cs.primaryContainer.withValues(alpha: 0.92),
+              cs.secondaryContainer.withValues(alpha: 0.7),
             ],
             child: FutureBuilder<String>(
               future: _geminiService.fetchQuoteOfTheDay(),
@@ -242,7 +254,7 @@ class _HomePageState extends State<HomePage>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        cs.primaryContainer.withOpacity(0.6),
+                        cs.primaryContainer.withValues(alpha: 0.6),
                         cs.surface,
                       ],
                     ),
@@ -260,77 +272,81 @@ class _HomePageState extends State<HomePage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Top bar: Hello + tip button ⋯ heart/streak icons ──
+                // ── Top bar: Hello greeting on left, vertical icon column on right ──
                 _Reveal(
                   animation: _seg(0.0, 0.45),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.displayMedium,
-                                  children: [
-                                    const TextSpan(text: 'Hello, '),
-                                    TextSpan(
-                                      text: '$firstName.',
-                                      style: TextStyle(
-                                        fontStyle: FontStyle.italic,
-                                        color: cs.primary,
-                                      ),
-                                    ),
-                                  ],
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: RichText(
+                            text: TextSpan(
+                              style: Theme.of(context).textTheme.displayMedium,
+                              children: [
+                                const TextSpan(text: 'Hello, '),
+                                TextSpan(
+                                  text: '$firstName.',
+                                  style: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    color: cs.primary,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                            const SizedBox(width: 6),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      AnimatedBuilder(
+                        animation: _floatAnimation,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _floatAnimation.value),
+                            child: child,
+                          );
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             _TipButton(
                               cs: cs,
                               onTap: () => _showTipSheet(context, cs),
                             ),
+                            const SizedBox(height: 8),
+                            _TopStatIcon(
+                              cs: cs,
+                              icon: Icons.favorite_rounded,
+                              tint: cs.primary,
+                              stream: user != null
+                                  ? FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(user.uid)
+                                        .collection('matched_suggestions')
+                                        .snapshots()
+                                  : null,
+                              countSelector: (snapshot) =>
+                                  snapshot?.docs.length ?? 0,
+                            ),
+                            const SizedBox(height: 8),
+                            _TopStatIcon(
+                              cs: cs,
+                              icon: Icons.local_fire_department_rounded,
+                              tint: const Color(0xFFFF8A3D),
+                              docStream: user != null
+                                  ? FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(user.uid)
+                                        .snapshots()
+                                  : null,
+                              docCountSelector: (data) =>
+                                  (data?['sharedStreakCurrent'] as int?) ??
+                                  (data?['streakCurrent'] as int?) ??
+                                  0,
+                            ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Row(
-                        children: [
-                          _TopStatIcon(
-                            cs: cs,
-                            icon: Icons.favorite_rounded,
-                            tint: cs.primary,
-                            stream: user != null
-                                ? FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(user.uid)
-                                      .collection('matched_suggestions')
-                                      .snapshots()
-                                : null,
-                            countSelector: (snapshot) =>
-                                snapshot?.docs.length ?? 0,
-                          ),
-                          const SizedBox(width: 10),
-                          _TopStatIcon(
-                            cs: cs,
-                            icon: Icons.local_fire_department_rounded,
-                            tint: const Color(0xFFFF8A3D),
-                            docStream: user != null
-                                ? FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(user.uid)
-                                      .snapshots()
-                                : null,
-                            docCountSelector: (data) =>
-                                (data?['sharedStreakCurrent'] as int?) ??
-                                (data?['streakCurrent'] as int?) ??
-                                0,
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -405,7 +421,7 @@ class _HomePageState extends State<HomePage>
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: cs.surface.withOpacity(0.55),
+                          color: cs.surface.withValues(alpha: 0.55),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -494,12 +510,12 @@ class _GlassCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: cs.shadow.withOpacity(0.07),
+            color: cs.shadow.withValues(alpha: 0.07),
             blurRadius: 26,
             offset: const Offset(0, 14),
           ),
           BoxShadow(
-            color: glow.withOpacity(0.12),
+            color: glow.withValues(alpha: 0.12),
             blurRadius: 18,
             offset: const Offset(0, 6),
             spreadRadius: -4,
@@ -517,14 +533,17 @@ class _GlassCard extends StatelessWidget {
                 colors:
                     gradientColors ??
                     [
-                      cs.surface.withOpacity(0.55),
-                      cs.primaryContainer.withOpacity(0.35),
+                      cs.surface.withValues(alpha: 0.55),
+                      cs.primaryContainer.withValues(alpha: 0.35),
                     ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(color: cs.primary.withOpacity(0.35), width: 1),
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.35),
+                width: 1,
+              ),
             ),
             child: child,
           ),
@@ -534,7 +553,7 @@ class _GlassCard extends StatelessWidget {
   }
 }
 
-// ── Tip button next to the greeting ─────────────────────────────────────
+// ── Tip button (Star / Inspiration) ─────────────────────────────────────
 
 class _TipButton extends StatelessWidget {
   final ColorScheme cs;
@@ -553,11 +572,11 @@ class _TipButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: cs.surface.withOpacity(0.65),
+            color: cs.surface.withValues(alpha: 0.65),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: cs.primary.withOpacity(0.12),
+                color: cs.primary.withValues(alpha: 0.12),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -570,9 +589,7 @@ class _TipButton extends StatelessWidget {
   }
 }
 
-// ── Top-right heart / streak icons ──────────────────────────────────────
-// Supports either a QuerySnapshot stream (matched dates count) or a
-// DocumentSnapshot stream (streak count) via whichever selector is passed.
+// ── Top-right stat icon component ──────────────────────────────────────
 
 class _TopStatIcon extends StatelessWidget {
   final ColorScheme cs;
@@ -606,11 +623,11 @@ class _TopStatIcon extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: cs.surface.withOpacity(0.65),
+                color: cs.surface.withValues(alpha: 0.65),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: tint.withOpacity(0.15),
+                    color: tint.withValues(alpha: 0.15),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -720,7 +737,7 @@ class _CharacterOrb extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: cs.primary.withOpacity(glowAlpha),
+                          color: cs.primary.withValues(alpha: glowAlpha),
                           blurRadius: 26,
                           spreadRadius: 4,
                         ),
@@ -740,11 +757,11 @@ class _CharacterOrb extends StatelessWidget {
               gradient: RadialGradient(
                 colors: [
                   cs.primaryContainer,
-                  cs.primaryContainer.withOpacity(0.65),
+                  cs.primaryContainer.withValues(alpha: 0.65),
                 ],
               ),
               border: Border.all(
-                color: cs.primary.withOpacity(0.35),
+                color: cs.primary.withValues(alpha: 0.35),
                 width: 2.2,
               ),
             ),
@@ -783,7 +800,7 @@ class _CharacterOrb extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: const Text('☁️', style: TextStyle(fontSize: 12)),
@@ -796,7 +813,7 @@ class _CharacterOrb extends StatelessWidget {
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.4),
+                  color: Colors.white.withValues(alpha: 0.4),
                 ),
                 child: const Text('🌙', style: TextStyle(fontSize: 14)),
               ),
