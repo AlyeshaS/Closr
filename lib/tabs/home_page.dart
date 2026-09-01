@@ -72,7 +72,7 @@ const _kCompanions = [
     'Cosmo',
     'Bear',
     'assets/images/bear.png',
-    7,
+    6,
     32.0,
     32.0,
   ),
