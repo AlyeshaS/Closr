@@ -121,7 +121,6 @@ class _HomePageState extends State<HomePage>
   late final AnimationController _entrance;
   late final AnimationController _flicker;
   late final AnimationController _floatController;
-  late final Animation<double> _floatAnimation;
   final GeminiService _geminiService = GeminiService();
 
   @override
@@ -144,10 +143,6 @@ class _HomePageState extends State<HomePage>
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
-
-    _floatAnimation = Tween<double>(begin: -1.5, end: 1.5).animate(
-      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
-    );
   }
 
   @override
@@ -238,6 +233,7 @@ class _HomePageState extends State<HomePage>
     final user = FirebaseAuth.instance.currentUser;
     final cs = Theme.of(context).colorScheme;
     final firstName = user?.displayName?.split(' ').first ?? 'there';
+    final cardBackgroundColor = cs.surfaceContainerHighest;
 
     return Stack(
       fit: StackFit.expand,
@@ -279,86 +275,145 @@ class _HomePageState extends State<HomePage>
         // ── Foreground layout ──────────────────────────────────────────
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _Reveal(
                   animation: _seg(0.0, 0.45),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: RichText(
-                            text: TextSpan(
-                              style: Theme.of(context).textTheme.displayMedium,
-                              children: [
-                                const TextSpan(text: 'Hello, '),
-                                TextSpan(
-                                  text: '$firstName.',
-                                  style: TextStyle(
-                                    fontStyle: FontStyle.italic,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardBackgroundColor.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cs.shadow.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Hello Greeting
+                        RichText(
+                          text: TextSpan(
+                            style: Theme.of(context).textTheme.displayMedium,
+                            children: [
+                              const TextSpan(text: 'Hello, '),
+                              TextSpan(
+                                text: '$firstName.',
+                                style: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Tip of the Day Button with Sparkle Icon at front
+                        Material(
+                          color: cs.surface.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            onTap: () => _showTipSheet(context, cs),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 18,
                                     color: cs.primary,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Daily inspiration',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: cs.onSurface,
+                                        ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      AnimatedBuilder(
-                        animation: _floatAnimation,
-                        builder: (context, child) {
-                          return Transform.translate(
-                            offset: Offset(0, _floatAnimation.value),
-                            child: child,
-                          );
-                        },
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                        const SizedBox(height: 12),
+
+                        // Heart and Fire stats as rounded rectangle pills
+                        Row(
                           children: [
-                            _TipButton(
-                              cs: cs,
-                              onTap: () => _showTipSheet(context, cs),
+                            Expanded(
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: user != null
+                                    ? FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(user.uid)
+                                          .collection('matched_suggestions')
+                                          .snapshots()
+                                    : null,
+                                builder: (context, snapshot) {
+                                  final count = snapshot.data?.docs.length ?? 0;
+                                  return _StatPill(
+                                    cs: cs,
+                                    icon: Icons.favorite_rounded,
+                                    tint: cs.primary,
+                                    label: '$count matches',
+                                  );
+                                },
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            _TopStatIcon(
-                              cs: cs,
-                              icon: Icons.favorite_rounded,
-                              tint: cs.primary,
-                              stream: user != null
-                                  ? FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(user.uid)
-                                        .collection('matched_suggestions')
-                                        .snapshots()
-                                  : null,
-                              countSelector: (snapshot) =>
-                                  snapshot?.docs.length ?? 0,
-                            ),
-                            const SizedBox(height: 8),
-                            _TopStatIcon(
-                              cs: cs,
-                              icon: Icons.local_fire_department_rounded,
-                              tint: const Color(0xFFFF8A3D),
-                              docStream: user != null
-                                  ? FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(user.uid)
-                                        .snapshots()
-                                  : null,
-                              docCountSelector: (data) =>
-                                  (data?['sharedStreakCurrent'] as int?) ??
-                                  (data?['streakCurrent'] as int?) ??
-                                  0,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: StreamBuilder<DocumentSnapshot>(
+                                stream: user != null
+                                    ? FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(user.uid)
+                                          .snapshots()
+                                    : null,
+                                builder: (context, snapshot) {
+                                  final data =
+                                      snapshot.data?.data()
+                                          as Map<String, dynamic>?;
+                                  final streak =
+                                      (data?['sharedStreakCurrent'] as int?) ??
+                                      (data?['streakCurrent'] as int?) ??
+                                      0;
+                                  return _StatPill(
+                                    cs: cs,
+                                    icon: Icons.local_fire_department_rounded,
+                                    tint: const Color(0xFFFF8A3D),
+                                    label: '$streak day streak',
+                                  );
+                                },
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -477,6 +532,48 @@ class _RoomFurniture extends StatelessWidget {
   }
 }
 
+// ── Stat Pill Widget ──────────────────────────────────────────────────────
+
+class _StatPill extends StatelessWidget {
+  final ColorScheme cs;
+  final IconData icon;
+  final Color tint;
+  final String label;
+
+  const _StatPill({
+    required this.cs,
+    required this.icon,
+    required this.tint,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: tint),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Furniture Inventory Sheet with Theme Beige Style & Sliding Toggle ─────
 
 class _FurnitureInventorySheet extends StatefulWidget {
@@ -498,13 +595,10 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final cs = widget.cs;
-
-    // Uses your theme's surface container highest tone to match the navbar beige styling
-    final cardBackgroundColor = cs.surface;
+    final cardBackgroundColor = cs.surfaceContainerHighest;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.65,
-      // Increased horizontal padding for a wider card presentation
       padding: EdgeInsets.fromLTRB(
         12,
         16,
@@ -528,7 +622,6 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
             Center(
               child: Container(
                 width: 36,
@@ -553,8 +646,6 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Sliding Toggle Bar for Categories with Elevation & Shadows
             Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
@@ -632,8 +723,6 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Item Grid Content
             Expanded(
               child: user == null
                   ? const SizedBox()
@@ -766,6 +855,100 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Companion Sprite Widget ───────────────────────────────────────────────
+
+class _CharacterSprite extends StatelessWidget {
+  final String source;
+  final String fallbackEmoji;
+  final List<String> equippedAccessories;
+
+  const _CharacterSprite({
+    super.key,
+    required this.source,
+    this.fallbackEmoji = '🐱',
+    this.equippedAccessories = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSpriteSheet = source.endsWith('.png');
+
+    final matchingOption = _kCompanions.firstWhere(
+      (c) => c.assetPath == source,
+      orElse: () => _kCompanions.first,
+    );
+
+    return SizedBox(
+      width: 120,
+      height: 120,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: isSpriteSheet
+                ? Center(
+                    child: Transform.scale(
+                      scale: matchingOption.frameWidth == 64.0
+                          ? 1.8
+                          : (matchingOption.frameWidth == 16.0 ? 4.5 : 3.0),
+                      child: SpriteAnimator(
+                        imagePath: source,
+                        totalFrames: matchingOption.totalFrames,
+                        displayWidth: matchingOption.frameWidth,
+                        displayHeight: matchingOption.frameHeight,
+                        duration: const Duration(milliseconds: 800),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      fallbackEmoji,
+                      style: const TextStyle(fontSize: 48),
+                    ),
+                  ),
+          ),
+          if (equippedAccessories.contains('cloud_blanket'))
+            Positioned(
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text('☁️', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+          if (equippedAccessories.contains('moon_halo'))
+            Positioned(
+              top: 10,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.4),
+                ),
+                child: const Text('🌙', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          if (equippedAccessories.contains('star_collar'))
+            const Positioned(
+              bottom: 18,
+              child: Text('✨', style: TextStyle(fontSize: 13)),
+            ),
+          if (equippedAccessories.contains('heart_tag'))
+            const Positioned(
+              bottom: 8,
+              child: Text('💗', style: TextStyle(fontSize: 11)),
+            ),
+        ],
       ),
     );
   }
@@ -908,193 +1091,6 @@ class _TipButton extends StatelessWidget {
           ),
           child: Icon(Icons.auto_awesome_rounded, size: 18, color: cs.primary),
         ),
-      ),
-    );
-  }
-}
-
-class _TopStatIcon extends StatelessWidget {
-  final ColorScheme cs;
-  final IconData icon;
-  final Color tint;
-  final Stream<QuerySnapshot>? stream;
-  final int Function(QuerySnapshot?)? countSelector;
-  final Stream<DocumentSnapshot>? docStream;
-  final int Function(Map<String, dynamic>?)? docCountSelector;
-
-  const _TopStatIcon({
-    required this.cs,
-    required this.icon,
-    required this.tint,
-    this.stream,
-    this.countSelector,
-    this.docStream,
-    this.docCountSelector,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Widget buildBadge(int count) {
-      return SizedBox(
-        width: 44,
-        height: 44,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: cs.surface.withValues(alpha: 0.65),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: tint.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(icon, size: 20, color: tint),
-            ),
-            if (count > 0)
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
-                  ),
-                  constraints: const BoxConstraints(minWidth: 18),
-                  decoration: BoxDecoration(
-                    color: tint,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: cs.surface, width: 1.5),
-                  ),
-                  child: Text(
-                    count > 99 ? '99+' : '$count',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onPrimary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    }
-
-    if (docStream != null && docCountSelector != null) {
-      return StreamBuilder<DocumentSnapshot>(
-        stream: docStream,
-        builder: (context, snapshot) {
-          final data = snapshot.data?.data() as Map<String, dynamic>?;
-          return buildBadge(docCountSelector!(data));
-        },
-      );
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: stream,
-      builder: (context, snapshot) {
-        final count = countSelector?.call(snapshot.data) ?? 0;
-        return buildBadge(count);
-      },
-    );
-  }
-}
-
-class _CharacterSprite extends StatelessWidget {
-  final String source;
-  final String fallbackEmoji;
-  final List<String> equippedAccessories;
-
-  const _CharacterSprite({
-    super.key,
-    required this.source,
-    this.fallbackEmoji = '🐱',
-    this.equippedAccessories = const [],
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSpriteSheet = source.endsWith('.png');
-
-    final matchingOption = _kCompanions.firstWhere(
-      (c) => c.assetPath == source,
-      orElse: () => _kCompanions.first,
-    );
-
-    return SizedBox(
-      width: 120,
-      height: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: 120,
-            height: 120,
-            child: isSpriteSheet
-                ? Center(
-                    child: Transform.scale(
-                      scale: matchingOption.frameWidth == 64.0
-                          ? 1.8
-                          : (matchingOption.frameWidth == 16.0 ? 4.5 : 3.0),
-                      child: SpriteAnimator(
-                        imagePath: source,
-                        totalFrames: matchingOption.totalFrames,
-                        displayWidth: matchingOption.frameWidth,
-                        displayHeight: matchingOption.frameHeight,
-                        duration: const Duration(milliseconds: 800),
-                      ),
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      fallbackEmoji,
-                      style: const TextStyle(fontSize: 48),
-                    ),
-                  ),
-          ),
-          if (equippedAccessories.contains('cloud_blanket'))
-            Positioned(
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.75),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: const Text('☁️', style: TextStyle(fontSize: 12)),
-              ),
-            ),
-          if (equippedAccessories.contains('moon_halo'))
-            Positioned(
-              top: 10,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
-                child: const Text('🌙', style: TextStyle(fontSize: 14)),
-              ),
-            ),
-          if (equippedAccessories.contains('star_collar'))
-            const Positioned(
-              bottom: 18,
-              child: Text('✨', style: TextStyle(fontSize: 13)),
-            ),
-          if (equippedAccessories.contains('heart_tag'))
-            const Positioned(
-              bottom: 8,
-              child: Text('💗', style: TextStyle(fontSize: 11)),
-            ),
-        ],
       ),
     );
   }
