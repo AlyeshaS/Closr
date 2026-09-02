@@ -43,7 +43,6 @@ const _kCompanions = [
     32.0,
     32.0,
   ),
-  // _CompanionOption('🐶', 'Biscuit', 'Dog', 'assets/images/dog.png', 10, 32.0, 32.0),
   _CompanionOption(
     '🐢',
     'Shelly',
@@ -53,15 +52,6 @@ const _kCompanions = [
     32.0,
     32.0,
   ),
-  // _CompanionOption(
-  //   '🐼',
-  //   'Bao',
-  //   'Panda',
-  //   'assets/images/panda.png',
-  //   4,
-  //   64.0,
-  //   64.0,
-  // ),
   _CompanionOption(
     '🐻',
     'Cosmo',
@@ -76,8 +66,8 @@ const _kCompanions = [
     'Lilac',
     'Bird',
     'assets/images/bird.png',
-    6, // Exact frame count from the image
-    16.0, // Match single frame width (or 48.0 if scaled)
+    6,
+    16.0,
     16.0,
   ),
   _CompanionOption(
@@ -89,62 +79,59 @@ const _kCompanions = [
     32.0,
     32.0,
   ),
-  // _CompanionOption(
-  //   '🐧',
-  //   'Pippin',
-  //   'Penguin',
-  //   'assets/animations/penguin.json',
-  //   7,
-  //   32.0,
-  //   32.0,
-  // ),
-  // _CompanionOption('🐨', 'Kobi', 'Koala', 'assets/animations/koala.json', 7, 32.0, 32.0),
 ];
 
-class _CompanionShopItem {
+// Sofa Shop Items mapping the 4 individual image files
+class _SofaShopItem {
   final String id;
   final String title;
   final String description;
-  final String emoji;
+  final String variantKey;
   final int cost;
+  final String assetPath;
 
-  const _CompanionShopItem({
+  const _SofaShopItem({
     required this.id,
     required this.title,
     required this.description,
-    required this.emoji,
+    required this.variantKey,
     required this.cost,
+    required this.assetPath,
   });
 }
 
-const _kCompanionShopItems = [
-  _CompanionShopItem(
-    id: 'star_collar',
-    title: 'Star Collar',
-    description: 'A bright collar for shared walks and cozy photos.',
-    emoji: '✨',
-    cost: 20,
+const _kSofaShopItems = [
+  _SofaShopItem(
+    id: 'sofa_brown',
+    title: 'Brown Sofa',
+    description: 'A warm, classic tone for a cozy reading corner.',
+    variantKey: 'brown',
+    cost: 0,
+    assetPath: 'assets/images/furniture/sofa_brown.png',
   ),
-  _CompanionShopItem(
-    id: 'heart_tag',
-    title: 'Heart Tag',
-    description: 'A little tag that keeps your companion close.',
-    emoji: '💗',
+  _SofaShopItem(
+    id: 'sofa_green',
+    title: 'Green Sofa',
+    description: 'An earthy hue that brings a fresh, natural vibe.',
+    variantKey: 'green',
     cost: 30,
+    assetPath: 'assets/images/furniture/sofa_green.png',
   ),
-  _CompanionShopItem(
-    id: 'cloud_blanket',
-    title: 'Cloud Blanket',
-    description: 'A soft blanket for rest days and recovery naps.',
-    emoji: '☁️',
+  _SofaShopItem(
+    id: 'sofa_grey',
+    title: 'Grey Sofa',
+    description: 'A sleek, neutral modern seating option.',
+    variantKey: 'grey',
     cost: 40,
+    assetPath: 'assets/images/furniture/sofa_grey.png',
   ),
-  _CompanionShopItem(
-    id: 'moon_halo',
-    title: 'Moon Halo',
-    description: 'A glowing halo for rare, special moments.',
-    emoji: '🌙',
-    cost: 60,
+  _SofaShopItem(
+    id: 'sofa_blue',
+    title: 'Blue Sofa',
+    description: 'A calm, cool accent piece for your room.',
+    variantKey: 'blue',
+    cost: 50,
+    assetPath: 'assets/images/furniture/sofa_blue.png',
   ),
 ];
 
@@ -214,8 +201,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _companionName = 'Mochi';
   String _companionAsset = 'assets/images/cat.png';
   int _companionPoints = 0;
-  Set<String> _ownedShopItemIds = <String>{};
-  Set<String> _equippedAccessories = <String>{};
+  Set<String> _ownedSofaIds = <String>{'sofa_brown'};
+  String _equippedSofa = 'brown';
   bool _companionLoading = true;
 
   final CompanionRewardsService _companionRewardsService =
@@ -243,11 +230,24 @@ class _SettingsPageState extends State<SettingsPage> {
     final normalized = await _companionRewardsService.normalizeCompanionProfile(
       userId: user.uid,
     );
+
     final doc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .get();
+
+    final furnitureSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('furniture')
+        .get();
+
     final data = doc.data() ?? {};
+    final ownedIds = furnitureSnapshot.docs.map((d) => d.id).toSet();
+    if (ownedIds.isEmpty) {
+      ownedIds.add('sofa_brown');
+    }
+
     setState(() {
       _companionEmoji =
           normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🐱';
@@ -258,12 +258,10 @@ class _SettingsPageState extends State<SettingsPage> {
           (data['companionLottie'] as String?) ??
           'assets/images/cat.png';
       _companionPoints = (data['companionPoints'] as int?) ?? 0;
-      _ownedShopItemIds = Set<String>.from(
-        List<String>.from((data['companionShopOwnedIds'] as List?) ?? const []),
-      );
-      _equippedAccessories = Set<String>.from(
-        List<String>.from((data['equippedAccessories'] as List?) ?? const []),
-      );
+
+      _ownedSofaIds = ownedIds;
+      _equippedSofa = (data['equippedSofa'] as String?) ?? 'brown';
+
       _partnerEmail =
           ((data['partnerEmailLower'] as String?) ??
                   (data['partnerEmail'] as String?) ??
@@ -278,22 +276,64 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  Future<void> _toggleEquipAccessory(String itemId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  // ── Sync Helper to update both users via email connection ────────────────
+  Future<void> _syncToPartnerAndSelf({
+    required String userEmail,
+    required String partnerEmail,
+    required Map<String, dynamic> dataToUpdate,
+    Map<String, dynamic>? furnitureItemToAdd,
+  }) async {
+    final firestore = FirebaseFirestore.instance;
 
-    final updated = Set<String>.from(_equippedAccessories);
-    if (updated.contains(itemId)) {
-      updated.remove(itemId);
-    } else {
-      updated.add(itemId);
+    final userQuery = await firestore
+        .collection('users')
+        .where('email', isEqualTo: userEmail)
+        .get();
+    final partnerQuery = partnerEmail.isNotEmpty
+        ? await firestore
+              .collection('users')
+              .where('email', isEqualTo: partnerEmail)
+              .get()
+        : null;
+
+    final batch = firestore.batch();
+
+    for (var doc in userQuery.docs) {
+      batch.set(doc.reference, dataToUpdate, SetOptions(merge: true));
+      if (furnitureItemToAdd != null) {
+        final furnitureRef = doc.reference
+            .collection('furniture')
+            .doc(furnitureItemToAdd['id']);
+        batch.set(furnitureRef, furnitureItemToAdd['data']);
+      }
     }
 
-    setState(() => _equippedAccessories = updated);
+    if (partnerQuery != null) {
+      for (var doc in partnerQuery.docs) {
+        batch.set(doc.reference, dataToUpdate, SetOptions(merge: true));
+        if (furnitureItemToAdd != null) {
+          final furnitureRef = doc.reference
+              .collection('furniture')
+              .doc(furnitureItemToAdd['id']);
+          batch.set(furnitureRef, furnitureItemToAdd['data']);
+        }
+      }
+    }
 
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-      'equippedAccessories': updated.toList(),
-    }, SetOptions(merge: true));
+    await batch.commit();
+  }
+
+  Future<void> _equipSofa(String variantKey) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.email == null) return;
+
+    setState(() => _equippedSofa = variantKey);
+
+    await _syncToPartnerAndSelf(
+      userEmail: user.email!,
+      partnerEmail: _partnerEmail,
+      dataToUpdate: {'equippedSofa': variantKey},
+    );
   }
 
   Future<void> _showCompletedBadgesSheet() async {
@@ -498,11 +538,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _openCompanionShop() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null || user.email == null) return;
 
     var points = _companionPoints;
-    var ownedIds = Set<String>.from(_ownedShopItemIds);
-    var equippedIds = Set<String>.from(_equippedAccessories);
+    var ownedIds = Set<String>.from(_ownedSofaIds);
+    var equippedKey = _equippedSofa;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -538,14 +578,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Companion shop',
+                  'Furniture shop',
                   style: Theme.of(
                     ctx,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Use achievement points to unlock and equip accessories on your companion.',
+                  'Use your companion points to unlock new sofa color variants for your room.',
                   style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                   ),
@@ -587,12 +627,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 Flexible(
                   child: ListView.separated(
                     shrinkWrap: true,
-                    itemCount: _kCompanionShopItems.length,
+                    itemCount: _kSofaShopItems.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final item = _kCompanionShopItems[index];
-                      final owned = ownedIds.contains(item.id);
-                      final isEquipped = equippedIds.contains(item.id);
+                      final item = _kSofaShopItems[index];
+                      final owned =
+                          item.variantKey == 'brown' ||
+                          ownedIds.contains(item.id);
+                      final isEquipped = equippedKey == item.variantKey;
                       final canBuy = !owned && points >= item.cost;
 
                       return Container(
@@ -618,9 +660,11 @@ class _SettingsPageState extends State<SettingsPage> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Center(
-                                child: Text(
-                                  item.emoji,
-                                  style: const TextStyle(fontSize: 24),
+                                child: Image.asset(
+                                  item.assetPath,
+                                  width: 36,
+                                  height: 36,
+                                  fit: BoxFit.contain,
                                 ),
                               ),
                             ),
@@ -666,46 +710,64 @@ class _SettingsPageState extends State<SettingsPage> {
                             const SizedBox(width: 12),
                             FilledButton(
                               onPressed: owned
-                                  ? () async {
-                                      await _toggleEquipAccessory(item.id);
-                                      setSheet(() {
-                                        if (equippedIds.contains(item.id)) {
-                                          equippedIds.remove(item.id);
-                                        } else {
-                                          equippedIds.add(item.id);
-                                        }
-                                      });
-                                    }
+                                  ? (isEquipped
+                                        ? null
+                                        : () async {
+                                            await _equipSofa(item.variantKey);
+                                            setSheet(() {
+                                              equippedKey = item.variantKey;
+                                            });
+                                            setState(() {
+                                              _equippedSofa = item.variantKey;
+                                            });
+                                          })
                                   : (!canBuy
                                         ? null
                                         : () async {
                                             try {
-                                              final spent =
-                                                  await _companionRewardsService
-                                                      .purchaseShopItem(
-                                                        userId: user.uid,
-                                                        itemId: item.id,
-                                                        cost: item.cost,
-                                                      );
-                                              if (spent <= 0) return;
-                                              setSheet(() {
-                                                points -= spent;
-                                                ownedIds.add(item.id);
-                                                equippedIds.add(item.id);
-                                              });
-                                              await _toggleEquipAccessory(
-                                                item.id,
+                                              await _syncToPartnerAndSelf(
+                                                userEmail: user.email!,
+                                                partnerEmail: _partnerEmail,
+                                                dataToUpdate: {
+                                                  'companionPoints':
+                                                      FieldValue.increment(
+                                                        -item.cost,
+                                                      ),
+                                                  'equippedSofa':
+                                                      item.variantKey,
+                                                },
+                                                furnitureItemToAdd: {
+                                                  'id': item.id,
+                                                  'data': {
+                                                    'variantKey':
+                                                        item.variantKey,
+                                                    'title': item.title,
+                                                    'unlockedAt':
+                                                        FieldValue.serverTimestamp(),
+                                                  },
+                                                },
                                               );
+
+                                              setSheet(() {
+                                                points -= item.cost;
+                                                ownedIds.add(item.id);
+                                                equippedKey = item.variantKey;
+                                              });
+                                              setState(() {
+                                                _equippedSofa = item.variantKey;
+                                                _ownedSofaIds = ownedIds;
+                                                _companionPoints = points;
+                                              });
                                               if (!mounted) return;
                                               await _loadCompanion();
-                                            } on StateError catch (_) {
+                                            } catch (_) {
                                               if (!mounted) return;
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
-                                                    'Not enough companion points',
+                                                    'Could not complete purchase',
                                                   ),
                                                 ),
                                               );
@@ -713,7 +775,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                           }),
                               child: Text(
                                 owned
-                                    ? (isEquipped ? 'Unequip' : 'Equip')
+                                    ? (isEquipped ? 'Equipped' : 'Equip')
                                     : 'Buy',
                               ),
                             ),
@@ -1047,17 +1109,20 @@ class _SettingsPageState extends State<SettingsPage> {
                             ? chosen.defaultName
                             : nameCtrl.text.trim();
                         final user = FirebaseAuth.instance.currentUser;
-                        if (user != null) {
-                          await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(user.uid)
-                              .set({
-                                'companionEmoji': chosen.emoji,
-                                'companionName': newName,
-                                'companionSpecies': chosen.species,
-                                'companionAsset': chosen.assetPath,
-                                'companionLottie': chosen.assetPath,
-                              }, SetOptions(merge: true));
+                        if (user != null && user.email != null) {
+                          final updateData = {
+                            'companionEmoji': chosen.emoji,
+                            'companionName': newName,
+                            'companionSpecies': chosen.species,
+                            'companionAsset': chosen.assetPath,
+                            'companionLottie': chosen.assetPath,
+                          };
+
+                          await _syncToPartnerAndSelf(
+                            userEmail: user.email!,
+                            partnerEmail: _partnerEmail,
+                            dataToUpdate: updateData,
+                          );
 
                           await _companionRewardsService.syncCompanionProfile(
                             userId: user.uid,
@@ -1074,12 +1139,10 @@ class _SettingsPageState extends State<SettingsPage> {
                           await _loadCompanion();
                         }
 
-                        // Close the bottom sheet modal cleanly
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                         }
 
-                        // Show a responsive confirmation snackbar with a heart icon
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -1397,15 +1460,15 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 20),
 
-          // ── Companion shop ──────────────────────────────────────────
-          _GroupLabel(text: 'Companion shop', cs: cs),
+          // ── Furniture shop ──────────────────────────────────────────
+          _GroupLabel(text: 'Furniture shop', cs: cs),
           const SizedBox(height: 8),
           _SettingsGroup(
             cs: cs,
             rows: [
               _SettingsRowData(
                 icon: Icons.storefront_rounded,
-                label: 'Open shop',
+                label: 'Open furniture shop',
                 onTap: _openCompanionShop,
                 trailing: const _TrailingArrow(),
               ),

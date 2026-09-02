@@ -66,6 +66,7 @@ flutter:
     - assets/closr_logo.png
     - assets/four_letter_words.txt
     - assets/images/
+    - assets/images/furniture/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

@@ -9,15 +9,19 @@ import '../widgets/sprite_animator.dart';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Room background asset.
-// Swap this for wherever you save Room1.png in your project, e.g.
-// 'assets/images/room/room_bg.png', and make sure it's registered in
-// pubspec.yaml under flutter -> assets.
 // ─────────────────────────────────────────────────────────────────────────
 const String kRoomBackgroundAsset = 'assets/images/room_bg.png';
 
 // How far up from the bottom of the screen the pet sits on the floor.
-// Lowered closer to the floor.
 const double kPetFloorOffset = 16.0;
+
+// Sofa asset variant map
+const Map<String, String> _kSofaAssets = {
+  'brown': 'assets/images/furniture/sofa_brown.png',
+  'green': 'assets/images/furniture/sofa_green.png',
+  'grey': 'assets/images/furniture/sofa_grey.png',
+  'blue': 'assets/images/furniture/sofa_blue.png',
+};
 
 // Companion option helper to support dynamic frame counts per sprite sheet
 class _CompanionOption {
@@ -218,6 +222,16 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  void _showFurnitureInventory(BuildContext context, ColorScheme cs) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.15),
+      isScrollControlled: true,
+      builder: (sheetContext) => _FurnitureInventorySheet(cs: cs),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -253,6 +267,13 @@ class _HomePageState extends State<HomePage>
               },
             ),
           ),
+        ),
+
+        // ── Room Furniture (Sofa) ─────────────────────────────────────
+        Positioned(
+          left: 50,
+          bottom: kPetFloorOffset + 75,
+          child: const _RoomFurniture(),
         ),
 
         // ── Foreground layout ──────────────────────────────────────────
@@ -345,7 +366,7 @@ class _HomePageState extends State<HomePage>
           ),
         ),
 
-        // ── Companion, sitting cleanly on the floor without circle or name ────────────
+        // ── Companion, sitting cleanly on the floor ────────────────────
         Positioned(
           left: 0,
           right: 0,
@@ -367,7 +388,7 @@ class _HomePageState extends State<HomePage>
                   final companionSource =
                       (data?['companionAsset'] as String?) ??
                       (data?['companionLottie'] as String?) ??
-                      'assets/images/IdleCattt.png';
+                      'assets/images/cat.png';
 
                   final companionEmoji =
                       (data?['companionEmoji'] as String?) ?? '🐱';
@@ -386,7 +407,225 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
+
+        // ── Furniture Inventory Button (Bottom Right) ──────────────────
+        Positioned(
+          right: 24,
+          bottom: kPetFloorOffset + 20,
+          child: _Reveal(
+            animation: _seg(0.3, 0.8),
+            child: Material(
+              color: cs.surface.withValues(alpha: 0.85),
+              shape: const CircleBorder(),
+              elevation: 4,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => _showFurnitureInventory(context, cs),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Icon(
+                    Icons.chair_alt_rounded,
+                    color: cs.primary,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+// ── Room Furniture Widget ─────────────────────────────────────────────────
+
+class _RoomFurniture extends StatelessWidget {
+  const _RoomFurniture();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: user != null
+          ? FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .snapshots()
+          : null,
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>?;
+        final colorVariant = (data?['equippedSofa'] as String?) ?? 'brown';
+
+        final assetPath =
+            _kSofaAssets[colorVariant] ??
+            'assets/images/furniture/sofa_brown.png';
+
+        return SizedBox(
+          width: 90,
+          height: 90,
+          child: Image.asset(
+            assetPath,
+            width: 90,
+            height: 90,
+            fit: BoxFit.contain,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Furniture Inventory Sheet ─────────────────────────────────────────────
+
+class _FurnitureInventorySheet extends StatelessWidget {
+  final ColorScheme cs;
+
+  const _FurnitureInventorySheet({required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).padding.bottom + 20,
+      ),
+      child: _GlassCard(
+        cs: cs,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.chair_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 10),
+                Text(
+                  'Your Furniture',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 90,
+              child: user == null
+                  ? const SizedBox()
+                  : StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .collection('furniture')
+                          .snapshots(),
+                      builder: (context, furnitureSnapshot) {
+                        return StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .snapshots(),
+                          builder: (context, userSnapshot) {
+                            if (!furnitureSnapshot.hasData ||
+                                !userSnapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final userData =
+                                userSnapshot.data?.data()
+                                    as Map<String, dynamic>?;
+                            final equippedSofa =
+                                (userData?['equippedSofa'] as String?) ??
+                                'brown';
+
+                            final docs = furnitureSnapshot.data!.docs;
+                            if (docs.isEmpty) {
+                              return const Center(
+                                child: Text('No furniture owned yet.'),
+                              );
+                            }
+
+                            return ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: docs.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                final furnitureData =
+                                    docs[index].data() as Map<String, dynamic>?;
+                                final variantKey =
+                                    (furnitureData?['variantKey'] as String?) ??
+                                    'brown';
+                                final isEquipped = variantKey == equippedSofa;
+
+                                final assetPath =
+                                    _kSofaAssets[variantKey] ??
+                                    _kSofaAssets['brown']!;
+
+                                return GestureDetector(
+                                  onTap: () async {
+                                    if (!isEquipped) {
+                                      await FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(user.uid)
+                                          .update({'equippedSofa': variantKey});
+                                    }
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 80,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isEquipped
+                                          ? cs.primary.withValues(alpha: 0.15)
+                                          : cs.surface.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isEquipped
+                                            ? cs.primary
+                                            : cs.outlineVariant,
+                                        width: isEquipped ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Image.asset(
+                                            assetPath,
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                        if (isEquipped) ...[
+                                          const SizedBox(height: 4),
+                                          Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 14,
+                                            color: cs.primary,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -499,8 +738,6 @@ class _GlassCard extends StatelessWidget {
   }
 }
 
-// ── Tip button (Star / Inspiration) ─────────────────────────────────────
-
 class _TipButton extends StatelessWidget {
   final ColorScheme cs;
   final VoidCallback onTap;
@@ -534,8 +771,6 @@ class _TipButton extends StatelessWidget {
     );
   }
 }
-
-// ── Top-right stat icon component ──────────────────────────────────────
 
 class _TopStatIcon extends StatelessWidget {
   final ColorScheme cs;
@@ -632,8 +867,6 @@ class _TopStatIcon extends StatelessWidget {
   }
 }
 
-// ── Companion Sprite without Orb background or name label ──────────────────
-
 class _CharacterSprite extends StatelessWidget {
   final String source;
   final String fallbackEmoji;
@@ -725,8 +958,6 @@ class _CharacterSprite extends StatelessWidget {
     );
   }
 }
-
-// ── Tip of the Day sheet content ────────────────────────────────────────
 
 class _TipLoading extends StatelessWidget {
   final ColorScheme cs;
