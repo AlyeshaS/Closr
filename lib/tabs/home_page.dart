@@ -226,7 +226,7 @@ class _HomePageState extends State<HomePage>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.15),
+      barrierColor: Colors.black.withValues(alpha: 0.15),
       isScrollControlled: true,
       builder: (sheetContext) => _FurnitureInventorySheet(cs: cs),
     );
@@ -477,45 +477,164 @@ class _RoomFurniture extends StatelessWidget {
   }
 }
 
-// ── Furniture Inventory Sheet ─────────────────────────────────────────────
+// ── Furniture Inventory Sheet with Theme Beige Style & Sliding Toggle ─────
 
-class _FurnitureInventorySheet extends StatelessWidget {
+class _FurnitureInventorySheet extends StatefulWidget {
   final ColorScheme cs;
 
   const _FurnitureInventorySheet({required this.cs});
 
   @override
+  State<_FurnitureInventorySheet> createState() =>
+      _FurnitureInventorySheetState();
+}
+
+class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
+  String _selectedCategory = 'Sofas';
+
+  final List<String> _categories = ['Sofas', 'Beds', 'Desks', 'Rugs', 'Decor'];
+
+  @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final cs = widget.cs;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).padding.bottom + 20,
+    // Uses your theme's surface container highest tone to match the navbar beige styling
+    final cardBackgroundColor = cs.surface;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.65,
+      // Increased horizontal padding for a wider card presentation
+      padding: EdgeInsets.fromLTRB(
+        12,
+        16,
+        12,
+        MediaQuery.of(context).padding.bottom + 20,
       ),
-      child: _GlassCard(
-        cs: cs,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardBackgroundColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
             Row(
               children: [
-                Icon(Icons.chair_rounded, size: 18, color: cs.primary),
+                Icon(Icons.chair_rounded, size: 20, color: cs.primary),
                 const SizedBox(width: 10),
                 Text(
-                  'Your Furniture',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  'Furniture Inventory',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 90,
+
+            // Sliding Toggle Bar for Categories with Elevation & Shadows
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(color: cs.onSurface.withValues(alpha: 0.05)),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final activeIndex = _categories.indexOf(_selectedCategory);
+                  final tabWidth =
+                      (constraints.maxWidth - 4) / _categories.length;
+
+                  return Stack(
+                    children: [
+                      AnimatedAlign(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.fastOutSlowIn,
+                        alignment: Alignment(
+                          -1.0 + (2.0 / (_categories.length - 1)) * activeIndex,
+                          0,
+                        ),
+                        child: Container(
+                          width: tabWidth,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: cs.surface,
+                            borderRadius: BorderRadius.circular(100),
+                            boxShadow: [
+                              BoxShadow(
+                                color: cs.primary.withValues(alpha: 0.15),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: _categories.map((category) {
+                          final active = category == _selectedCategory;
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _selectedCategory = category),
+                              behavior: HitTestBehavior.opaque,
+                              child: SizedBox(
+                                height: 38,
+                                child: Center(
+                                  child: Text(
+                                    category,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: active
+                                          ? FontWeight.w500
+                                          : FontWeight.w300,
+                                      color: active
+                                          ? cs.onSurface
+                                          : cs.onSurfaceVariant.withValues(
+                                              alpha: 0.8,
+                                            ),
+                                      letterSpacing: 0.1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Item Grid Content
+            Expanded(
               child: user == null
                   ? const SizedBox()
                   : StreamBuilder<QuerySnapshot>(
@@ -546,20 +665,41 @@ class _FurnitureInventorySheet extends StatelessWidget {
                                 'brown';
 
                             final docs = furnitureSnapshot.data!.docs;
-                            if (docs.isEmpty) {
-                              return const Center(
-                                child: Text('No furniture owned yet.'),
+
+                            final filteredDocs = docs.where((doc) {
+                              final data = doc.data() as Map<String, dynamic>?;
+                              final category =
+                                  (data?['category'] as String?) ?? 'Sofas';
+                              return category.toLowerCase() ==
+                                  _selectedCategory.toLowerCase();
+                            }).toList();
+
+                            if (filteredDocs.isEmpty) {
+                              return Center(
+                                child: Text(
+                                  'No items unlocked in $_selectedCategory yet.',
+                                  style: TextStyle(
+                                    color: cs.onSurfaceVariant,
+                                    fontSize: 14,
+                                  ),
+                                ),
                               );
                             }
 
-                            return ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: docs.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
+                            return GridView.builder(
+                              physics: const BouncingScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    mainAxisSpacing: 12,
+                                    crossAxisSpacing: 12,
+                                    childAspectRatio: 1.1,
+                                  ),
+                              itemCount: filteredDocs.length,
                               itemBuilder: (context, index) {
                                 final furnitureData =
-                                    docs[index].data() as Map<String, dynamic>?;
+                                    filteredDocs[index].data()
+                                        as Map<String, dynamic>?;
                                 final variantKey =
                                     (furnitureData?['variantKey'] as String?) ??
                                     'brown';
@@ -580,12 +720,12 @@ class _FurnitureInventorySheet extends StatelessWidget {
                                   },
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    width: 80,
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: isEquipped
-                                          ? cs.primary.withValues(alpha: 0.15)
-                                          : cs.surface.withValues(alpha: 0.5),
+                                          ? cs.primary.withValues(alpha: 0.12)
+                                          : cs.surfaceContainerHighest
+                                                .withValues(alpha: 0.3),
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color: isEquipped
@@ -594,24 +734,25 @@ class _FurnitureInventorySheet extends StatelessWidget {
                                         width: isEquipped ? 2 : 1,
                                       ),
                                     ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                                    child: Stack(
+                                      alignment: Alignment.center,
                                       children: [
-                                        Expanded(
+                                        Center(
                                           child: Image.asset(
                                             assetPath,
                                             fit: BoxFit.contain,
                                           ),
                                         ),
-                                        if (isEquipped) ...[
-                                          const SizedBox(height: 4),
-                                          Icon(
-                                            Icons.check_circle_rounded,
-                                            size: 14,
-                                            color: cs.primary,
+                                        if (isEquipped)
+                                          Positioned(
+                                            top: 4,
+                                            right: 4,
+                                            child: Icon(
+                                              Icons.check_circle_rounded,
+                                              size: 16,
+                                              color: cs.primary,
+                                            ),
                                           ),
-                                        ],
                                       ],
                                     ),
                                   ),
