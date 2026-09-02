@@ -245,19 +245,25 @@ class _HomePageState extends State<HomePage>
       children: [
         // ── Room background ────────────────────────────────────────────
         Positioned.fill(
-          child: StreamBuilder<DocumentSnapshot>(
+          child: StreamBuilder<QuerySnapshot>(
             stream: user != null
                 ? FirebaseFirestore.instance
                       .collection('users')
                       .doc(user.uid)
+                      .collection('furniture')
+                      .where('isEquipped', isEqualTo: true)
                       .snapshots()
                 : null,
             builder: (context, snapshot) {
-              final data = snapshot.data?.data() as Map<String, dynamic>?;
-              final equippedRoomKey =
-                  (data?['equippedRoom'] as String?) ?? 'room_bg';
-              final roomAsset =
-                  _kRoomBackgrounds[equippedRoomKey] ?? kRoomBackgroundAsset;
+              var roomAsset = kRoomBackgroundAsset;
+              if (snapshot.hasData) {
+                for (final doc in snapshot.data!.docs) {
+                  if (_kRoomBackgrounds.containsKey(doc.id)) {
+                    roomAsset = _kRoomBackgrounds[doc.id]!;
+                    break;
+                  }
+                }
+              }
 
               return Transform.scale(
                 scale: 1.18,
@@ -523,19 +529,38 @@ class _RoomFurniture extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    return StreamBuilder<DocumentSnapshot>(
+    return StreamBuilder<QuerySnapshot>(
       stream: user != null
           ? FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
+                .collection('furniture')
+                .where('isEquipped', isEqualTo: true)
                 .snapshots()
           : null,
       builder: (context, snapshot) {
-        final data = snapshot.data?.data() as Map<String, dynamic>?;
-        final colorVariant = (data?['equippedSofa'] as String?) ?? 'brown';
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return SizedBox(
+            width: 90,
+            height: 90,
+            child: Image.asset(
+              'assets/images/furniture/sofa_brown.png',
+              fit: BoxFit.contain,
+            ),
+          );
+        }
 
+        String variantKey = 'brown';
+        for (final doc in snapshot.data!.docs) {
+          if (doc.id.startsWith('sofa_')) {
+            variantKey = doc.id.contains('_')
+                ? doc.id.split('_').last
+                : 'brown';
+            break;
+          }
+        }
         final assetPath =
-            _kSofaAssets[colorVariant] ??
+            _kSofaAssets[variantKey] ??
             'assets/images/furniture/sofa_brown.png';
 
         return SizedBox(
@@ -608,7 +633,7 @@ class _FurnitureInventorySheet extends StatefulWidget {
 }
 
 class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
-  String _selectedCategory = 'Sofas';
+  String _selectedCategory = 'Rooms';
 
   final List<String> _categories = [
     'Rooms',
@@ -761,243 +786,393 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                           .collection('furniture')
                           .snapshots(),
                       builder: (context, furnitureSnapshot) {
-                        return StreamBuilder<DocumentSnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(user.uid)
-                              .snapshots(),
-                          builder: (context, userSnapshot) {
-                            if (!furnitureSnapshot.hasData ||
-                                !userSnapshot.hasData) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
+                        if (!furnitureSnapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        final docs = furnitureSnapshot.data!.docs;
+                        final isRoomCategory =
+                            _selectedCategory.toLowerCase() == 'rooms';
+
+                        if (isRoomCategory) {
+                          final roomKeys = _kRoomBackgrounds.keys.toList();
+
+                          final hasEquippedRoom = docs.any((doc) {
+                            if (!_kRoomBackgrounds.containsKey(doc.id)) {
+                              return false;
                             }
+                            final data = doc.data() as Map<String, dynamic>?;
+                            return data?['isEquipped'] == true;
+                          });
 
-                            final userData =
-                                userSnapshot.data?.data()
-                                    as Map<String, dynamic>?;
-                            final equippedSofa =
-                                (userData?['equippedSofa'] as String?) ??
-                                'brown';
-                            final equippedRoom =
-                                (userData?['equippedRoom'] as String?) ??
-                                'room_bg';
-
-                            final isRoomCategory =
-                                _selectedCategory.toLowerCase() == 'rooms';
-                            if (isRoomCategory) {
-                              final roomKeys = _kRoomBackgrounds.keys.toList();
-                              return GridView.builder(
-                                physics: const BouncingScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      mainAxisSpacing: 12,
-                                      crossAxisSpacing: 12,
-                                      childAspectRatio: 1.5,
-                                    ),
-                                itemCount: roomKeys.length,
-                                itemBuilder: (context, index) {
-                                  final roomKey = roomKeys[index];
-                                  final isEquipped = roomKey == equippedRoom;
-
-                                  return GestureDetector(
-                                    onTap: () async {
-                                      if (!isEquipped &&
-                                          user != null &&
-                                          user.email != null) {
-                                        final firestore =
-                                            FirebaseFirestore.instance;
-                                        final userDoc = await firestore
-                                            .collection('users')
-                                            .doc(user.uid)
-                                            .get();
-                                        final data = userDoc.data() ?? {};
-                                        final partnerEmail =
-                                            ((data['partnerEmailLower']
-                                                        as String?) ??
-                                                    (data['partnerEmail']
-                                                        as String?) ??
-                                                    '')
-                                                .trim()
-                                                .toLowerCase();
-
-                                        final userQuery = await firestore
-                                            .collection('users')
-                                            .where(
-                                              'email',
-                                              isEqualTo: user.email,
-                                            )
-                                            .get();
-                                        final partnerQuery =
-                                            partnerEmail.isNotEmpty
-                                            ? await firestore
-                                                  .collection('users')
-                                                  .where(
-                                                    'email',
-                                                    isEqualTo: partnerEmail,
-                                                  )
-                                                  .get()
-                                            : null;
-
-                                        final batch = firestore.batch();
-                                        for (final doc in userQuery.docs) {
-                                          batch.set(doc.reference, {
-                                            'equippedRoom': roomKey,
-                                          }, SetOptions(merge: true));
-                                        }
-                                        if (partnerQuery != null) {
-                                          for (final doc in partnerQuery.docs) {
-                                            batch.set(
-                                              doc.reference,
-                                              {'equippedRoom': roomKey},
-                                              SetOptions(merge: true),
-                                            );
-                                          }
-                                        }
-                                        await batch.commit();
-                                      }
-                                    },
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: isEquipped
-                                              ? cs.primary
-                                              : cs.outlineVariant,
-                                          width: isEquipped ? 2 : 1,
-                                        ),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(14),
-                                        child: Stack(
-                                          fit: StackFit.expand,
-                                          children: [
-                                            Image.asset(
-                                              _kRoomBackgrounds[roomKey]!,
-                                              fit: BoxFit.cover,
-                                              alignment: Alignment.bottomCenter,
-                                            ),
-                                            if (isEquipped)
-                                              Container(
-                                                color: cs.primary.withValues(
-                                                  alpha: 0.2,
-                                                ),
-                                                child: Center(
-                                                  child: Icon(
-                                                    Icons.check_circle_rounded,
-                                                    color: cs.primary,
-                                                    size: 28,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            }
-
-                            final docs = furnitureSnapshot.data!.docs;
-
-                            final filteredDocs = docs.where((doc) {
-                              final data = doc.data() as Map<String, dynamic>?;
-                              final category =
-                                  (data?['category'] as String?) ?? 'Sofas';
-                              return category.toLowerCase() ==
-                                  _selectedCategory.toLowerCase();
-                            }).toList();
-
-                            if (filteredDocs.isEmpty) {
-                              return Center(
-                                child: Text(
-                                  'No items unlocked in $_selectedCategory yet.',
-                                  style: TextStyle(
-                                    color: cs.onSurfaceVariant,
-                                    fontSize: 14,
-                                  ),
+                          return GridView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  childAspectRatio: 1.5,
                                 ),
-                              );
-                            }
+                            itemCount: roomKeys.length,
+                            itemBuilder: (context, index) {
+                              final roomKey = roomKeys[index];
 
-                            return GridView.builder(
-                              physics: const BouncingScrollPhysics(),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    mainAxisSpacing: 12,
-                                    crossAxisSpacing: 12,
-                                    childAspectRatio: 1.1,
-                                  ),
-                              itemCount: filteredDocs.length,
-                              itemBuilder: (context, index) {
-                                final furnitureData =
-                                    filteredDocs[index].data()
-                                        as Map<String, dynamic>?;
-                                final variantKey =
-                                    (furnitureData?['variantKey'] as String?) ??
-                                    'brown';
-                                final isEquipped = variantKey == equippedSofa;
+                              final roomDoc = docs
+                                  .where((d) => d.id == roomKey)
+                                  .firstOrNull;
+                              final roomData =
+                                  roomDoc?.data() as Map<String, dynamic>?;
+                              final isEquippedExplicitly =
+                                  roomData?['isEquipped'] == true;
 
-                                final assetPath =
-                                    _kSofaAssets[variantKey] ??
-                                    _kSofaAssets['brown']!;
+                              final actuallyEquipped =
+                                  isEquippedExplicitly ||
+                                  (roomKey == 'room_bg' && !hasEquippedRoom);
 
-                                return GestureDetector(
-                                  onTap: () async {
-                                    if (!isEquipped) {
-                                      await FirebaseFirestore.instance
-                                          .collection('users')
-                                          .doc(user.uid)
-                                          .update({'equippedSofa': variantKey});
+                              return GestureDetector(
+                                onTap: () async {
+                                  if (!actuallyEquipped &&
+                                      user != null &&
+                                      user.email != null) {
+                                    final firestore =
+                                        FirebaseFirestore.instance;
+                                    final userDoc = await firestore
+                                        .collection('users')
+                                        .doc(user.uid)
+                                        .get();
+                                    final data = userDoc.data() ?? {};
+                                    final partnerEmail =
+                                        ((data['partnerEmailLower']
+                                                    as String?) ??
+                                                (data['partnerEmail']
+                                                    as String?) ??
+                                                '')
+                                            .trim()
+                                            .toLowerCase();
+
+                                    final userQuery = await firestore
+                                        .collection('users')
+                                        .where('email', isEqualTo: user.email)
+                                        .get();
+                                    final partnerQuery = partnerEmail.isNotEmpty
+                                        ? await firestore
+                                              .collection('users')
+                                              .where(
+                                                'email',
+                                                isEqualTo: partnerEmail,
+                                              )
+                                              .get()
+                                        : null;
+
+                                    final batch = firestore.batch();
+
+                                    Future<void> updateRoomSubcollection(
+                                      DocumentReference userRef,
+                                    ) async {
+                                      final furnitureRef = userRef.collection(
+                                        'furniture',
+                                      );
+                                      final furnitureDocs = await furnitureRef
+                                          .get();
+
+                                      for (final fDoc in furnitureDocs.docs) {
+                                        if (_kRoomBackgrounds.containsKey(
+                                          fDoc.id,
+                                        )) {
+                                          batch.update(fDoc.reference, {
+                                            'isEquipped': false,
+                                          });
+                                        }
+                                      }
+
+                                      batch.set(
+                                        furnitureRef.doc(roomKey),
+                                        {'isEquipped': true},
+                                        SetOptions(merge: true),
+                                      );
                                     }
-                                  },
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: isEquipped
-                                          ? cs.primary.withValues(alpha: 0.12)
-                                          : cs.surfaceContainerHighest
-                                                .withValues(alpha: 0.3),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: isEquipped
-                                            ? cs.primary
-                                            : cs.outlineVariant,
-                                        width: isEquipped ? 2 : 1,
-                                      ),
+
+                                    for (final doc in userQuery.docs) {
+                                      await updateRoomSubcollection(
+                                        doc.reference,
+                                      );
+                                    }
+                                    if (partnerQuery != null) {
+                                      for (final doc in partnerQuery.docs) {
+                                        await updateRoomSubcollection(
+                                          doc.reference,
+                                        );
+                                      }
+                                    }
+
+                                    await batch.commit();
+                                  }
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: actuallyEquipped
+                                          ? cs.primary
+                                          : cs.outlineVariant,
+                                      width: actuallyEquipped ? 2 : 1,
                                     ),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
                                     child: Stack(
-                                      alignment: Alignment.center,
+                                      fit: StackFit.expand,
                                       children: [
-                                        Center(
-                                          child: Image.asset(
-                                            assetPath,
-                                            fit: BoxFit.contain,
-                                          ),
+                                        Image.asset(
+                                          _kRoomBackgrounds[roomKey]!,
+                                          fit: BoxFit.cover,
+                                          alignment: Alignment.bottomCenter,
                                         ),
-                                        if (isEquipped)
-                                          Positioned(
-                                            top: 4,
-                                            right: 4,
-                                            child: Icon(
-                                              Icons.check_circle_rounded,
-                                              size: 16,
-                                              color: cs.primary,
+                                        if (actuallyEquipped)
+                                          Container(
+                                            color: cs.primary.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            child: Center(
+                                              child: Icon(
+                                                Icons.check_circle_rounded,
+                                                color: cs.primary,
+                                                size: 28,
+                                              ),
                                             ),
                                           ),
                                       ],
                                     ),
                                   ),
-                                );
+                                ),
+                              );
+                            },
+                          );
+                        }
+
+                        final filteredDocs = docs.where((doc) {
+                          if (_kRoomBackgrounds.containsKey(doc.id)) {
+                            return false; // Skip rooms in non-room category tabs
+                          }
+                          final data = doc.data() as Map<String, dynamic>?;
+                          final category = (data?['category'] as String?) ?? '';
+                          return category.toLowerCase() ==
+                                  _selectedCategory.toLowerCase() ||
+                              (_selectedCategory.toLowerCase() == 'sofas' &&
+                                  doc.id.startsWith('sofa_'));
+                        }).toList();
+
+                        // Fallback: If user has no furniture docs in Firestore for Sofas yet, show default brown sofa as owned
+                        if (filteredDocs.isEmpty &&
+                            _selectedCategory.toLowerCase() == 'sofas') {
+                          return GridView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  childAspectRatio: 1.1,
+                                ),
+                            itemCount: 1,
+                            itemBuilder: (context, index) {
+                              return GestureDetector(
+                                onTap: () {},
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: cs.primary,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Center(
+                                        child: Image.asset(
+                                          _kSofaAssets['brown']!,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      const Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: Icon(
+                                          Icons.check_circle_rounded,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        }
+
+                        if (filteredDocs.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No items unlocked in $_selectedCategory yet.',
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontSize: 14,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return GridView.builder(
+                          physics: const BouncingScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 1.1,
+                              ),
+                          itemCount: filteredDocs.length,
+                          itemBuilder: (context, index) {
+                            final currentDoc = filteredDocs[index];
+                            final furnitureData =
+                                currentDoc.data() as Map<String, dynamic>?;
+                            final isEquipped =
+                                (furnitureData?['isEquipped'] ?? false) == true;
+
+                            final docId = currentDoc.id;
+                            final variantKey = docId.contains('_')
+                                ? docId.split('_').last
+                                : 'brown';
+
+                            final assetPath =
+                                _kSofaAssets[variantKey] ??
+                                _kSofaAssets['brown']!;
+
+                            return GestureDetector(
+                              onTap: () async {
+                                if (!isEquipped && user != null) {
+                                  final firestore = FirebaseFirestore.instance;
+                                  final batch = firestore.batch();
+                                  final furnitureRef = firestore
+                                      .collection('users')
+                                      .doc(user.uid)
+                                      .collection('furniture');
+
+                                  // 1. Unequip all other sofas in current user subcollection
+                                  final allItems = await furnitureRef.get();
+                                  for (var doc in allItems.docs) {
+                                    final data = doc.data();
+                                    if (doc.id.startsWith('sofa_') ||
+                                        data['category'] == 'Sofas') {
+                                      batch.update(doc.reference, {
+                                        'isEquipped': false,
+                                      });
+                                    }
+                                  }
+
+                                  // 2. Equip selected sofa for user
+                                  batch.set(currentDoc.reference, {
+                                    'isEquipped': true,
+                                    'category': 'Sofas',
+                                    'variantKey': variantKey,
+                                  }, SetOptions(merge: true));
+
+                                  // 3. Sync to partner if partner email exists
+                                  final userDoc = await firestore
+                                      .collection('users')
+                                      .doc(user.uid)
+                                      .get();
+                                  final userData = userDoc.data() ?? {};
+                                  final partnerEmail =
+                                      ((userData['partnerEmailLower']
+                                                  as String?) ??
+                                              (userData['partnerEmail']
+                                                  as String?) ??
+                                              '')
+                                          .trim()
+                                          .toLowerCase();
+
+                                  if (partnerEmail.isNotEmpty) {
+                                    final partnerQuery = await firestore
+                                        .collection('users')
+                                        .where('email', isEqualTo: partnerEmail)
+                                        .get();
+                                    for (var pDoc in partnerQuery.docs) {
+                                      final pFurnitureRef = pDoc.reference
+                                          .collection('furniture');
+                                      final pItems = await pFurnitureRef.get();
+                                      for (var pItemDoc in pItems.docs) {
+                                        final data = pItemDoc.data();
+                                        if (pItemDoc.id.startsWith('sofa_') ||
+                                            data['category'] == 'Sofas') {
+                                          batch.update(pItemDoc.reference, {
+                                            'isEquipped': false,
+                                          });
+                                        }
+                                      }
+                                      batch.set(
+                                        pFurnitureRef.doc(currentDoc.id),
+                                        {
+                                          'isEquipped': true,
+                                          'category': 'Sofas',
+                                          'variantKey': variantKey,
+                                        },
+                                        SetOptions(merge: true),
+                                      );
+                                    }
+                                  }
+
+                                  await batch.commit();
+                                }
                               },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isEquipped
+                                      ? cs.primary.withValues(alpha: 0.12)
+                                      : cs.surfaceContainerHighest.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isEquipped
+                                        ? cs.primary
+                                        : cs.outlineVariant,
+                                    width: isEquipped ? 2 : 1,
+                                  ),
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Center(
+                                      child: Image.asset(
+                                        assetPath,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                    if (isEquipped)
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: Icon(
+                                          Icons.check_circle_rounded,
+                                          size: 16,
+                                          color: cs.primary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             );
                           },
                         );

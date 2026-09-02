@@ -248,6 +248,17 @@ class _SettingsPageState extends State<SettingsPage> {
       ownedIds.add('sofa_brown');
     }
 
+    // Check which item is currently equipped via isEquipped boolean
+    String equippedVariant = 'brown';
+    for (var fDoc in furnitureSnapshot.docs) {
+      final fData = fDoc.data();
+      if (fData['isEquipped'] == true) {
+        final docId = fDoc.id;
+        equippedVariant = docId.contains('_') ? docId.split('_').last : 'brown';
+        break;
+      }
+    }
+
     setState(() {
       _companionEmoji =
           normalized?['emoji'] ?? (data['companionEmoji'] as String?) ?? '🐱';
@@ -260,7 +271,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _companionPoints = (data['companionPoints'] as int?) ?? 0;
 
       _ownedSofaIds = ownedIds;
-      _equippedSofa = (data['equippedSofa'] as String?) ?? 'brown';
+      _equippedSofa = equippedVariant;
 
       _partnerEmail =
           ((data['partnerEmailLower'] as String?) ??
@@ -282,6 +293,7 @@ class _SettingsPageState extends State<SettingsPage> {
     required String partnerEmail,
     required Map<String, dynamic> dataToUpdate,
     Map<String, dynamic>? furnitureItemToAdd,
+    String? equippedFurnitureId,
   }) async {
     final firestore = FirebaseFirestore.instance;
 
@@ -300,22 +312,52 @@ class _SettingsPageState extends State<SettingsPage> {
 
     for (var doc in userQuery.docs) {
       batch.set(doc.reference, dataToUpdate, SetOptions(merge: true));
+
       if (furnitureItemToAdd != null) {
         final furnitureRef = doc.reference
             .collection('furniture')
             .doc(furnitureItemToAdd['id']);
         batch.set(furnitureRef, furnitureItemToAdd['data']);
       }
+
+      if (equippedFurnitureId != null) {
+        final fColl = await doc.reference.collection('furniture').get();
+        for (var fDoc in fColl.docs) {
+          final fData = fDoc.data();
+          final isSofa =
+              fDoc.id.startsWith('sofa_') || fData['category'] == 'Sofas';
+          if (isSofa) {
+            batch.update(fDoc.reference, {
+              'isEquipped': fDoc.id == equippedFurnitureId,
+            });
+          }
+        }
+      }
     }
 
     if (partnerQuery != null) {
       for (var doc in partnerQuery.docs) {
         batch.set(doc.reference, dataToUpdate, SetOptions(merge: true));
+
         if (furnitureItemToAdd != null) {
           final furnitureRef = doc.reference
               .collection('furniture')
               .doc(furnitureItemToAdd['id']);
           batch.set(furnitureRef, furnitureItemToAdd['data']);
+        }
+
+        if (equippedFurnitureId != null) {
+          final fColl = await doc.reference.collection('furniture').get();
+          for (var fDoc in fColl.docs) {
+            final fData = fDoc.data();
+            final isSofa =
+                fDoc.id.startsWith('sofa_') || fData['category'] == 'Sofas';
+            if (isSofa) {
+              batch.update(fDoc.reference, {
+                'isEquipped': fDoc.id == equippedFurnitureId,
+              });
+            }
+          }
         }
       }
     }
@@ -323,7 +365,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await batch.commit();
   }
 
-  Future<void> _equipSofa(String variantKey) async {
+  Future<void> _equipSofa(String sofaId, String variantKey) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.email == null) return;
 
@@ -332,7 +374,16 @@ class _SettingsPageState extends State<SettingsPage> {
     await _syncToPartnerAndSelf(
       userEmail: user.email!,
       partnerEmail: _partnerEmail,
-      dataToUpdate: {'equippedSofa': variantKey},
+      dataToUpdate: {},
+      furnitureItemToAdd: {
+        'id': sofaId,
+        'data': {
+          'isEquipped': true,
+          'category': 'Sofas',
+          'variantKey': variantKey,
+        },
+      },
+      equippedFurnitureId: sofaId,
     );
   }
 
@@ -713,7 +764,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                   ? (isEquipped
                                         ? null
                                         : () async {
-                                            await _equipSofa(item.variantKey);
+                                            await _equipSofa(
+                                              item.id,
+                                              item.variantKey,
+                                            );
                                             setSheet(() {
                                               equippedKey = item.variantKey;
                                             });
@@ -733,19 +787,17 @@ class _SettingsPageState extends State<SettingsPage> {
                                                       FieldValue.increment(
                                                         -item.cost,
                                                       ),
-                                                  'equippedSofa':
-                                                      item.variantKey,
                                                 },
                                                 furnitureItemToAdd: {
                                                   'id': item.id,
                                                   'data': {
+                                                    'isEquipped': true,
+                                                    'category': 'Sofas',
                                                     'variantKey':
                                                         item.variantKey,
-                                                    'title': item.title,
-                                                    'unlockedAt':
-                                                        FieldValue.serverTimestamp(),
                                                   },
                                                 },
+                                                equippedFurnitureId: item.id,
                                               );
 
                                               setSheet(() {
