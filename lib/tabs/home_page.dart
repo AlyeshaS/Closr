@@ -15,6 +15,11 @@ const String kRoomBackgroundAsset = 'assets/images/room_bg.png';
 // How far up from the bottom of the screen the pet sits on the floor.
 const double kPetFloorOffset = 16.0;
 
+const Map<String, String> _kRoomBackgrounds = {
+  'room_bg': 'assets/images/room_bg.png',
+  'room_bg2': 'assets/images/room_bg2.png',
+};
+
 // Sofa asset variant map
 const Map<String, String> _kSofaAssets = {
   'brown': 'assets/images/furniture/sofa_brown.png',
@@ -240,28 +245,44 @@ class _HomePageState extends State<HomePage>
       children: [
         // ── Room background ────────────────────────────────────────────
         Positioned.fill(
-          child: Transform.scale(
-            scale: 1.18,
-            alignment: const Alignment(0, 0.18),
-            child: Image.asset(
-              kRoomBackgroundAsset,
-              fit: BoxFit.cover,
-              alignment: Alignment.bottomCenter,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        cs.primaryContainer.withValues(alpha: 0.6),
-                        cs.surface,
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+          child: StreamBuilder<DocumentSnapshot>(
+            stream: user != null
+                ? FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .snapshots()
+                : null,
+            builder: (context, snapshot) {
+              final data = snapshot.data?.data() as Map<String, dynamic>?;
+              final equippedRoomKey =
+                  (data?['equippedRoom'] as String?) ?? 'room_bg';
+              final roomAsset =
+                  _kRoomBackgrounds[equippedRoomKey] ?? kRoomBackgroundAsset;
+
+              return Transform.scale(
+                scale: 1.18,
+                alignment: const Alignment(0, 0.18),
+                child: Image.asset(
+                  roomAsset,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.bottomCenter,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            cs.primaryContainer.withValues(alpha: 0.6),
+                            cs.surface,
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ),
 
@@ -589,7 +610,14 @@ class _FurnitureInventorySheet extends StatefulWidget {
 class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   String _selectedCategory = 'Sofas';
 
-  final List<String> _categories = ['Sofas', 'Beds', 'Desks', 'Rugs', 'Decor'];
+  final List<String> _categories = [
+    'Rooms',
+    'Sofas',
+    'Beds',
+    'Desks',
+    'Rugs',
+    'Decor',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -752,6 +780,129 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                             final equippedSofa =
                                 (userData?['equippedSofa'] as String?) ??
                                 'brown';
+                            final equippedRoom =
+                                (userData?['equippedRoom'] as String?) ??
+                                'room_bg';
+
+                            final isRoomCategory =
+                                _selectedCategory.toLowerCase() == 'rooms';
+                            if (isRoomCategory) {
+                              final roomKeys = _kRoomBackgrounds.keys.toList();
+                              return GridView.builder(
+                                physics: const BouncingScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      mainAxisSpacing: 12,
+                                      crossAxisSpacing: 12,
+                                      childAspectRatio: 1.5,
+                                    ),
+                                itemCount: roomKeys.length,
+                                itemBuilder: (context, index) {
+                                  final roomKey = roomKeys[index];
+                                  final isEquipped = roomKey == equippedRoom;
+
+                                  return GestureDetector(
+                                    onTap: () async {
+                                      if (!isEquipped &&
+                                          user != null &&
+                                          user.email != null) {
+                                        final firestore =
+                                            FirebaseFirestore.instance;
+                                        final userDoc = await firestore
+                                            .collection('users')
+                                            .doc(user.uid)
+                                            .get();
+                                        final data = userDoc.data() ?? {};
+                                        final partnerEmail =
+                                            ((data['partnerEmailLower']
+                                                        as String?) ??
+                                                    (data['partnerEmail']
+                                                        as String?) ??
+                                                    '')
+                                                .trim()
+                                                .toLowerCase();
+
+                                        final userQuery = await firestore
+                                            .collection('users')
+                                            .where(
+                                              'email',
+                                              isEqualTo: user.email,
+                                            )
+                                            .get();
+                                        final partnerQuery =
+                                            partnerEmail.isNotEmpty
+                                            ? await firestore
+                                                  .collection('users')
+                                                  .where(
+                                                    'email',
+                                                    isEqualTo: partnerEmail,
+                                                  )
+                                                  .get()
+                                            : null;
+
+                                        final batch = firestore.batch();
+                                        for (final doc in userQuery.docs) {
+                                          batch.set(doc.reference, {
+                                            'equippedRoom': roomKey,
+                                          }, SetOptions(merge: true));
+                                        }
+                                        if (partnerQuery != null) {
+                                          for (final doc in partnerQuery.docs) {
+                                            batch.set(
+                                              doc.reference,
+                                              {'equippedRoom': roomKey},
+                                              SetOptions(merge: true),
+                                            );
+                                          }
+                                        }
+                                        await batch.commit();
+                                      }
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: isEquipped
+                                              ? cs.primary
+                                              : cs.outlineVariant,
+                                          width: isEquipped ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            Image.asset(
+                                              _kRoomBackgrounds[roomKey]!,
+                                              fit: BoxFit.cover,
+                                              alignment: Alignment.bottomCenter,
+                                            ),
+                                            if (isEquipped)
+                                              Container(
+                                                color: cs.primary.withValues(
+                                                  alpha: 0.2,
+                                                ),
+                                                child: Center(
+                                                  child: Icon(
+                                                    Icons.check_circle_rounded,
+                                                    color: cs.primary,
+                                                    size: 28,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            }
 
                             final docs = furnitureSnapshot.data!.docs;
 
