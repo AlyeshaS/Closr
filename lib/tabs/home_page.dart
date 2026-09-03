@@ -1,4 +1,5 @@
 // lib/tabs/home_page.dart
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -127,6 +128,7 @@ class _HomePageState extends State<HomePage>
   late final AnimationController _flicker;
   late final AnimationController _floatController;
   final GeminiService _geminiService = GeminiService();
+  bool _isEditingLayout = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -228,7 +230,14 @@ class _HomePageState extends State<HomePage>
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.15),
       isScrollControlled: true,
-      builder: (sheetContext) => _FurnitureInventorySheet(cs: cs),
+      builder: (sheetContext) => _FurnitureInventorySheet(
+        cs: cs,
+        onEditModeChanged: (isEditing) {
+          setState(() {
+            _isEditingLayout = isEditing;
+          });
+        },
+      ),
     );
   }
 
@@ -292,12 +301,8 @@ class _HomePageState extends State<HomePage>
           ),
         ),
 
-        // ── Room Furniture (Sofa) ─────────────────────────────────────
-        Positioned(
-          left: 50,
-          bottom: kPetFloorOffset + 75,
-          child: const _RoomFurniture(),
-        ),
+        // ── Room Furniture (Sofa) with Edit Grid Support ────────────────
+        Positioned.fill(child: _RoomFurniture(isEditing: _isEditingLayout)),
 
         // ── Foreground layout ──────────────────────────────────────────
         SafeArea(
@@ -520,14 +525,119 @@ class _HomePageState extends State<HomePage>
   }
 }
 
-// ── Room Furniture Widget ─────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Room perspective geometry — the SINGLE source of truth for both the grid
+// that gets painted on screen and the math that positions furniture. Every
+// number here is calibrated against the actual room_bg / room_bg2 art (the
+// back corner and the wall/floor seam), so "where an item can go" always
+// matches "what the grid lines show"[cite: 1].
+// ─────────────────────────────────────────────────────────────────────────
 
-class _RoomFurniture extends StatelessWidget {
-  const _RoomFurniture();
+enum RoomSurface { floor, leftWall, rightWall }
+
+class _RoomPoint {
+  final Offset anchor;
+  final double scale;
+  const _RoomPoint(this.anchor, this.scale);
+}
+
+class _RoomPerspective {
+  const _RoomPerspective(this.size);
+  final Size size;
+
+  // Fraction of the room height where the back corner (where both walls
+  // meet the floor) sits, at screen center. Measured from room_bg.png[cite: 1].
+  static const double kCornerVertexYFrac = 0.605;
+  // The same wall/floor seam slopes downward as it goes outward — this is
+  // how far down it's reached by the time it hits the left/right edges[cite: 1].
+  static const double kSeamEdgeYFrac = 0.68;
+  // How small an item gets at the farthest point of its surface (the back
+  // corner for floor items, the seam for wall items)[cite: 1].
+  static const double kMinDepthScale = 0.55;
+  // >1 compresses grid rows near the vanishing point, like real perspective[cite: 1].
+  static const double kPerspectiveGamma = 1.5;
+
+  double get centerX => size.width / 2;
+  double get cornerVertexY => size.height * kCornerVertexYFrac;
+  double get _seamEdgeY => size.height * kSeamEdgeYFrac;
+
+  double _ease(double t) =>
+      math.pow(t.clamp(0.0, 1.0), kPerspectiveGamma).toDouble();
+
+  /// Y of the wall/floor seam at a horizontal fraction across the screen
+  /// (0 = left edge, 0.5 = the back corner, 1 = right edge). It's a shallow
+  /// "V" peaking at the corner, matching the room art[cite: 1].
+  double seamYAt(double xFrac) {
+    final distFromCenter = (xFrac.clamp(0.0, 1.0) - 0.5).abs() * 2;
+    return lerpDouble(cornerVertexY, _seamEdgeY, distFromCenter)!;
+  }
+
+  /// Floor placement. col: 0 (left) .. 1 (right).
+  /// row: 0 (back, against the wall) .. 1 (front, closest to the viewer)[cite: 1].
+  _RoomPoint floorPoint(double col, double row) {
+    final c = col.clamp(0.0, 1.0);
+    final x = size.width * c;
+    final seamY = seamYAt(c);
+    final t = _ease(row);
+    final y = lerpDouble(seamY, size.height, t)!;
+    final scale = lerpDouble(kMinDepthScale, 1.0, t)!;
+    return _RoomPoint(Offset(x, y), scale);
+  }
+
+  /// Wall placement. col: 0 (at the back corner seam) .. 1 (at the wall's
+  /// outer/front edge). row: 0 (floor) .. 1 (ceiling)[cite: 1].
+  _RoomPoint wallPoint(RoomSurface side, double col, double row) {
+    final outerX = side == RoomSurface.leftWall ? 0.0 : size.width;
+    final dt = _ease(col);
+    final x = lerpDouble(centerX, outerX, dt)!;
+    final xFrac = (x / size.width).clamp(0.0, 1.0);
+    final floorY = seamYAt(xFrac);
+    final y = lerpDouble(floorY, 0, row.clamp(0.0, 1.0))!;
+    final scale = lerpDouble(kMinDepthScale, 1.0, dt)!;
+    return _RoomPoint(Offset(x, y), scale);
+  }
+
+  _RoomPoint pointFor(RoomSurface surface, double col, double row) {
+    if (surface == RoomSurface.floor) return floorPoint(col, row);
+    return wallPoint(surface, col, row);
+  }
+}
+
+class _RoomFurniture extends StatefulWidget {
+  final bool isEditing;
+  const _RoomFurniture({this.isEditing = false});
+
+  @override
+  State<_RoomFurniture> createState() => _RoomFurnitureState();
+}
+
+class _RoomFurnitureState extends State<_RoomFurniture> {
+  static const double kBaseItemSize = 130.0;
+  static const double kStep = 0.08;
+
+  double? _editingCol;
+  double? _editingRow;
+  String? _editingDocId;
+  bool _wasEditing = false;
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final screenSize = MediaQuery.of(context).size;
+    final perspective = _RoomPerspective(screenSize);
+
+    if (_wasEditing && !widget.isEditing) {
+      if (_editingCol != null &&
+          _editingRow != null &&
+          _editingDocId != null &&
+          user != null) {
+        _saveItemPosition(user, _editingDocId!, _editingCol!, _editingRow!);
+      }
+      _editingCol = null;
+      _editingRow = null;
+      _editingDocId = null;
+    }
+    _wasEditing = widget.isEditing;
 
     return StreamBuilder<QuerySnapshot>(
       stream: user != null
@@ -540,42 +650,480 @@ class _RoomFurniture extends StatelessWidget {
           : null,
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return SizedBox(
-            width: 90,
-            height: 90,
-            child: Image.asset(
-              'assets/images/furniture/sofa_brown.png',
-              fit: BoxFit.contain,
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
-        String variantKey = 'brown';
-        for (final doc in snapshot.data!.docs) {
-          if (doc.id.startsWith('sofa_')) {
-            variantKey = doc.id.contains('_')
-                ? doc.id.split('_').last
-                : 'brown';
-            break;
+        final equippedDoc = snapshot.data!.docs.first;
+        final data = equippedDoc.data() as Map<String, dynamic>?;
+        final locationMap = data?['location'] as Map<String, dynamic>?;
+
+        // The surface is a property of the item itself (set on the
+        // furniture doc, e.g. by whoever catalogued it), not something
+        // picked in the editor: 'floor', 'leftWall', or 'rightWall'[cite: 1].
+        final surface = RoomSurface.values.firstWhere(
+          (s) => s.name == (data?['surface'] as String?),
+          orElse: () => RoomSurface.floor,
+        );
+
+        final defaultRow = surface == RoomSurface.floor ? 0.35 : 0.5;
+        final savedCol = (locationMap?['col'] as num?)?.toDouble() ?? 0.5;
+        final savedRow =
+            (locationMap?['row'] as num?)?.toDouble() ?? defaultRow;
+
+        if (_editingDocId != equippedDoc.id) {
+          _editingDocId = equippedDoc.id;
+          if (widget.isEditing) {
+            _editingCol = savedCol;
+            _editingRow = savedRow;
           }
+        }
+        if (widget.isEditing && (_editingCol == null || _editingRow == null)) {
+          _editingCol = savedCol;
+          _editingRow = savedRow;
+        }
+
+        final col = widget.isEditing ? _editingCol! : savedCol;
+        final row = widget.isEditing ? _editingRow! : savedRow;
+
+        String variantKey = 'brown';
+        if (equippedDoc.id.startsWith('sofa_')) {
+          variantKey = equippedDoc.id.contains('_')
+              ? equippedDoc.id.split('_').last
+              : 'brown';
         }
         final assetPath =
             _kSofaAssets[variantKey] ??
             'assets/images/furniture/sofa_brown.png';
 
-        return SizedBox(
-          width: 90,
-          height: 90,
-          child: Image.asset(
-            assetPath,
-            width: 90,
-            height: 90,
-            fit: BoxFit.contain,
-          ),
+        final point = perspective.pointFor(surface, col, row);
+        final itemSize = kBaseItemSize * point.scale;
+        final isFloor = surface == RoomSurface.floor;
+        final left = point.anchor.dx - itemSize / 2;
+        final top = isFloor
+            ? point.anchor.dy - itemSize
+            : point.anchor.dy - itemSize / 2;
+
+        return Stack(
+          children: [
+            if (widget.isEditing)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _RoomGridPainter(activeSurface: surface),
+                ),
+              ),
+
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 150),
+              left: left,
+              top: top,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  SizedBox(
+                    width: itemSize,
+                    height: itemSize,
+                    child: Image.asset(assetPath, fit: BoxFit.contain),
+                  ),
+
+                  if (widget.isEditing) ...[
+                    Positioned(
+                      top: -30,
+                      child: _GridArrowButton(
+                        icon: Icons.keyboard_arrow_up_rounded,
+                        onTap: () => setState(() => _moveVertical(surface, 1)),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -30,
+                      child: _GridArrowButton(
+                        icon: Icons.keyboard_arrow_down_rounded,
+                        onTap: () => setState(() => _moveVertical(surface, -1)),
+                      ),
+                    ),
+                    Positioned(
+                      left: -30,
+                      child: _GridArrowButton(
+                        icon: Icons.keyboard_arrow_left_rounded,
+                        onTap: () =>
+                            setState(() => _moveHorizontal(surface, -1)),
+                      ),
+                    ),
+                    Positioned(
+                      right: -30,
+                      child: _GridArrowButton(
+                        icon: Icons.keyboard_arrow_right_rounded,
+                        onTap: () =>
+                            setState(() => _moveHorizontal(surface, 1)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
   }
+
+  double _clamp01(double v) => v.clamp(0.0, 1.0);
+
+  // "Left"/"right"/"up"/"down" always mean what they look like on screen,
+  // regardless of which surface the item is on — the col/row delta needed
+  // to achieve that differs per surface (see _RoomPerspective)[cite: 1].
+  void _moveHorizontal(RoomSurface surface, int dir) {
+    final sign = surface == RoomSurface.leftWall ? -dir : dir;
+    _editingCol = _clamp01(_editingCol! + sign * kStep);
+  }
+
+  void _moveVertical(RoomSurface surface, int dir) {
+    if (surface == RoomSurface.floor) {
+      // dir 1 = "up" arrow = further back = smaller row[cite: 1].
+      _editingRow = _clamp01(_editingRow! - dir * kStep);
+    } else {
+      // dir 1 = "up" arrow = toward the ceiling = larger row[cite: 1].
+      _editingRow = _clamp01(_editingRow! + dir * kStep);
+    }
+  }
+
+  Future<void> _saveItemPosition(
+    User user,
+    String docId,
+    double col,
+    double row,
+  ) async {
+    final firestore = FirebaseFirestore.instance;
+    final userDoc = await firestore.collection('users').doc(user.uid).get();
+    final data = userDoc.data() ?? {};
+    final partnerEmail =
+        ((data['partnerEmailLower'] as String?) ??
+                (data['partnerEmail'] as String?) ??
+                '')
+            .trim()
+            .toLowerCase();
+
+    final userQuery = await firestore
+        .collection('users')
+        .where('email', isEqualTo: user.email)
+        .get();
+    final partnerQuery = partnerEmail.isNotEmpty
+        ? await firestore
+              .collection('users')
+              .where('email', isEqualTo: partnerEmail)
+              .get()
+        : null;
+
+    final location = {'col': col, 'row': row};
+
+    final batch = firestore.batch();
+    for (final doc in userQuery.docs) {
+      batch.set(doc.reference.collection('furniture').doc(docId), {
+        'location': location,
+      }, SetOptions(merge: true));
+    }
+    if (partnerQuery != null) {
+      for (final doc in partnerQuery.docs) {
+        batch.set(
+          doc.reference.collection('furniture').doc(docId),
+          {'location': location},
+          SetOptions(merge: true),
+        );
+      }
+    }
+    await batch.commit();
+  }
+}
+
+// ── Helper UI Components for Grid & Arrows ──────────────────────────────
+
+class _GridArrowButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _GridArrowButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Room Grid Painter with correct isometric-style diamond floor tiles ───
+
+class _RoomGridPainter extends CustomPainter {
+  final RoomSurface activeSurface;
+  const _RoomGridPainter({required this.activeSurface});
+
+  // These values match the room artwork itself.
+  //
+  // The room is split into:
+  //   • left wall polygon
+  //   • right wall polygon
+  //   • floor polygon
+  //
+  // Drawing inside clipped polygons keeps every line perfectly contained
+  // inside its own surface, like the reference image.
+  static const double _centerX = 0.50;
+
+  // Top centre point where both walls meet.
+  static const double _ceilingCenterY = 0.010;
+
+  // Outer top corners of each wall.
+  static const double _ceilingEdgeY = 0.086;
+
+  // Back floor corner.
+  static const double _floorCornerY = 0.535;
+
+  // Floor/wall seam at the left/right edges.
+  static const double _floorEdgeY = 0.645;
+
+  // Tiny right-side correction so the grid aligns with the background.
+  // Smaller Y = slightly higher on screen.
+  static const double _rightFloorEdgeY = 0.642;
+
+  // Grid density. These values give the same "pixel room" feel as the
+  // generated reference while keeping cells large enough for furniture.
+  static const int _wallColumns = 8;
+  static const int _wallRows = 14;
+  static const int _floorBands = 10;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _paintLeftWall(canvas, size, activeSurface == RoomSurface.leftWall);
+    _paintRightWall(canvas, size, activeSurface == RoomSurface.rightWall);
+    _paintFloor(canvas, size, activeSurface == RoomSurface.floor);
+  }
+
+  Paint _gridPaint(bool active) => Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = active ? 1.15 : 0.85
+    ..color = Colors.black.withValues(alpha: active ? 0.34 : 0.20);
+
+  Offset _p(Size size, double x, double y) =>
+      Offset(size.width * x, size.height * y);
+
+  Path _leftWallPath(Size size) {
+    return Path()
+      ..moveTo(size.width * _centerX, size.height * _ceilingCenterY)
+      ..lineTo(0, size.height * _ceilingEdgeY)
+      ..lineTo(0, size.height * _floorEdgeY)
+      ..lineTo(size.width * _centerX, size.height * _floorCornerY)
+      ..close();
+  }
+
+  Path _rightWallPath(Size size) {
+    return Path()
+      ..moveTo(size.width * _centerX, size.height * _ceilingCenterY)
+      ..lineTo(size.width, size.height * _ceilingEdgeY)
+      ..lineTo(size.width, size.height * _rightFloorEdgeY)
+      ..lineTo(size.width * _centerX, size.height * _floorCornerY)
+      ..close();
+  }
+
+  Path _floorPath(Size size) {
+    return Path()
+      ..moveTo(0, size.height * _floorEdgeY)
+      ..lineTo(size.width * _centerX, size.height * _floorCornerY)
+      ..lineTo(size.width, size.height * _rightFloorEdgeY)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  void _paintLeftWall(Canvas canvas, Size size, bool active) {
+    final paint = _gridPaint(active);
+    final clip = _leftWallPath(size);
+
+    canvas.save();
+    canvas.clipPath(clip);
+
+    // Vertical-ish columns. Each line connects the sloped ceiling edge to
+    // the sloped floor seam, producing straight perspective cells.
+    for (int i = 1; i < _wallColumns; i++) {
+      final t = i / _wallColumns;
+
+      final top = Offset.lerp(
+        _p(size, _centerX, _ceilingCenterY),
+        _p(size, 0, _ceilingEdgeY),
+        t,
+      )!;
+
+      final bottom = Offset.lerp(
+        _p(size, _centerX, _floorCornerY),
+        _p(size, 0, _floorEdgeY),
+        t,
+      )!;
+
+      canvas.drawLine(top, bottom, paint);
+    }
+
+    // Horizontal rows. Interpolating between the ceiling edge and floor
+    // seam keeps the rows straight and parallel to the wall perspective.
+    for (int j = 1; j < _wallRows; j++) {
+      final t = j / _wallRows;
+
+      final inner = Offset.lerp(
+        _p(size, _centerX, _ceilingCenterY),
+        _p(size, _centerX, _floorCornerY),
+        t,
+      )!;
+
+      final outer = Offset.lerp(
+        _p(size, 0, _ceilingEdgeY),
+        _p(size, 0, _floorEdgeY),
+        t,
+      )!;
+
+      canvas.drawLine(inner, outer, paint);
+    }
+
+    canvas.restore();
+  }
+
+  void _paintRightWall(Canvas canvas, Size size, bool active) {
+    final paint = _gridPaint(active);
+    final clip = _rightWallPath(size);
+
+    canvas.save();
+    canvas.clipPath(clip);
+
+    for (int i = 1; i < _wallColumns; i++) {
+      final t = i / _wallColumns;
+
+      final top = Offset.lerp(
+        _p(size, _centerX, _ceilingCenterY),
+        _p(size, 1, _ceilingEdgeY),
+        t,
+      )!;
+
+      final bottom = Offset.lerp(
+        _p(size, _centerX, _floorCornerY),
+        _p(size, 1, _rightFloorEdgeY),
+        t,
+      )!;
+
+      canvas.drawLine(top, bottom, paint);
+    }
+
+    for (int j = 1; j < _wallRows; j++) {
+      final t = j / _wallRows;
+
+      final inner = Offset.lerp(
+        _p(size, _centerX, _ceilingCenterY),
+        _p(size, _centerX, _floorCornerY),
+        t,
+      )!;
+
+      final outer = Offset.lerp(
+        _p(size, 1, _ceilingEdgeY),
+        _p(size, 1, _rightFloorEdgeY),
+        t,
+      )!;
+
+      canvas.drawLine(inner, outer, paint);
+    }
+
+    canvas.restore();
+  }
+
+  void _paintFloor(Canvas canvas, Size size, bool active) {
+    final paint = _gridPaint(active);
+    final floor = _floorPath(size);
+
+    canvas.save();
+    canvas.clipPath(floor);
+
+    final w = size.width;
+    final h = size.height;
+
+    final corner = Offset(w * _centerX, h * _floorCornerY);
+
+    final leftEdge = Offset(0, h * _floorEdgeY);
+
+    final rightEdge = Offset(w, h * _rightFloorEdgeY);
+
+    // IMPORTANT:
+    // The floor lines now use the EXACT SAME seam division points as the
+    // vertical wall-column lines above them.
+    //
+    // That means every wall column ends at a point on the wall/floor seam,
+    // and a floor line begins at that exact same point. Visually the grid
+    // now looks continuous across the corner instead of being two separate
+    // grids that merely have similar spacing.
+
+    // Screen-space slopes of the actual left and right wall/floor seams.
+    final leftSeamSlope = (leftEdge.dy - corner.dy) / (leftEdge.dx - corner.dx);
+    final rightSeamSlope =
+        (rightEdge.dy - corner.dy) / (rightEdge.dx - corner.dx);
+
+    // ── LEFT WALL -> FLOOR ────────────────────────────────────────────
+    //
+    // These start at the same bottom points used by _paintLeftWall().
+    // Once they hit the floor, they travel in the direction parallel to
+    // the RIGHT seam, forming one family of the diamond grid.
+    const int floorOverflowLines = 24;
+
+    for (
+      int i = -floorOverflowLines;
+      i <= _wallColumns + floorOverflowLines;
+      i++
+    ) {
+      final t = i / _wallColumns;
+
+      final start = Offset.lerp(corner, leftEdge, t)!;
+
+      // Continue down-right, parallel to the opposite/right seam.
+      final remainingY = h - start.dy;
+      final dx = rightSeamSlope.abs() < 0.0001
+          ? w
+          : remainingY / rightSeamSlope.abs();
+
+      final end = Offset(start.dx + dx, h);
+
+      canvas.drawLine(start, end, paint);
+    }
+
+    // ── RIGHT WALL -> FLOOR ───────────────────────────────────────────
+    //
+    // These start at the same bottom points used by _paintRightWall().
+    // They continue down-left, parallel to the LEFT seam.
+    for (
+      int i = -floorOverflowLines;
+      i <= _wallColumns + floorOverflowLines;
+      i++
+    ) {
+      final t = i / _wallColumns;
+
+      final start = Offset.lerp(corner, rightEdge, t)!;
+
+      final remainingY = h - start.dy;
+      final dx = leftSeamSlope.abs() < 0.0001
+          ? w
+          : remainingY / leftSeamSlope.abs();
+
+      final end = Offset(start.dx - dx, h);
+
+      canvas.drawLine(start, end, paint);
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoomGridPainter oldDelegate) =>
+      oldDelegate.activeSurface != activeSurface;
 }
 
 // ── Stat Pill Widget ──────────────────────────────────────────────────────
@@ -624,8 +1172,9 @@ class _StatPill extends StatelessWidget {
 
 class _FurnitureInventorySheet extends StatefulWidget {
   final ColorScheme cs;
+  final ValueChanged<bool>? onEditModeChanged;
 
-  const _FurnitureInventorySheet({required this.cs});
+  const _FurnitureInventorySheet({required this.cs, this.onEditModeChanged});
 
   @override
   State<_FurnitureInventorySheet> createState() =>
@@ -634,6 +1183,7 @@ class _FurnitureInventorySheet extends StatefulWidget {
 
 class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   String _selectedCategory = 'Rooms';
+  bool _isEditingLayout = false;
 
   final List<String> _categories = [
     'Rooms',
@@ -651,7 +1201,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
     final cardBackgroundColor = cs.surfaceContainerHighest;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.65,
+      height: MediaQuery.of(context).size.height * 0.70,
       padding: EdgeInsets.fromLTRB(
         12,
         16,
@@ -696,9 +1246,27 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(
+                    _isEditingLayout ? Icons.check_rounded : Icons.edit_rounded,
+                    color: cs.primary,
+                  ),
+                  tooltip: _isEditingLayout
+                      ? 'Save layout'
+                      : 'Edit room layout',
+                  onPressed: () {
+                    setState(() {
+                      _isEditingLayout = !_isEditingLayout;
+                    });
+                    if (widget.onEditModeChanged != null) {
+                      widget.onEditModeChanged!(_isEditingLayout);
+                    }
+                  },
+                ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
@@ -956,17 +1524,15 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
 
                         final filteredDocs = docs.where((doc) {
                           if (_kRoomBackgrounds.containsKey(doc.id)) {
-                            return false; // Skip rooms in non-room category tabs
+                            return false;
                           }
                           final data = doc.data() as Map<String, dynamic>?;
-                          final category = (data?['category'] as String?) ?? '';
+                          final category =
+                              (data?['category'] as String?) ?? 'Sofas';
                           return category.toLowerCase() ==
-                                  _selectedCategory.toLowerCase() ||
-                              (_selectedCategory.toLowerCase() == 'sofas' &&
-                                  doc.id.startsWith('sofa_'));
+                              _selectedCategory.toLowerCase();
                         }).toList();
 
-                        // Fallback: If user has no furniture docs in Firestore for Sofas yet, show default brown sofa as owned
                         if (filteredDocs.isEmpty &&
                             _selectedCategory.toLowerCase() == 'sofas') {
                           return GridView.builder(
@@ -1067,26 +1633,21 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                       .doc(user.uid)
                                       .collection('furniture');
 
-                                  // 1. Unequip all other sofas in current user subcollection
                                   final allItems = await furnitureRef.get();
                                   for (var doc in allItems.docs) {
-                                    final data = doc.data();
-                                    if (doc.id.startsWith('sofa_') ||
-                                        data['category'] == 'Sofas') {
+                                    if (!_kRoomBackgrounds.containsKey(
+                                      doc.id,
+                                    )) {
                                       batch.update(doc.reference, {
                                         'isEquipped': false,
                                       });
                                     }
                                   }
 
-                                  // 2. Equip selected sofa for user
-                                  batch.set(currentDoc.reference, {
+                                  batch.update(currentDoc.reference, {
                                     'isEquipped': true,
-                                    'category': 'Sofas',
-                                    'variantKey': variantKey,
-                                  }, SetOptions(merge: true));
+                                  });
 
-                                  // 3. Sync to partner if partner email exists
                                   final userDoc = await firestore
                                       .collection('users')
                                       .doc(user.uid)
@@ -1111,22 +1672,17 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                           .collection('furniture');
                                       final pItems = await pFurnitureRef.get();
                                       for (var pItemDoc in pItems.docs) {
-                                        final data = pItemDoc.data();
-                                        if (pItemDoc.id.startsWith('sofa_') ||
-                                            data['category'] == 'Sofas') {
+                                        if (!_kRoomBackgrounds.containsKey(
+                                          pItemDoc.id,
+                                        )) {
                                           batch.update(pItemDoc.reference, {
                                             'isEquipped': false,
                                           });
                                         }
                                       }
-                                      batch.set(
+                                      batch.update(
                                         pFurnitureRef.doc(currentDoc.id),
-                                        {
-                                          'isEquipped': true,
-                                          'category': 'Sofas',
-                                          'variantKey': variantKey,
-                                        },
-                                        SetOptions(merge: true),
+                                        {'isEquipped': true},
                                       );
                                     }
                                   }
@@ -1186,139 +1742,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   }
 }
 
-// ── Companion Sprite Widget ───────────────────────────────────────────────
-
-class _CharacterSprite extends StatelessWidget {
-  final String source;
-  final String fallbackEmoji;
-  final List<String> equippedAccessories;
-
-  const _CharacterSprite({
-    super.key,
-    required this.source,
-    this.fallbackEmoji = '🐱',
-    this.equippedAccessories = const [],
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSpriteSheet = source.endsWith('.png');
-
-    final matchingOption = _kCompanions.firstWhere(
-      (c) => c.assetPath == source,
-      orElse: () => _kCompanions.first,
-    );
-
-    return SizedBox(
-      width: 120,
-      height: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: 120,
-            height: 120,
-            child: isSpriteSheet
-                ? Center(
-                    child: Transform.scale(
-                      scale: matchingOption.frameWidth == 64.0
-                          ? 1.8
-                          : (matchingOption.frameWidth == 16.0 ? 4.5 : 3.0),
-                      child: SpriteAnimator(
-                        imagePath: source,
-                        totalFrames: matchingOption.totalFrames,
-                        displayWidth: matchingOption.frameWidth,
-                        displayHeight: matchingOption.frameHeight,
-                        duration: const Duration(milliseconds: 800),
-                      ),
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      fallbackEmoji,
-                      style: const TextStyle(fontSize: 48),
-                    ),
-                  ),
-          ),
-          if (equippedAccessories.contains('cloud_blanket'))
-            Positioned(
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.75),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: const Text('☁️', style: TextStyle(fontSize: 12)),
-              ),
-            ),
-          if (equippedAccessories.contains('moon_halo'))
-            Positioned(
-              top: 10,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
-                child: const Text('🌙', style: TextStyle(fontSize: 14)),
-              ),
-            ),
-          if (equippedAccessories.contains('star_collar'))
-            const Positioned(
-              bottom: 18,
-              child: Text('✨', style: TextStyle(fontSize: 13)),
-            ),
-          if (equippedAccessories.contains('heart_tag'))
-            const Positioned(
-              bottom: 8,
-              child: Text('💗', style: TextStyle(fontSize: 11)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Original Entrance & Design Components ─────────────────────────────────
-
-class _Reveal extends StatelessWidget {
-  final Animation<double> animation;
-  final Widget child;
-  final Offset beginOffset;
-  final double beginScale;
-
-  const _Reveal({
-    required this.animation,
-    required this.child,
-    this.beginOffset = const Offset(0, 0.06),
-    this.beginScale = 1.0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      child: child,
-      builder: (context, child) {
-        final t = animation.value.clamp(0.0, 1.0);
-        return Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(
-              beginOffset.dx * 60 * (1 - t),
-              beginOffset.dy * 60 * (1 - t),
-            ),
-            child: Transform.scale(
-              scale: beginScale + (1 - beginScale) * t,
-              child: child,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
+// ── Glass Card Component ──────────────────────────────────────────────────
 
 class _GlassCard extends StatelessWidget {
   final Widget child;
@@ -1388,39 +1812,7 @@ class _GlassCard extends StatelessWidget {
   }
 }
 
-class _TipButton extends StatelessWidget {
-  final ColorScheme cs;
-  final VoidCallback onTap;
-
-  const _TipButton({required this.cs, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: 0.65),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: cs.primary.withValues(alpha: 0.12),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(Icons.auto_awesome_rounded, size: 18, color: cs.primary),
-        ),
-      ),
-    );
-  }
-}
+// ── Tip Loading & Loaded Components ───────────────────────────────────────
 
 class _TipLoading extends StatelessWidget {
   final ColorScheme cs;
@@ -1544,6 +1936,140 @@ class _TipLoaded extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Reveal Animation Component ────────────────────────────────────────────
+
+class _Reveal extends StatelessWidget {
+  final Animation<double> animation;
+  final Widget child;
+  final Offset beginOffset;
+  final double beginScale;
+
+  const _Reveal({
+    required this.animation,
+    required this.child,
+    this.beginOffset = const Offset(0, 0.06),
+    this.beginScale = 1.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final t = animation.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(
+              beginOffset.dx * 60 * (1 - t),
+              beginOffset.dy * 60 * (1 - t),
+            ),
+            child: Transform.scale(
+              scale: beginScale + (1 - beginScale) * t,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Character Sprite Component ────────────────────────────────────────────
+
+class _CharacterSprite extends StatelessWidget {
+  final String source;
+  final String fallbackEmoji;
+  final List<String> equippedAccessories;
+
+  const _CharacterSprite({
+    super.key,
+    required this.source,
+    this.fallbackEmoji = '🐱',
+    this.equippedAccessories = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSpriteSheet = source.endsWith('.png');
+
+    final matchingOption = _kCompanions.firstWhere(
+      (c) => c.assetPath == source,
+      orElse: () => _kCompanions.first,
+    );
+
+    return SizedBox(
+      width: 120,
+      height: 120,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: isSpriteSheet
+                ? Center(
+                    child: Transform.scale(
+                      scale: matchingOption.frameWidth == 64.0
+                          ? 1.8
+                          : (matchingOption.frameWidth == 16.0 ? 4.5 : 3.0),
+                      child: SpriteAnimator(
+                        imagePath: source,
+                        totalFrames: matchingOption.totalFrames,
+                        displayWidth: matchingOption.frameWidth,
+                        displayHeight: matchingOption.frameHeight,
+                        duration: const Duration(milliseconds: 800),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      fallbackEmoji,
+                      style: const TextStyle(fontSize: 48),
+                    ),
+                  ),
+          ),
+          if (equippedAccessories.contains('cloud_blanket'))
+            Positioned(
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text('☁️', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+          if (equippedAccessories.contains('moon_halo'))
+            Positioned(
+              top: 10,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.4),
+                ),
+                child: const Text('🌙', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          if (equippedAccessories.contains('star_collar'))
+            const Positioned(
+              bottom: 18,
+              child: Text('✨', style: TextStyle(fontSize: 13)),
+            ),
+          if (equippedAccessories.contains('heart_tag'))
+            const Positioned(
+              bottom: 8,
+              child: Text('💗', style: TextStyle(fontSize: 11)),
+            ),
+        ],
+      ),
     );
   }
 }
