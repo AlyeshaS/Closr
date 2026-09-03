@@ -107,6 +107,45 @@ const Map<String, String> _kSofaAssets = {
   'grey': 'assets/images/furniture/sofa_grey.png',
 };
 
+const Map<String, String> _kBedAssets = {
+  'black': 'assets/images/furniture/bed_black.png',
+  'blue': 'assets/images/furniture/bed_blue.png',
+  'green': 'assets/images/furniture/bed_green.png',
+  'orange': 'assets/images/furniture/bed_orange.png',
+  'purple': 'assets/images/furniture/bed_purple.png',
+  'red': 'assets/images/furniture/bed_red.png',
+  'white': 'assets/images/furniture/bed_white.png',
+  'yellow': 'assets/images/furniture/bed_yellow.png',
+};
+
+const Map<String, String> _kDeskAssets = {
+  'beige': 'assets/images/furniture/desk_beige.png',
+  'black': 'assets/images/furniture/desk_black.png',
+  'blue': 'assets/images/furniture/desk_blue.png',
+  'brown': 'assets/images/furniture/desk_brown.png',
+  'purple': 'assets/images/furniture/desk_purple.png',
+  'yellow': 'assets/images/furniture/desk_yellow.png',
+};
+
+const Map<String, String> _kRugAssets = {
+  'blue': 'assets/images/furniture/carpet_blue.png',
+  'brown': 'assets/images/furniture/carpet_brown.png',
+  'green': 'assets/images/furniture/carpet_green.png',
+  'purple': 'assets/images/furniture/carpet_purple.png',
+  'red': 'assets/images/furniture/carpet_red.png',
+  'white': 'assets/images/furniture/carpet_white.png',
+  'yellow': 'assets/images/furniture/carpet_yellow.png',
+};
+
+const Map<String, String> _kDecorAssets = {
+  'aquarium': 'assets/images/furniture/aquarium.png',
+  'bookcase': 'assets/images/furniture/BookCase.png',
+  'candle': 'assets/images/furniture/Candle.png',
+  'dog': 'assets/images/furniture/Dog.png',
+  'television': 'assets/images/furniture/Television.png',
+  'plant': 'assets/images/furniture/Plant.png',
+};
+
 class _CompanionOption {
   final String emoji;
   final String defaultName;
@@ -422,7 +461,6 @@ class _HomePageState extends State<HomePage>
           ),
         ),
 
-        // Smooth dissolve animation overlay covering loading state
         AbsorbPointer(
           absorbing: _isLoadingRoom,
           child: AnimatedOpacity(
@@ -465,6 +503,7 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
+
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -1557,18 +1596,53 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
     'Decor',
   ];
 
-  String _getSofaTitle(String variantKey) {
-    switch (variantKey) {
-      case 'green':
-        return 'Fern Sofa';
-      case 'blue':
-        return 'Sky Sofa';
-      case 'brown':
-        return 'Sand Sofa';
-      case 'grey':
-        return 'Slate Sofa';
+  String _getItemTitle(String category, String variantKey) {
+    final formatted = variantKey.replaceAll('_', ' ');
+    final capitalized = formatted.isEmpty
+        ? ''
+        : formatted[0].toUpperCase() + formatted.substring(1);
+
+    switch (category.toLowerCase()) {
+      case 'sofas':
+        switch (variantKey) {
+          case 'green':
+            return 'Fern Sofa';
+          case 'blue':
+            return 'Sky Sofa';
+          case 'brown':
+            return 'Sand Sofa';
+          case 'grey':
+            return 'Slate Sofa';
+          default:
+            return '$capitalized Sofa';
+        }
+      case 'beds':
+        return '$capitalized Bed';
+      case 'desks':
+        return '$capitalized Desk';
+      case 'rugs':
+        return '$capitalized Rug';
+      case 'decor':
+        return capitalized;
       default:
-        return 'Classic Sofa';
+        return capitalized;
+    }
+  }
+
+  Map<String, String> _getAssetsForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'sofas':
+        return _kSofaAssets;
+      case 'beds':
+        return _kBedAssets;
+      case 'desks':
+        return _kDeskAssets;
+      case 'rugs':
+        return _kRugAssets;
+      case 'decor':
+        return _kDecorAssets;
+      default:
+        return {};
     }
   }
 
@@ -1831,56 +1905,53 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                           );
                         }
 
-                        final isSofaCategory =
-                            _selectedCategory.toLowerCase() == 'sofas';
-                        List<Map<String, dynamic>> filteredSofas = [];
+                        final categoryAssets = _getAssetsForCategory(
+                          _selectedCategory,
+                        );
+                        final prefix =
+                            _selectedCategory.toLowerCase() == 'sofas'
+                            ? 'sofa_'
+                            : (_selectedCategory.toLowerCase() == 'beds'
+                                  ? 'bed_'
+                                  : (_selectedCategory.toLowerCase() == 'desks'
+                                        ? 'desk_'
+                                        : (_selectedCategory.toLowerCase() ==
+                                                  'rugs'
+                                              ? 'carpet_'
+                                              : '')));
 
-                        if (isSofaCategory) {
-                          final uniqueVariants = [
-                            'green',
-                            'blue',
-                            'brown',
-                            'grey',
-                          ];
-                          for (final variant in uniqueVariants) {
-                            final docId = 'sofa_$variant';
-                            QueryDocumentSnapshot? matchDoc;
-                            for (final doc in docs) {
-                              if (doc.id == docId) {
-                                matchDoc = doc;
-                                break;
-                              }
+                        List<Map<String, dynamic>> catalogItems = [];
+
+                        categoryAssets.forEach((variantKey, assetPath) {
+                          final docId = prefix.isNotEmpty
+                              ? '$prefix$variantKey'
+                              : variantKey;
+                          QueryDocumentSnapshot? matchDoc;
+                          for (final doc in docs) {
+                            if (doc.id == docId || doc.id == variantKey) {
+                              matchDoc = doc;
+                              break;
                             }
-                            final data =
-                                matchDoc?.data() as Map<String, dynamic>?;
-                            final isEquipped =
-                                (data?['isEquipped'] ??
-                                    (variant == 'brown' &&
-                                        docs.every(
-                                          (d) =>
-                                              !d.id.startsWith('sofa_') ||
-                                              (d.data()
-                                                      as Map<
-                                                        String,
-                                                        dynamic
-                                                      >)['isEquipped'] !=
-                                                  true,
-                                        ))) ==
-                                true;
-
-                            filteredSofas.add({
-                              'docId': docId,
-                              'doc': matchDoc,
-                              'variantKey': variant,
-                              'isEquipped': isEquipped,
-                            });
                           }
-                        }
 
-                        if (isSofaCategory && filteredSofas.isEmpty) {
+                          final data =
+                              matchDoc?.data() as Map<String, dynamic>?;
+                          final isEquipped =
+                              (data?['isEquipped'] ?? false) == true;
+
+                          catalogItems.add({
+                            'docId': docId,
+                            'doc': matchDoc,
+                            'variantKey': variantKey,
+                            'assetPath': assetPath,
+                            'isEquipped': isEquipped,
+                          });
+                        });
+
+                        if (catalogItems.isEmpty) {
                           return Center(
                             child: Text(
-                              'No items unlocked in $_selectedCategory yet.',
+                              'No items available in $_selectedCategory.',
                               style: TextStyle(
                                 color: cs.onSurfaceVariant,
                                 fontSize: 14,
@@ -1898,39 +1969,19 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                 crossAxisSpacing: 12,
                                 childAspectRatio: 1.15,
                               ),
-                          itemCount: isSofaCategory
-                              ? filteredSofas.length
-                              : docs.length,
+                          itemCount: catalogItems.length,
                           itemBuilder: (context, index) {
-                            String docId;
-                            String variantKey;
-                            bool isEquipped;
-                            QueryDocumentSnapshot? targetDoc;
-
-                            if (isSofaCategory) {
-                              final sofaInfo = filteredSofas[index];
-                              docId = sofaInfo['docId'] as String;
-                              variantKey = sofaInfo['variantKey'] as String;
-                              isEquipped = sofaInfo['isEquipped'] as bool;
-                              targetDoc =
-                                  sofaInfo['doc'] as QueryDocumentSnapshot?;
-                            } else {
-                              targetDoc = docs[index];
-                              docId = targetDoc.id;
-                              variantKey = docId.contains('_')
-                                  ? docId.split('_').last
-                                  : 'brown';
-                              final furnitureData =
-                                  targetDoc.data() as Map<String, dynamic>?;
-                              isEquipped =
-                                  (furnitureData?['isEquipped'] ?? false) ==
-                                  true;
-                            }
-
-                            final assetPath =
-                                _kSofaAssets[variantKey] ??
-                                _kSofaAssets['brown']!;
-                            final sofaTitle = _getSofaTitle(variantKey);
+                            final itemInfo = catalogItems[index];
+                            final docId = itemInfo['docId'] as String;
+                            final variantKey = itemInfo['variantKey'] as String;
+                            final assetPath = itemInfo['assetPath'] as String;
+                            final isEquipped = itemInfo['isEquipped'] as bool;
+                            final targetDoc =
+                                itemInfo['doc'] as QueryDocumentSnapshot?;
+                            final itemTitle = _getItemTitle(
+                              _selectedCategory,
+                              variantKey,
+                            );
 
                             return GestureDetector(
                               onTap: () async {
@@ -1944,7 +1995,11 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
 
                                   final allItems = await furnitureRef.get();
                                   for (var doc in allItems.docs) {
-                                    if (doc.id.startsWith('sofa_')) {
+                                    final dId = doc.id;
+                                    final belongsToCat = prefix.isNotEmpty
+                                        ? dId.startsWith(prefix)
+                                        : categoryAssets.containsKey(dId);
+                                    if (belongsToCat) {
                                       batch.update(doc.reference, {
                                         'isEquipped': false,
                                       });
@@ -1954,12 +2009,15 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                   if (targetDoc != null) {
                                     batch.set(targetDoc.reference, {
                                       'isEquipped': true,
-                                      'category': 'Sofas',
+                                      'category': _selectedCategory,
                                     }, SetOptions(merge: true));
                                   } else {
                                     batch.set(
                                       furnitureRef.doc(docId),
-                                      {'isEquipped': true, 'category': 'Sofas'},
+                                      {
+                                        'isEquipped': true,
+                                        'category': _selectedCategory,
+                                      },
                                       SetOptions(merge: true),
                                     );
                                   }
@@ -1988,7 +2046,11 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                           .collection('furniture');
                                       final pItems = await pFurnitureRef.get();
                                       for (var pItemDoc in pItems.docs) {
-                                        if (pItemDoc.id.startsWith('sofa_')) {
+                                        final pId = pItemDoc.id;
+                                        final pBelongs = prefix.isNotEmpty
+                                            ? pId.startsWith(prefix)
+                                            : categoryAssets.containsKey(pId);
+                                        if (pBelongs) {
                                           batch.update(pItemDoc.reference, {
                                             'isEquipped': false,
                                           });
@@ -1998,7 +2060,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                         pFurnitureRef.doc(docId),
                                         {
                                           'isEquipped': true,
-                                          'category': 'Sofas',
+                                          'category': _selectedCategory,
                                         },
                                         SetOptions(merge: true),
                                       );
@@ -2053,7 +2115,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            sofaTitle,
+                                            itemTitle,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 12,
@@ -2299,7 +2361,6 @@ class _Reveal extends StatelessWidget {
     return AnimatedBuilder(
       animation: animation,
       child: child,
-      // Fixed builder signature: takes (context, child) instead of three arguments
       builder: (context, child) {
         final t = animation.value.clamp(0.0, 1.0);
         return Opacity(
