@@ -40,7 +40,6 @@ class _RoomTheme {
 const Map<String, _RoomTheme> _kRoomThemes = {
   'room_pink': _RoomTheme(
     name: 'Rose Room',
-    // Sampled from room_bg2 - Copy.png
     leftTop: Color(0xFFCD9186),
     leftBottom: Color(0xFFCC9086),
     rightTop: Color(0xFFB87569),
@@ -53,7 +52,6 @@ const Map<String, _RoomTheme> _kRoomThemes = {
   ),
   'room_beige': _RoomTheme(
     name: 'Sand Room',
-    // Sampled from room_bg(3).png
     leftTop: Color(0xFFB99E75),
     leftBottom: Color(0xFFB59B72),
     rightTop: Color(0xFF917B58),
@@ -102,15 +100,13 @@ const Map<String, _RoomTheme> _kRoomThemes = {
   ),
 };
 
-// Sofa asset variant map
 const Map<String, String> _kSofaAssets = {
-  'brown': 'assets/images/furniture/sofa_brown.png',
   'green': 'assets/images/furniture/sofa_green.png',
-  'grey': 'assets/images/furniture/sofa_grey.png',
   'blue': 'assets/images/furniture/sofa_blue.png',
+  'brown': 'assets/images/furniture/sofa_brown.png',
+  'grey': 'assets/images/furniture/sofa_grey.png',
 };
 
-// Companion option helper to support dynamic frame counts per sprite sheet
 class _CompanionOption {
   final String emoji;
   final String defaultName;
@@ -211,6 +207,7 @@ class _HomePageState extends State<HomePage>
   final GeminiService _geminiService = GeminiService();
   bool _isEditingLayout = false;
   String _selectedRoomTheme = 'room_pink';
+  bool _isLoadingRoom = true;
 
   @override
   bool get wantKeepAlive => true;
@@ -237,23 +234,37 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _loadEquippedRoom() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) {
+        setState(() => _isLoadingRoom = false);
+      }
+      return;
+    }
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('furniture')
-        .where('isEquipped', isEqualTo: true)
-        .get();
-    final equippedRoom = snapshot.docs
-        .map((doc) => doc.id)
-        .where(_kRoomThemes.containsKey)
-        .firstOrNull;
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('furniture')
+          .where('isEquipped', isEqualTo: true)
+          .get();
+      final equippedRoom = snapshot.docs
+          .map((doc) => doc.id)
+          .where(_kRoomThemes.containsKey)
+          .firstOrNull;
 
-    if (equippedRoom != null && mounted) {
-      setState(() {
-        _selectedRoomTheme = equippedRoom;
-      });
+      if (mounted) {
+        setState(() {
+          if (equippedRoom != null) {
+            _selectedRoomTheme = equippedRoom;
+          }
+          _isLoadingRoom = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingRoom = false);
+      }
     }
   }
 
@@ -403,11 +414,6 @@ class _HomePageState extends State<HomePage>
     return Stack(
       fit: StackFit.expand,
       children: [
-        // ── Shared room canvas ──────────────────────────────────────────
-        // The background, grid, and furniture are drawn on the SAME
-        // 853 × 1844 canvas first, then the completed room is scaled/cropped
-        // as one unit. This prevents device aspect ratios from moving the
-        // floor/grid relative to the artwork.
         Positioned.fill(
           child: _RoomScene(
             isEditing: _isEditingLayout,
@@ -416,7 +422,49 @@ class _HomePageState extends State<HomePage>
           ),
         ),
 
-        // ── Foreground layout ──────────────────────────────────────────
+        // Smooth dissolve animation overlay covering loading state
+        AbsorbPointer(
+          absorbing: _isLoadingRoom,
+          child: AnimatedOpacity(
+            opacity: _isLoadingRoom ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeInOut,
+            child: ColoredBox(
+              color: cs.surfaceContainerHighest,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.8, end: 1.1),
+                      duration: const Duration(milliseconds: 900),
+                      curve: Curves.easeInOut,
+                      builder: (context, scale, child) {
+                        return Transform.scale(
+                          scale: scale,
+                          child: Icon(
+                            Icons.chair_alt_rounded,
+                            size: 48,
+                            color: cs.primary,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -444,7 +492,6 @@ class _HomePageState extends State<HomePage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Hello Greeting
                         RichText(
                           text: TextSpan(
                             style: Theme.of(context).textTheme.displayMedium,
@@ -461,8 +508,6 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                         const SizedBox(height: 14),
-
-                        // Tip of the Day Button with Sparkle Icon at front
                         Material(
                           color: cs.surface.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(16),
@@ -504,8 +549,6 @@ class _HomePageState extends State<HomePage>
                           ),
                         ),
                         const SizedBox(height: 12),
-
-                        // Heart and Fire stats as rounded rectangle pills
                         Row(
                           children: [
                             Expanded(
@@ -564,8 +607,6 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
-
-        // ── Companion, sitting cleanly on the floor ────────────────────
         Positioned(
           left: 0,
           right: 0,
@@ -606,8 +647,6 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
-
-        // ── Furniture Inventory Button (Bottom Right) ──────────────────
         Positioned(
           right: 24,
           bottom: kPetFloorOffset + 20,
@@ -637,45 +676,23 @@ class _HomePageState extends State<HomePage>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Room perspective geometry — the SINGLE source of truth for both the grid
-// that gets painted on screen and the math that positions furniture. Every
-// number here is calibrated against the actual room_bg / room_bg2 art (the
-// back corner and the wall/floor seam), so "where an item can go" always
-// matches "what the grid lines show"[cite: 1].
-// ─────────────────────────────────────────────────────────────────────────
-
 enum RoomSurface { floor, leftWall, rightWall }
 
 class _RoomCanvas {
-  // IMPORTANT: every room background should use this exact canvas size.
-  // The uploaded room background is 853 × 1844.
   static const Size size = Size(853, 1844);
-
-  // Preserve the exact visual zoom/alignment the old background used.
   static const double displayScale = 1.0;
   static const Alignment displayScaleAlignment = Alignment(0, 0.18);
 }
 
 class _RoomGeometry {
-  // ONE source of truth for the NEW 853 × 1844 room artwork.
-  //
-  // These values were calibrated against the visible room edges and the
-  // LOWER baseboard/floor seam in the new background. Because the room,
-  // grid, and furniture all share this same fixed canvas, these points stay
-  // locked to the artwork on every device.
-
-  // Visible room bounds inside the 853 × 1844 PNG.
   static const double leftX = 0.0;
   static const double centerX = 0.5;
   static const double rightX = 1.0;
 
-  // Ceiling / wall outline.
   static const double ceilingCenterY = 41 / 1844;
   static const double ceilingLeftEdgeY = 166 / 1844;
   static const double ceilingRightEdgeY = 166 / 1844;
 
-  // LOWER edge of the baseboard = actual beginning of usable floor.
   static const double floorCornerY = 1090 / 1844;
   static const double floorLeftEdgeY = 1223 / 1844;
   static const double floorRightEdgeY = 1221 / 1844;
@@ -711,8 +728,6 @@ class _RoomScene extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // The room itself is painted from the exact same geometry
-                // used by the grid and furniture.
                 CustomPaint(
                   painter: _RoomBackgroundPainter(
                     theme:
@@ -720,7 +735,6 @@ class _RoomScene extends StatelessWidget {
                         _kRoomThemes['room_pink']!,
                   ),
                 ),
-
                 _RoomFurniture(isEditing: isEditing),
               ],
             ),
@@ -791,11 +805,9 @@ class _RoomBackgroundPainter extends CustomPainter {
 
   Path _floorPath(Size size) {
     final r = _roomRect(size);
-
     final left = _p(size, _RoomGeometry.leftX, _RoomGeometry.floorLeftEdgeY);
     final corner = _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY);
     final right = _p(size, _RoomGeometry.rightX, _RoomGeometry.floorRightEdgeY);
-
     final bottomRight = Offset(
       r.left + r.width * _RoomGeometry.rightX,
       r.bottom,
@@ -822,11 +834,7 @@ class _RoomBackgroundPainter extends CustomPainter {
       _RoomGeometry.leftX,
       _RoomGeometry.floorLeftEdgeY,
     );
-
-    // The floor seam is the BOTTOM edge of the baseboard.
-    // The whole light rim sits ABOVE that seam, entirely inside the wall.
     const thickness = 22.0;
-
     final topCorner = Offset(wallCorner.dx, wallCorner.dy - thickness);
     final topLeft = Offset(wallLeft.dx, wallLeft.dy - thickness);
 
@@ -849,9 +857,7 @@ class _RoomBackgroundPainter extends CustomPainter {
       _RoomGeometry.rightX,
       _RoomGeometry.floorRightEdgeY,
     );
-
     const thickness = 22.0;
-
     final topCorner = Offset(wallCorner.dx, wallCorner.dy - thickness);
     final topRight = Offset(wallRight.dx, wallRight.dy - thickness);
 
@@ -866,9 +872,6 @@ class _RoomBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final room = _roomRect(size);
-
-    // Fill outside the room with a dark pink so there are never transparent
-    // strips if the room outline doesn't touch a device edge.
     canvas.drawRect(room, Paint()..color = theme.leftTop);
 
     final leftWallPaint = Paint()
@@ -893,12 +896,9 @@ class _RoomBackgroundPainter extends CustomPainter {
       ).createShader(room);
 
     canvas.drawPath(_leftWallPath(size), leftWallPaint);
-
     canvas.drawPath(_rightWallPath(size), rightWallPaint);
-
     canvas.drawPath(_floorPath(size), floorPaint);
 
-    // Baseboards are generated mathematically from the same wall/floor seam.
     final baseboardPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
@@ -909,7 +909,6 @@ class _RoomBackgroundPainter extends CustomPainter {
     canvas.drawPath(_baseboardLeftPath(size), baseboardPaint);
     canvas.drawPath(_baseboardRightPath(size), baseboardPaint);
 
-    // Central vertical seam.
     final topCenter = Offset(
       room.left + room.width * _RoomGeometry.centerX,
       room.top,
@@ -948,19 +947,13 @@ class _RoomPerspective {
   static const double kPerspectiveGamma = 1.5;
 
   Rect get roomRect => Offset.zero & size;
-
   double get leftX => roomRect.left + roomRect.width * _RoomGeometry.leftX;
-
   double get centerX => roomRect.left + roomRect.width * _RoomGeometry.centerX;
-
   double get rightX => roomRect.left + roomRect.width * _RoomGeometry.rightX;
-
   double get cornerVertexY =>
       roomRect.top + roomRect.height * _RoomGeometry.floorCornerY;
-
   double get _leftSeamEdgeY =>
       roomRect.top + roomRect.height * _RoomGeometry.floorLeftEdgeY;
-
   double get _rightSeamEdgeY =>
       roomRect.top + roomRect.height * _RoomGeometry.floorRightEdgeY;
 
@@ -973,40 +966,30 @@ class _RoomPerspective {
       final t = denom.abs() < 0.0001
           ? 0.0
           : ((centerX - x) / denom).clamp(0.0, 1.0);
-
       return lerpDouble(cornerVertexY, _leftSeamEdgeY, t)!;
     }
-
     final denom = rightX - centerX;
     final t = denom.abs() < 0.0001
         ? 0.0
         : ((x - centerX) / denom).clamp(0.0, 1.0);
-
     return lerpDouble(cornerVertexY, _rightSeamEdgeY, t)!;
   }
 
   _RoomPoint floorPoint(double col, double row) {
     final c = col.clamp(0.0, 1.0);
-
-    // Furniture columns span only the visible room, excluding the PNG's
-    // black side margins.
     final x = lerpDouble(leftX, rightX, c)!;
     final seamY = seamYAtCanvasX(x);
-
     final t = _ease(row);
     final y = lerpDouble(seamY, roomRect.bottom, t)!;
     final scale = lerpDouble(kMinDepthScale, 1.0, t)!;
-
     return _RoomPoint(Offset(x, y), scale);
   }
 
   _RoomPoint wallPoint(RoomSurface side, double col, double row) {
     final outerX = side == RoomSurface.leftWall ? leftX : rightX;
-
     final dt = _ease(col);
     final x = lerpDouble(centerX, outerX, dt)!;
     final floorY = seamYAtCanvasX(x);
-
     final ceilingY = side == RoomSurface.leftWall
         ? lerpDouble(
             roomRect.top + roomRect.height * _RoomGeometry.ceilingCenterY,
@@ -1018,11 +1001,8 @@ class _RoomPerspective {
             roomRect.top + roomRect.height * _RoomGeometry.ceilingRightEdgeY,
             dt,
           )!;
-
     final y = lerpDouble(floorY, ceilingY, row.clamp(0.0, 1.0))!;
-
     final scale = lerpDouble(kMinDepthScale, 1.0, dt)!;
-
     return _RoomPoint(Offset(x, y), scale);
   }
 
@@ -1030,7 +1010,6 @@ class _RoomPerspective {
     if (surface == RoomSurface.floor) {
       return floorPoint(col, row);
     }
-
     return wallPoint(surface, col, row);
   }
 }
@@ -1088,13 +1067,21 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
               return const SizedBox.shrink();
             }
 
-            final equippedDoc = snapshot.data!.docs.first;
+            final equippedDocs = snapshot.data!.docs.where((doc) {
+              return _kSofaAssets.containsKey(
+                    doc.id.replaceFirst('sofa_', ''),
+                  ) ||
+                  doc.id.startsWith('sofa_');
+            }).toList();
+
+            if (equippedDocs.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            final equippedDoc = equippedDocs.first;
             final data = equippedDoc.data() as Map<String, dynamic>?;
             final locationMap = data?['location'] as Map<String, dynamic>?;
 
-            // The surface is a property of the item itself (set on the
-            // furniture doc, e.g. by whoever catalogued it), not something
-            // picked in the editor: 'floor', 'leftWall', or 'rightWall'[cite: 1].
             final surface = RoomSurface.values.firstWhere(
               (s) => s.name == (data?['surface'] as String?),
               orElse: () => RoomSurface.floor,
@@ -1209,9 +1196,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
 
   double _clamp01(double v) => v.clamp(0.0, 1.0);
 
-  // "Left"/"right"/"up"/"down" always mean what they look like on screen,
-  // regardless of which surface the item is on — the col/row delta needed
-  // to achieve that differs per surface (see _RoomPerspective)[cite: 1].
   void _moveHorizontal(RoomSurface surface, int dir) {
     final sign = surface == RoomSurface.leftWall ? -dir : dir;
     _editingCol = _clamp01(_editingCol! + sign * kStep);
@@ -1219,10 +1203,8 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
 
   void _moveVertical(RoomSurface surface, int dir) {
     if (surface == RoomSurface.floor) {
-      // dir 1 = "up" arrow = further back = smaller row[cite: 1].
       _editingRow = _clamp01(_editingRow! - dir * kStep);
     } else {
-      // dir 1 = "up" arrow = toward the ceiling = larger row[cite: 1].
       _editingRow = _clamp01(_editingRow! + dir * kStep);
     }
   }
@@ -1275,8 +1257,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
   }
 }
 
-// ── Helper UI Components for Grid & Arrows ──────────────────────────────
-
 class _GridArrowButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -1300,8 +1280,6 @@ class _GridArrowButton extends StatelessWidget {
   }
 }
 
-// ── Room Grid Painter with correct isometric-style diamond floor tiles ───
-
 class _RoomGridPainter extends CustomPainter {
   final RoomSurface activeSurface;
 
@@ -1310,9 +1288,7 @@ class _RoomGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     _paintLeftWall(canvas, size, activeSurface == RoomSurface.leftWall);
-
     _paintRightWall(canvas, size, activeSurface == RoomSurface.rightWall);
-
     _paintFloor(canvas, size, activeSurface == RoomSurface.floor);
   }
 
@@ -1325,17 +1301,13 @@ class _RoomGridPainter extends CustomPainter {
 
   Offset _p(Size size, double x, double y) {
     final r = _roomRect(size);
-
     return Offset(r.left + r.width * x, r.top + r.height * y);
   }
 
   Path _leftWallPath(Size size) {
     final a = _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY);
-
     final b = _p(size, _RoomGeometry.leftX, _RoomGeometry.ceilingLeftEdgeY);
-
     final c = _p(size, _RoomGeometry.leftX, _RoomGeometry.floorLeftEdgeY);
-
     final d = _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY);
 
     return Path()
@@ -1348,11 +1320,8 @@ class _RoomGridPainter extends CustomPainter {
 
   Path _rightWallPath(Size size) {
     final a = _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY);
-
     final b = _p(size, _RoomGeometry.rightX, _RoomGeometry.ceilingRightEdgeY);
-
     final c = _p(size, _RoomGeometry.rightX, _RoomGeometry.floorRightEdgeY);
-
     final d = _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY);
 
     return Path()
@@ -1365,18 +1334,13 @@ class _RoomGridPainter extends CustomPainter {
 
   Path _floorPath(Size size) {
     final r = _roomRect(size);
-
     final left = _p(size, _RoomGeometry.leftX, _RoomGeometry.floorLeftEdgeY);
-
     final corner = _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY);
-
     final right = _p(size, _RoomGeometry.rightX, _RoomGeometry.floorRightEdgeY);
-
     final bottomRight = Offset(
       r.left + r.width * _RoomGeometry.rightX,
       r.bottom,
     );
-
     final bottomLeft = Offset(r.left + r.width * _RoomGeometry.leftX, r.bottom);
 
     return Path()
@@ -1390,109 +1354,90 @@ class _RoomGridPainter extends CustomPainter {
 
   void _paintLeftWall(Canvas canvas, Size size, bool active) {
     final paint = _gridPaint(active);
-
     canvas.save();
     canvas.clipPath(_leftWallPath(size));
 
     for (int i = 1; i < _RoomGeometry.wallColumns; i++) {
       final t = i / _RoomGeometry.wallColumns;
-
       final top = Offset.lerp(
         _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
         _p(size, _RoomGeometry.leftX, _RoomGeometry.ceilingLeftEdgeY),
         t,
       )!;
-
       final bottom = Offset.lerp(
         _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY),
         _p(size, _RoomGeometry.leftX, _RoomGeometry.floorLeftEdgeY),
         t,
       )!;
-
       canvas.drawLine(top, bottom, paint);
     }
 
     for (int j = 1; j < _RoomGeometry.wallRows; j++) {
       final t = j / _RoomGeometry.wallRows;
-
       final inner = Offset.lerp(
         _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
         _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY),
         t,
       )!;
-
       final outer = Offset.lerp(
         _p(size, _RoomGeometry.leftX, _RoomGeometry.ceilingLeftEdgeY),
         _p(size, _RoomGeometry.leftX, _RoomGeometry.floorLeftEdgeY),
         t,
       )!;
-
       canvas.drawLine(inner, outer, paint);
     }
-
     canvas.restore();
   }
 
   void _paintRightWall(Canvas canvas, Size size, bool active) {
     final paint = _gridPaint(active);
-
     canvas.save();
     canvas.clipPath(_rightWallPath(size));
 
     for (int i = 1; i < _RoomGeometry.wallColumns; i++) {
       final t = i / _RoomGeometry.wallColumns;
-
       final top = Offset.lerp(
         _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
         _p(size, _RoomGeometry.rightX, _RoomGeometry.ceilingRightEdgeY),
         t,
       )!;
-
       final bottom = Offset.lerp(
         _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY),
         _p(size, _RoomGeometry.rightX, _RoomGeometry.floorRightEdgeY),
         t,
       )!;
-
       canvas.drawLine(top, bottom, paint);
     }
 
     for (int j = 1; j < _RoomGeometry.wallRows; j++) {
       final t = j / _RoomGeometry.wallRows;
-
       final inner = Offset.lerp(
         _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
         _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY),
         t,
       )!;
-
       final outer = Offset.lerp(
         _p(size, _RoomGeometry.rightX, _RoomGeometry.ceilingRightEdgeY),
         _p(size, _RoomGeometry.rightX, _RoomGeometry.floorRightEdgeY),
         t,
       )!;
-
       canvas.drawLine(inner, outer, paint);
     }
-
     canvas.restore();
   }
 
   void _paintFloor(Canvas canvas, Size size, bool active) {
     final paint = _gridPaint(active);
     final room = _roomRect(size);
-
     canvas.save();
     canvas.clipPath(_floorPath(size));
 
     final corner = _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY);
-
     final leftEdge = _p(
       size,
       _RoomGeometry.leftX,
       _RoomGeometry.floorLeftEdgeY,
     );
-
     final rightEdge = _p(
       size,
       _RoomGeometry.rightX,
@@ -1500,50 +1445,38 @@ class _RoomGridPainter extends CustomPainter {
     );
 
     final leftSeamSlope = (leftEdge.dy - corner.dy) / (leftEdge.dx - corner.dx);
-
     final rightSeamSlope =
         (rightEdge.dy - corner.dy) / (rightEdge.dx - corner.dx);
 
     const int floorOverflowLines = 24;
 
-    // Continue the LEFT wall columns onto the floor.
     for (
       int i = -floorOverflowLines;
       i <= _RoomGeometry.wallColumns + floorOverflowLines;
       i++
     ) {
       final t = i / _RoomGeometry.wallColumns;
-
       final start = Offset.lerp(corner, leftEdge, t)!;
-
       final remainingY = room.bottom - start.dy;
-
       final dx = rightSeamSlope.abs() < 0.0001
           ? room.width
           : remainingY / rightSeamSlope.abs();
-
       canvas.drawLine(start, Offset(start.dx + dx, room.bottom), paint);
     }
 
-    // Continue the RIGHT wall columns onto the floor.
     for (
       int i = -floorOverflowLines;
       i <= _RoomGeometry.wallColumns + floorOverflowLines;
       i++
     ) {
       final t = i / _RoomGeometry.wallColumns;
-
       final start = Offset.lerp(corner, rightEdge, t)!;
-
       final remainingY = room.bottom - start.dy;
-
       final dx = leftSeamSlope.abs() < 0.0001
           ? room.width
           : remainingY / leftSeamSlope.abs();
-
       canvas.drawLine(start, Offset(start.dx - dx, room.bottom), paint);
     }
-
     canvas.restore();
   }
 
@@ -1552,8 +1485,6 @@ class _RoomGridPainter extends CustomPainter {
     return oldDelegate.activeSurface != activeSurface;
   }
 }
-
-// ── Stat Pill Widget ──────────────────────────────────────────────────────
 
 class _StatPill extends StatelessWidget {
   final ColorScheme cs;
@@ -1595,8 +1526,6 @@ class _StatPill extends StatelessWidget {
   }
 }
 
-// ── Furniture Inventory Sheet with Theme Beige Style & Sliding Toggle ─────
-
 class _FurnitureInventorySheet extends StatefulWidget {
   final ColorScheme cs;
   final ValueChanged<bool>? onEditModeChanged;
@@ -1627,6 +1556,21 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
     'Rugs',
     'Decor',
   ];
+
+  String _getSofaTitle(String variantKey) {
+    switch (variantKey) {
+      case 'green':
+        return 'Fern Sofa';
+      case 'blue':
+        return 'Sky Sofa';
+      case 'brown':
+        return 'Sand Sofa';
+      case 'grey':
+        return 'Slate Sofa';
+      default:
+        return 'Classic Sofa';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1887,67 +1831,53 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                           );
                         }
 
-                        final filteredDocs = docs.where((doc) {
-                          final data = doc.data() as Map<String, dynamic>?;
-                          final category =
-                              (data?['category'] as String?) ?? 'Sofas';
-                          return category.toLowerCase() ==
-                              _selectedCategory.toLowerCase();
-                        }).toList();
+                        final isSofaCategory =
+                            _selectedCategory.toLowerCase() == 'sofas';
+                        List<Map<String, dynamic>> filteredSofas = [];
 
-                        if (filteredDocs.isEmpty &&
-                            _selectedCategory.toLowerCase() == 'sofas') {
-                          return GridView.builder(
-                            physics: const BouncingScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  mainAxisSpacing: 12,
-                                  crossAxisSpacing: 12,
-                                  childAspectRatio: 1.1,
-                                ),
-                            itemCount: 1,
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () {},
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: cs.primary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: cs.primary,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Center(
-                                        child: Image.asset(
-                                          _kSofaAssets['brown']!,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                      const Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: Icon(
-                                          Icons.check_circle_rounded,
-                                          size: 16,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
+                        if (isSofaCategory) {
+                          final uniqueVariants = [
+                            'green',
+                            'blue',
+                            'brown',
+                            'grey',
+                          ];
+                          for (final variant in uniqueVariants) {
+                            final docId = 'sofa_$variant';
+                            QueryDocumentSnapshot? matchDoc;
+                            for (final doc in docs) {
+                              if (doc.id == docId) {
+                                matchDoc = doc;
+                                break;
+                              }
+                            }
+                            final data =
+                                matchDoc?.data() as Map<String, dynamic>?;
+                            final isEquipped =
+                                (data?['isEquipped'] ??
+                                    (variant == 'brown' &&
+                                        docs.every(
+                                          (d) =>
+                                              !d.id.startsWith('sofa_') ||
+                                              (d.data()
+                                                      as Map<
+                                                        String,
+                                                        dynamic
+                                                      >)['isEquipped'] !=
+                                                  true,
+                                        ))) ==
+                                true;
+
+                            filteredSofas.add({
+                              'docId': docId,
+                              'doc': matchDoc,
+                              'variantKey': variant,
+                              'isEquipped': isEquipped,
+                            });
+                          }
                         }
 
-                        if (filteredDocs.isEmpty) {
+                        if (isSofaCategory && filteredSofas.isEmpty) {
                           return Center(
                             child: Text(
                               'No items unlocked in $_selectedCategory yet.',
@@ -1963,27 +1893,44 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                           physics: const BouncingScrollPhysics(),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
+                                crossAxisCount: 2,
                                 mainAxisSpacing: 12,
                                 crossAxisSpacing: 12,
-                                childAspectRatio: 1.1,
+                                childAspectRatio: 1.15,
                               ),
-                          itemCount: filteredDocs.length,
+                          itemCount: isSofaCategory
+                              ? filteredSofas.length
+                              : docs.length,
                           itemBuilder: (context, index) {
-                            final currentDoc = filteredDocs[index];
-                            final furnitureData =
-                                currentDoc.data() as Map<String, dynamic>?;
-                            final isEquipped =
-                                (furnitureData?['isEquipped'] ?? false) == true;
+                            String docId;
+                            String variantKey;
+                            bool isEquipped;
+                            QueryDocumentSnapshot? targetDoc;
 
-                            final docId = currentDoc.id;
-                            final variantKey = docId.contains('_')
-                                ? docId.split('_').last
-                                : 'brown';
+                            if (isSofaCategory) {
+                              final sofaInfo = filteredSofas[index];
+                              docId = sofaInfo['docId'] as String;
+                              variantKey = sofaInfo['variantKey'] as String;
+                              isEquipped = sofaInfo['isEquipped'] as bool;
+                              targetDoc =
+                                  sofaInfo['doc'] as QueryDocumentSnapshot?;
+                            } else {
+                              targetDoc = docs[index];
+                              docId = targetDoc.id;
+                              variantKey = docId.contains('_')
+                                  ? docId.split('_').last
+                                  : 'brown';
+                              final furnitureData =
+                                  targetDoc.data() as Map<String, dynamic>?;
+                              isEquipped =
+                                  (furnitureData?['isEquipped'] ?? false) ==
+                                  true;
+                            }
 
                             final assetPath =
                                 _kSofaAssets[variantKey] ??
                                 _kSofaAssets['brown']!;
+                            final sofaTitle = _getSofaTitle(variantKey);
 
                             return GestureDetector(
                               onTap: () async {
@@ -1997,14 +1944,25 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
 
                                   final allItems = await furnitureRef.get();
                                   for (var doc in allItems.docs) {
-                                    batch.update(doc.reference, {
-                                      'isEquipped': false,
-                                    });
+                                    if (doc.id.startsWith('sofa_')) {
+                                      batch.update(doc.reference, {
+                                        'isEquipped': false,
+                                      });
+                                    }
                                   }
 
-                                  batch.update(currentDoc.reference, {
-                                    'isEquipped': true,
-                                  });
+                                  if (targetDoc != null) {
+                                    batch.set(targetDoc.reference, {
+                                      'isEquipped': true,
+                                      'category': 'Sofas',
+                                    }, SetOptions(merge: true));
+                                  } else {
+                                    batch.set(
+                                      furnitureRef.doc(docId),
+                                      {'isEquipped': true, 'category': 'Sofas'},
+                                      SetOptions(merge: true),
+                                    );
+                                  }
 
                                   final userDoc = await firestore
                                       .collection('users')
@@ -2030,13 +1988,19 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                           .collection('furniture');
                                       final pItems = await pFurnitureRef.get();
                                       for (var pItemDoc in pItems.docs) {
-                                        batch.update(pItemDoc.reference, {
-                                          'isEquipped': false,
-                                        });
+                                        if (pItemDoc.id.startsWith('sofa_')) {
+                                          batch.update(pItemDoc.reference, {
+                                            'isEquipped': false,
+                                          });
+                                        }
                                       }
-                                      batch.update(
-                                        pFurnitureRef.doc(currentDoc.id),
-                                        {'isEquipped': true},
+                                      batch.set(
+                                        pFurnitureRef.doc(docId),
+                                        {
+                                          'isEquipped': true,
+                                          'category': 'Sofas',
+                                        },
+                                        SetOptions(merge: true),
                                       );
                                     }
                                   }
@@ -2045,14 +2009,9 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                 }
                               },
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
+                                duration: const Duration(milliseconds: 180),
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: isEquipped
-                                      ? cs.primary.withValues(alpha: 0.12)
-                                      : cs.surfaceContainerHighest.withValues(
-                                          alpha: 0.3,
-                                        ),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: isEquipped
@@ -2061,25 +2020,57 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                     width: isEquipped ? 2 : 1,
                                   ),
                                 ),
-                                child: Stack(
-                                  alignment: Alignment.center,
+                                child: Column(
                                   children: [
-                                    Center(
-                                      child: Image.asset(
-                                        assetPath,
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                    if (isEquipped)
-                                      Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: Icon(
-                                          Icons.check_circle_rounded,
-                                          size: 16,
-                                          color: cs.primary,
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            Container(
+                                              color: cs.surfaceContainerHighest
+                                                  .withValues(alpha: 0.3),
+                                              child: const SizedBox.expand(),
+                                            ),
+                                            Center(
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(
+                                                  8.0,
+                                                ),
+                                                child: Image.asset(
+                                                  assetPath,
+                                                  fit: BoxFit.contain,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
+                                    ),
+                                    const SizedBox(height: 7),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            sofaTitle,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: isEquipped
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        if (isEquipped)
+                                          Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 17,
+                                            color: cs.primary,
+                                          ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -2095,8 +2086,6 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
     );
   }
 }
-
-// ── Glass Card Component ──────────────────────────────────────────────────
 
 class _GlassCard extends StatelessWidget {
   final Widget child;
@@ -2165,8 +2154,6 @@ class _GlassCard extends StatelessWidget {
     );
   }
 }
-
-// ── Tip Loading & Loaded Components ───────────────────────────────────────
 
 class _TipLoading extends StatelessWidget {
   final ColorScheme cs;
@@ -2294,8 +2281,6 @@ class _TipLoaded extends StatelessWidget {
   }
 }
 
-// ── Reveal Animation Component ────────────────────────────────────────────
-
 class _Reveal extends StatelessWidget {
   final Animation<double> animation;
   final Widget child;
@@ -2314,6 +2299,7 @@ class _Reveal extends StatelessWidget {
     return AnimatedBuilder(
       animation: animation,
       child: child,
+      // Fixed builder signature: takes (context, child) instead of three arguments
       builder: (context, child) {
         final t = animation.value.clamp(0.0, 1.0);
         return Opacity(
@@ -2333,8 +2319,6 @@ class _Reveal extends StatelessWidget {
     );
   }
 }
-
-// ── Character Sprite Component ────────────────────────────────────────────
 
 class _CharacterSprite extends StatelessWidget {
   final String source;
