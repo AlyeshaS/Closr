@@ -7,143 +7,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../gemini_service.dart';
 import '../widgets/sprite_animator.dart';
+import '../models/room_theme.dart';
+import '../models/furniture_meta.dart';
 
 // How far up from the bottom of the screen the pet sits on the floor.
 const double kPetFloorOffset = 16.0;
 
-class _RoomTheme {
-  final String name;
-  final Color leftTop;
-  final Color leftBottom;
-  final Color rightTop;
-  final Color rightBottom;
-  final Color floorTop;
-  final Color floorBottom;
-  final Color baseboardLight;
-  final Color baseboardDark;
-  final Color seam;
-
-  const _RoomTheme({
-    required this.name,
-    required this.leftTop,
-    required this.leftBottom,
-    required this.rightTop,
-    required this.rightBottom,
-    required this.floorTop,
-    required this.floorBottom,
-    required this.baseboardLight,
-    required this.baseboardDark,
-    required this.seam,
-  });
-}
-
-const Map<String, _RoomTheme> _kRoomThemes = {
-  'room_pink': _RoomTheme(
-    name: 'Rose Room',
-    leftTop: Color(0xFFCD9186),
-    leftBottom: Color(0xFFCC9086),
-    rightTop: Color(0xFFB87569),
-    rightBottom: Color(0xFFB8766A),
-    floorTop: Color(0xFFA8685C),
-    floorBottom: Color(0xFFA7665A),
-    baseboardLight: Color(0xFFD99B90),
-    baseboardDark: Color(0xFFB87569),
-    seam: Color(0xFF8E554C),
-  ),
-  'room_beige': _RoomTheme(
-    name: 'Sand Room',
-    leftTop: Color(0xFFB99E75),
-    leftBottom: Color(0xFFB59B72),
-    rightTop: Color(0xFF917B58),
-    rightBottom: Color(0xFF927D5A),
-    floorTop: Color(0xFFB69A7D),
-    floorBottom: Color(0xFFB29679),
-    baseboardLight: Color(0xFFBCA57C),
-    baseboardDark: Color(0xFF8F7957),
-    seam: Color(0xFF69583F),
-  ),
-  'room_blue': _RoomTheme(
-    name: 'Sky Room',
-    leftTop: Color(0xFF9FC5D8),
-    leftBottom: Color(0xFF8EB6CC),
-    rightTop: Color(0xFF789EB8),
-    rightBottom: Color(0xFF6B91AA),
-    floorTop: Color(0xFF7099AA),
-    floorBottom: Color(0xFF628A9B),
-    baseboardLight: Color(0xFFB8D7E4),
-    baseboardDark: Color(0xFF6C92A8),
-    seam: Color(0xFF4F7183),
-  ),
-  'room_green': _RoomTheme(
-    name: 'Fern Room',
-    leftTop: Color(0xFFA9C9B1),
-    leftBottom: Color(0xFF97BDA1),
-    rightTop: Color(0xFF789F87),
-    rightBottom: Color(0xFF6B9279),
-    floorTop: Color(0xFF70977B),
-    floorBottom: Color(0xFF62886E),
-    baseboardLight: Color(0xFFC4DEC7),
-    baseboardDark: Color(0xFF6C9277),
-    seam: Color(0xFF4E7058),
-  ),
-  'room_lavender': _RoomTheme(
-    name: 'Lavender Room',
-    leftTop: Color(0xFFC3B8D6),
-    leftBottom: Color(0xFFB1A5C8),
-    rightTop: Color(0xFF9688B0),
-    rightBottom: Color(0xFF887AA4),
-    floorTop: Color(0xFF8D7FA0),
-    floorBottom: Color(0xFF7D708F),
-    baseboardLight: Color(0xFFD9D0E6),
-    baseboardDark: Color(0xFF897BA2),
-    seam: Color(0xFF665777),
-  ),
-};
-
-const Map<String, String> _kSofaAssets = {
-  'green': 'assets/images/furniture/sofa_green.png',
-  'blue': 'assets/images/furniture/sofa_blue.png',
-  'brown': 'assets/images/furniture/sofa_brown.png',
-  'grey': 'assets/images/furniture/sofa_grey.png',
-};
-
-const Map<String, String> _kBedAssets = {
-  'black': 'assets/images/furniture/bed_black.png',
-  'blue': 'assets/images/furniture/bed_blue.png',
-  'green': 'assets/images/furniture/bed_green.png',
-  'orange': 'assets/images/furniture/bed_orange.png',
-  'purple': 'assets/images/furniture/bed_purple.png',
-  'red': 'assets/images/furniture/bed_red.png',
-  'white': 'assets/images/furniture/bed_white.png',
-  'yellow': 'assets/images/furniture/bed_yellow.png',
-};
-
-const Map<String, String> _kDeskAssets = {
-  'beige': 'assets/images/furniture/desk_beige.png',
-  'black': 'assets/images/furniture/desk_black.png',
-  'blue': 'assets/images/furniture/desk_blue.png',
-  'brown': 'assets/images/furniture/desk_brown.png',
-  'purple': 'assets/images/furniture/desk_purple.png',
-  'yellow': 'assets/images/furniture/desk_yellow.png',
-};
-
-const Map<String, String> _kRugAssets = {
-  'blue': 'assets/images/furniture/carpet_blue.png',
-  'brown': 'assets/images/furniture/carpet_brown.png',
-  'green': 'assets/images/furniture/carpet_green.png',
-  'purple': 'assets/images/furniture/carpet_purple.png',
-  'red': 'assets/images/furniture/carpet_red.png',
-  'white': 'assets/images/furniture/carpet_white.png',
-  'yellow': 'assets/images/furniture/carpet_yellow.png',
-};
-
-const Map<String, String> _kDecorAssets = {
-  'aquarium': 'assets/images/furniture/aquarium.png',
-  'bookcase': 'assets/images/furniture/BookCase.png',
-  'candle': 'assets/images/furniture/Candle.png',
-  'dog': 'assets/images/furniture/Dog.png',
-  'television': 'assets/images/furniture/Television.png',
-  'plant': 'assets/images/furniture/Plant.png',
+const Map<String, String> _kCompanionsImages = {
+  '🐱': 'assets/images/cat.png',
+  '🐶': 'assets/images/dog.png',
+  '🐢': 'assets/images/turtle.png',
+  '🐻': 'assets/images/bear.png',
+  '🐦': 'assets/images/IdleBird.png',
+  '🐰': 'assets/images/bunny.png',
+  '🐨': 'assets/images/koala.png',
 };
 
 class _CompanionOption {
@@ -289,7 +166,7 @@ class _HomePageState extends State<HomePage>
           .get();
       final equippedRoom = snapshot.docs
           .map((doc) => doc.id)
-          .where(_kRoomThemes.containsKey)
+          .where(kRoomThemes.containsKey)
           .firstOrNull;
 
       if (mounted) {
@@ -392,9 +269,9 @@ class _HomePageState extends State<HomePage>
           setState(() => _selectedRoomTheme = themeKey);
           await _equipRoomForCouple(themeKey);
         },
-        onEditModeChanged: (isEditing) {
+        onEditModeRequested: () {
           setState(() {
-            _isEditingLayout = isEditing;
+            _isEditingLayout = true;
           });
         },
       ),
@@ -403,7 +280,7 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _equipRoomForCouple(String themeKey) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || !_kRoomThemes.containsKey(themeKey)) return;
+    if (user == null || !kRoomThemes.containsKey(themeKey)) return;
 
     final firestore = FirebaseFirestore.instance;
     final userRef = firestore.collection('users').doc(user.uid);
@@ -430,10 +307,10 @@ class _HomePageState extends State<HomePage>
     final batch = firestore.batch();
     for (final ref in userRefs) {
       final furnitureRef = ref.collection('furniture');
-      for (final roomKey in _kRoomThemes.keys) {
+      for (final roomKey in kRoomThemes.keys) {
         batch.set(furnitureRef.doc(roomKey), {
           'type': 'room',
-          'name': _kRoomThemes[roomKey]!.name,
+          'name': kRoomThemes[roomKey]!.name,
           'themeKey': roomKey,
           'isEquipped': roomKey == themeKey,
         }, SetOptions(merge: true));
@@ -458,11 +335,19 @@ class _HomePageState extends State<HomePage>
             isEditing: _isEditingLayout,
             colorScheme: cs,
             roomThemeKey: _selectedRoomTheme,
+            onToggleEditing: (val) {
+              setState(() {
+                _isEditingLayout = val;
+              });
+            },
           ),
         ),
 
-        AbsorbPointer(
-          absorbing: _isLoadingRoom,
+        IgnorePointer(
+          // AnimatedOpacity at opacity 0 still participates in hit testing.
+          // After loading, ignore this full-screen overlay so room controls
+          // underneath (including the furniture arrows) can receive taps.
+          ignoring: !_isLoadingRoom,
           child: AnimatedOpacity(
             opacity: _isLoadingRoom ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 700),
@@ -504,145 +389,150 @@ class _HomePageState extends State<HomePage>
           ),
         ),
 
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Reveal(
-                  animation: _seg(0.0, 0.45),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardBackgroundColor.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.5),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cs.shadow.withValues(alpha: 0.08),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
+        IgnorePointer(
+          ignoring: _isEditingLayout,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Reveal(
+                    animation: _seg(0.0, 0.45),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cardBackgroundColor.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.5),
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        RichText(
-                          text: TextSpan(
-                            style: Theme.of(context).textTheme.displayMedium,
+                        boxShadow: [
+                          BoxShadow(
+                            color: cs.shadow.withValues(alpha: 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          RichText(
+                            text: TextSpan(
+                              style: Theme.of(context).textTheme.displayMedium,
+                              children: [
+                                const TextSpan(text: 'Hello, '),
+                                TextSpan(
+                                  text: '$firstName.',
+                                  style: TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Material(
+                            color: cs.surface.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: () => _showTipSheet(context, cs),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.auto_awesome_rounded,
+                                      size: 18,
+                                      color: cs.primary,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Daily inspiration',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: cs.onSurface,
+                                          ),
+                                    ),
+                                    const Spacer(),
+                                    Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 18,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
                             children: [
-                              const TextSpan(text: 'Hello, '),
-                              TextSpan(
-                                text: '$firstName.',
-                                style: TextStyle(
-                                  fontStyle: FontStyle.italic,
-                                  color: cs.primary,
+                              Expanded(
+                                child: StreamBuilder<QuerySnapshot>(
+                                  stream: user != null
+                                      ? FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(user.uid)
+                                            .collection('matched_suggestions')
+                                            .snapshots()
+                                      : null,
+                                  builder: (context, snapshot) {
+                                    final count =
+                                        snapshot.data?.docs.length ?? 0;
+                                    return _StatPill(
+                                      cs: cs,
+                                      icon: Icons.favorite_rounded,
+                                      tint: cs.primary,
+                                      label: '$count matches',
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: StreamBuilder<DocumentSnapshot>(
+                                  stream: user != null
+                                      ? FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(user.uid)
+                                            .snapshots()
+                                      : null,
+                                  builder: (context, snapshot) {
+                                    final data =
+                                        snapshot.data?.data()
+                                            as Map<String, dynamic>?;
+                                    final streak =
+                                        (data?['sharedStreakCurrent']
+                                            as int?) ??
+                                        (data?['streakCurrent'] as int?) ??
+                                        0;
+                                    return _StatPill(
+                                      cs: cs,
+                                      icon: Icons.local_fire_department_rounded,
+                                      tint: const Color(0xFFFF8A3D),
+                                      label: '$streak day streak',
+                                    );
+                                  },
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        Material(
-                          color: cs.surface.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(16),
-                          child: InkWell(
-                            onTap: () => _showTipSheet(context, cs),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 18,
-                                    color: cs.primary,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    'Daily inspiration',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: cs.onSurface,
-                                        ),
-                                  ),
-                                  const Spacer(),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 18,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: StreamBuilder<QuerySnapshot>(
-                                stream: user != null
-                                    ? FirebaseFirestore.instance
-                                          .collection('users')
-                                          .doc(user.uid)
-                                          .collection('matched_suggestions')
-                                          .snapshots()
-                                    : null,
-                                builder: (context, snapshot) {
-                                  final count = snapshot.data?.docs.length ?? 0;
-                                  return _StatPill(
-                                    cs: cs,
-                                    icon: Icons.favorite_rounded,
-                                    tint: cs.primary,
-                                    label: '$count matches',
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: StreamBuilder<DocumentSnapshot>(
-                                stream: user != null
-                                    ? FirebaseFirestore.instance
-                                          .collection('users')
-                                          .doc(user.uid)
-                                          .snapshots()
-                                    : null,
-                                builder: (context, snapshot) {
-                                  final data =
-                                      snapshot.data?.data()
-                                          as Map<String, dynamic>?;
-                                  final streak =
-                                      (data?['sharedStreakCurrent'] as int?) ??
-                                      (data?['streakCurrent'] as int?) ??
-                                      0;
-                                  return _StatPill(
-                                    cs: cs,
-                                    icon: Icons.local_fire_department_rounded,
-                                    tint: const Color(0xFFFF8A3D),
-                                    label: '$streak day streak',
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -650,38 +540,41 @@ class _HomePageState extends State<HomePage>
           left: 0,
           right: 0,
           bottom: kPetFloorOffset,
-          child: Center(
-            child: _Reveal(
-              animation: _seg(0.15, 0.7),
-              beginOffset: const Offset(0, 0.08),
-              child: StreamBuilder<DocumentSnapshot>(
-                stream: user != null
-                    ? FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .snapshots()
-                    : null,
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data() as Map<String, dynamic>?;
+          child: IgnorePointer(
+            ignoring: _isEditingLayout,
+            child: Center(
+              child: _Reveal(
+                animation: _seg(0.15, 0.7),
+                beginOffset: const Offset(0, 0.08),
+                child: StreamBuilder<DocumentSnapshot>(
+                  stream: user != null
+                      ? FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .snapshots()
+                      : null,
+                  builder: (context, snapshot) {
+                    final data = snapshot.data?.data() as Map<String, dynamic>?;
 
-                  final companionSource =
-                      (data?['companionAsset'] as String?) ??
-                      (data?['companionLottie'] as String?) ??
-                      'assets/images/cat.png';
+                    final companionEmoji =
+                        (data?['companionEmoji'] as String?) ?? '🐱';
+                    final companionSource =
+                        (data?['companionAsset'] as String?) ??
+                        (data?['companionLottie'] as String?) ??
+                        _kCompanionsImages[companionEmoji] ??
+                        'assets/images/cat.png';
 
-                  final companionEmoji =
-                      (data?['companionEmoji'] as String?) ?? '🐱';
+                    final equipped = List<String>.from(
+                      (data?['equippedAccessories'] as List?) ?? const [],
+                    );
 
-                  final equipped = List<String>.from(
-                    (data?['equippedAccessories'] as List?) ?? const [],
-                  );
-
-                  return _CharacterSprite(
-                    source: companionSource,
-                    fallbackEmoji: companionEmoji,
-                    equippedAccessories: equipped,
-                  );
-                },
+                    return _CharacterSprite(
+                      source: companionSource,
+                      fallbackEmoji: companionEmoji,
+                      equippedAccessories: equipped,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -689,21 +582,24 @@ class _HomePageState extends State<HomePage>
         Positioned(
           right: 24,
           bottom: kPetFloorOffset + 20,
-          child: _Reveal(
-            animation: _seg(0.3, 0.8),
-            child: Material(
-              color: cs.surface.withValues(alpha: 0.85),
-              shape: const CircleBorder(),
-              elevation: 4,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => _showFurnitureInventory(context, cs),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Icon(
-                    Icons.chair_alt_rounded,
-                    color: cs.primary,
-                    size: 24,
+          child: IgnorePointer(
+            ignoring: _isEditingLayout,
+            child: _Reveal(
+              animation: _seg(0.3, 0.8),
+              child: Material(
+                color: cs.surface.withValues(alpha: 0.85),
+                shape: const CircleBorder(),
+                elevation: 4,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => _showFurnitureInventory(context, cs),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Icon(
+                      Icons.chair_alt_rounded,
+                      color: cs.primary,
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
@@ -715,9 +611,10 @@ class _HomePageState extends State<HomePage>
   }
 }
 
-enum RoomSurface { floor, leftWall, rightWall }
-
 class _RoomCanvas {
+  static double get furnitureSquarePixels =>
+      size.width / _RoomGeometry.floorColumns;
+
   static const Size size = Size(853, 1844);
   static const double displayScale = 1.0;
   static const Alignment displayScaleAlignment = Alignment(0, 0.18);
@@ -738,17 +635,20 @@ class _RoomGeometry {
 
   static const int wallColumns = 8;
   static const int wallRows = 14;
+  static const int floorColumns = 8;
 }
 
 class _RoomScene extends StatelessWidget {
   final bool isEditing;
   final ColorScheme colorScheme;
   final String roomThemeKey;
+  final ValueChanged<bool> onToggleEditing;
 
   const _RoomScene({
     required this.isEditing,
     required this.colorScheme,
     required this.roomThemeKey,
+    required this.onToggleEditing,
   });
 
   @override
@@ -770,11 +670,14 @@ class _RoomScene extends StatelessWidget {
                 CustomPaint(
                   painter: _RoomBackgroundPainter(
                     theme:
-                        _kRoomThemes[roomThemeKey] ??
-                        _kRoomThemes['room_pink']!,
+                        kRoomThemes[roomThemeKey] ?? kRoomThemes['room_pink']!,
                   ),
                 ),
-                _RoomFurniture(isEditing: isEditing),
+                _RoomFurniture(
+                  isEditing: isEditing,
+                  colorScheme: colorScheme,
+                  onToggleEditing: onToggleEditing,
+                ),
               ],
             ),
           ),
@@ -785,7 +688,7 @@ class _RoomScene extends StatelessWidget {
 }
 
 class _RoomBackgroundPainter extends CustomPainter {
-  final _RoomTheme theme;
+  final RoomTheme theme;
 
   const _RoomBackgroundPainter({required this.theme});
 
@@ -986,6 +889,7 @@ class _RoomPerspective {
   static const double kPerspectiveGamma = 1.5;
 
   Rect get roomRect => Offset.zero & size;
+
   double get leftX => roomRect.left + roomRect.width * _RoomGeometry.leftX;
   double get centerX => roomRect.left + roomRect.width * _RoomGeometry.centerX;
   double get rightX => roomRect.left + roomRect.width * _RoomGeometry.rightX;
@@ -1012,6 +916,133 @@ class _RoomPerspective {
         ? 0.0
         : ((x - centerX) / denom).clamp(0.0, 1.0);
     return lerpDouble(cornerVertexY, _rightSeamEdgeY, t)!;
+  }
+
+  Offset floorGridIntersection(double gridX, double gridY) {
+    final corner = Offset(
+      roomRect.left + roomRect.width * _RoomGeometry.centerX,
+      roomRect.top + roomRect.height * _RoomGeometry.floorCornerY,
+    );
+    final leftEdge = Offset(
+      roomRect.left + roomRect.width * _RoomGeometry.leftX,
+      roomRect.top + roomRect.height * _RoomGeometry.floorLeftEdgeY,
+    );
+    final rightEdge = Offset(
+      roomRect.left + roomRect.width * _RoomGeometry.rightX,
+      roomRect.top + roomRect.height * _RoomGeometry.floorRightEdgeY,
+    );
+
+    final n = _RoomGeometry.floorColumns.toDouble();
+    final startLeft = Offset.lerp(corner, leftEdge, gridX / n)!;
+    final startRight = Offset.lerp(corner, rightEdge, gridY / n)!;
+
+    final leftSlope = (leftEdge.dy - corner.dy) / (leftEdge.dx - corner.dx);
+    final rightSlope = (rightEdge.dy - corner.dy) / (rightEdge.dx - corner.dx);
+
+    final m1 = rightSlope;
+    final m2 = leftSlope;
+    final b1 = startLeft.dy - m1 * startLeft.dx;
+    final b2 = startRight.dy - m2 * startRight.dx;
+
+    final x = (b2 - b1) / (m1 - m2);
+    final y = m1 * x + b1;
+    return Offset(x, y);
+  }
+
+  Path floorPath() {
+    final left = Offset(
+      roomRect.left + roomRect.width * _RoomGeometry.leftX,
+      roomRect.top + roomRect.height * _RoomGeometry.floorLeftEdgeY,
+    );
+    final corner = Offset(
+      roomRect.left + roomRect.width * _RoomGeometry.centerX,
+      roomRect.top + roomRect.height * _RoomGeometry.floorCornerY,
+    );
+    final right = Offset(
+      roomRect.left + roomRect.width * _RoomGeometry.rightX,
+      roomRect.top + roomRect.height * _RoomGeometry.floorRightEdgeY,
+    );
+
+    return Path()
+      ..moveTo(left.dx, left.dy)
+      ..lineTo(corner.dx, corner.dy)
+      ..lineTo(right.dx, right.dy)
+      ..lineTo(roomRect.right, roomRect.bottom)
+      ..lineTo(roomRect.left, roomRect.bottom)
+      ..close();
+  }
+
+  bool floorFootprintFits({
+    required int gridX,
+    required int gridY,
+    required int widthSquares,
+    required int lengthSquares,
+  }) {
+    final path = floorPath();
+    final points = floorFootprint(
+      gridX: gridX,
+      gridY: gridY,
+      widthSquares: widthSquares,
+      lengthSquares: lengthSquares,
+    );
+
+    // Keep the full furniture footprint on the floor. A tiny inset avoids
+    // rejecting cells that mathematically land exactly on the path edge.
+    final center = Offset(
+      points.map((p) => p.dx).reduce((a, b) => a + b) / points.length,
+      points.map((p) => p.dy).reduce((a, b) => a + b) / points.length,
+    );
+
+    for (final point in points) {
+      final inset = Offset.lerp(point, center, 0.015)!;
+      if (!path.contains(inset)) return false;
+    }
+    return true;
+  }
+
+  List<Offset> floorFootprint({
+    required int gridX,
+    required int gridY,
+    required int widthSquares,
+    required int lengthSquares,
+  }) {
+    return [
+      floorGridIntersection(gridX.toDouble(), gridY.toDouble()),
+      floorGridIntersection(
+        (gridX + widthSquares).toDouble(),
+        gridY.toDouble(),
+      ),
+      floorGridIntersection(
+        (gridX + widthSquares).toDouble(),
+        (gridY + lengthSquares).toDouble(),
+      ),
+      floorGridIntersection(
+        gridX.toDouble(),
+        (gridY + lengthSquares).toDouble(),
+      ),
+    ];
+  }
+
+  Rect floorFootprintBounds({
+    required int gridX,
+    required int gridY,
+    required int widthSquares,
+    required int lengthSquares,
+  }) {
+    final points = floorFootprint(
+      gridX: gridX,
+      gridY: gridY,
+      widthSquares: widthSquares,
+      lengthSquares: lengthSquares,
+    );
+    final xs = points.map((p) => p.dx).toList();
+    final ys = points.map((p) => p.dy).toList();
+    return Rect.fromLTRB(
+      xs.reduce((a, b) => a < b ? a : b),
+      ys.reduce((a, b) => a < b ? a : b),
+      xs.reduce((a, b) => a > b ? a : b),
+      ys.reduce((a, b) => a > b ? a : b),
+    );
   }
 
   _RoomPoint floorPoint(double col, double row) {
@@ -1055,20 +1086,100 @@ class _RoomPerspective {
 
 class _RoomFurniture extends StatefulWidget {
   final bool isEditing;
-  const _RoomFurniture({this.isEditing = false});
+  final ColorScheme colorScheme;
+  final ValueChanged<bool> onToggleEditing;
+
+  const _RoomFurniture({
+    required this.isEditing,
+    required this.colorScheme,
+    required this.onToggleEditing,
+  });
 
   @override
   State<_RoomFurniture> createState() => _RoomFurnitureState();
 }
 
 class _RoomFurnitureState extends State<_RoomFurniture> {
-  static const double kBaseItemSize = 260.0;
-  static const double kStep = 0.08;
-
   double? _editingCol;
   double? _editingRow;
   String? _editingDocId;
   bool _wasEditing = false;
+  String _activeCategory = 'Sofas';
+  double _dragGridXAccumulator = 0.0;
+  double _dragGridYAccumulator = 0.0;
+  double? _dragTargetGridX;
+  double? _dragTargetGridY;
+
+  final List<String> _editCategories = [
+    'Sofas',
+    'Beds',
+    'Desks',
+    'Rugs',
+    'Decor',
+  ];
+
+  Map<String, String> _getAssetsForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'sofas':
+        return kSofaAssets;
+      case 'beds':
+        return kBedAssets;
+      case 'desks':
+        return kDeskAssets;
+      case 'rugs':
+        return kRugAssets;
+      case 'decor':
+        return kDecorAssets;
+      default:
+        return kSofaAssets;
+    }
+  }
+
+  bool _checkOverlap(
+    String currentDocId,
+    double targetCol,
+    double targetRow,
+    List<QueryDocumentSnapshot> allDocs,
+  ) {
+    final metaCurrent = getFurnitureMeta(currentDocId);
+
+    final currentX = targetCol * _RoomGeometry.floorColumns;
+    final currentY = targetRow * _RoomGeometry.floorColumns;
+
+    final currentRect = Rect.fromLTWH(
+      currentX,
+      currentY,
+      metaCurrent.widthSquares.toDouble(),
+      metaCurrent.lengthSquares.toDouble(),
+    );
+
+    for (final doc in allDocs) {
+      if (doc.id == currentDocId) continue;
+
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data?['isEquipped'] != true) continue;
+
+      final metaOther = getFurnitureMeta(doc.id);
+      if (metaOther.surface != metaCurrent.surface) continue;
+
+      final loc = data?['location'] as Map<String, dynamic>?;
+      if (loc == null) continue;
+
+      final otherCol = (loc['col'] as num?)?.toDouble() ?? 0.5;
+      final otherRow = (loc['row'] as num?)?.toDouble() ?? 0.5;
+
+      final otherRect = Rect.fromLTWH(
+        otherCol * _RoomGeometry.floorColumns,
+        otherRow * _RoomGeometry.floorColumns,
+        metaOther.widthSquares.toDouble(),
+        metaOther.lengthSquares.toDouble(),
+      );
+
+      if (currentRect.overlaps(otherRect)) return true;
+    }
+
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1079,52 +1190,78 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
         final roomSize = Size(constraints.maxWidth, constraints.maxHeight);
         final perspective = _RoomPerspective(roomSize);
 
-        if (_wasEditing && !widget.isEditing) {
-          if (_editingCol != null &&
-              _editingRow != null &&
-              _editingDocId != null &&
-              user != null) {
-            _saveItemPosition(user, _editingDocId!, _editingCol!, _editingRow!);
-          }
-          _editingCol = null;
-          _editingRow = null;
-          _editingDocId = null;
-        }
-        _wasEditing = widget.isEditing;
-
         return StreamBuilder<QuerySnapshot>(
           stream: user != null
               ? FirebaseFirestore.instance
                     .collection('users')
                     .doc(user.uid)
                     .collection('furniture')
-                    .where('isEquipped', isEqualTo: true)
                     .snapshots()
               : null,
           builder: (context, snapshot) {
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            if (!snapshot.hasData) {
               return const SizedBox.shrink();
             }
 
-            final equippedDocs = snapshot.data!.docs.where((doc) {
-              return _kSofaAssets.containsKey(
-                    doc.id.replaceFirst('sofa_', ''),
-                  ) ||
-                  doc.id.startsWith('sofa_');
+            final allDocs = snapshot.data!.docs;
+            final equippedDocs = allDocs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>?;
+              return data?['isEquipped'] == true &&
+                  !kRoomThemes.containsKey(doc.id);
             }).toList();
 
-            if (equippedDocs.isEmpty) {
-              return const SizedBox.shrink();
+            final equippedDoc = widget.isEditing && _editingDocId != null
+                ? equippedDocs
+                          .where((doc) => doc.id == _editingDocId)
+                          .firstOrNull ??
+                      equippedDocs.firstOrNull
+                : equippedDocs.firstOrNull;
+
+            if (_wasEditing && !widget.isEditing) {
+              if (_editingCol != null &&
+                  _editingRow != null &&
+                  _editingDocId != null &&
+                  user != null) {
+                _saveItemPosition(
+                  user,
+                  _editingDocId!,
+                  _editingCol!,
+                  _editingRow!,
+                );
+              }
+              _editingCol = null;
+              _editingRow = null;
+              _editingDocId = null;
+            }
+            _wasEditing = widget.isEditing;
+
+            if (equippedDoc == null) {
+              return Stack(
+                children: [
+                  if (widget.isEditing)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _RoomGridPainter(
+                          activeSurface: RoomSurface.floor,
+                        ),
+                      ),
+                    ),
+                  if (widget.isEditing)
+                    Positioned(
+                      bottom: 40,
+                      left: 16,
+                      right: 16,
+                      child: _buildBottomEditBar(user, allDocs),
+                    ),
+                ],
+              );
             }
 
-            final equippedDoc = equippedDocs.first;
             final data = equippedDoc.data() as Map<String, dynamic>?;
             final locationMap = data?['location'] as Map<String, dynamic>?;
 
-            final surface = RoomSurface.values.firstWhere(
-              (s) => s.name == (data?['surface'] as String?),
-              orElse: () => RoomSurface.floor,
-            );
+            final meta = getFurnitureMeta(equippedDoc.id);
+            final surface = meta.surface;
 
             final defaultRow = surface == RoomSurface.floor ? 0.35 : 0.5;
             final savedCol = (locationMap?['col'] as num?)?.toDouble() ?? 0.5;
@@ -1144,26 +1281,48 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
               _editingRow = savedRow;
             }
 
-            final col = widget.isEditing ? _editingCol! : savedCol;
-            final row = widget.isEditing ? _editingRow! : savedRow;
+            final rawCol = widget.isEditing ? _editingCol! : savedCol;
+            final rawRow = widget.isEditing ? _editingRow! : savedRow;
 
-            String variantKey = 'brown';
-            if (equippedDoc.id.startsWith('sofa_')) {
-              variantKey = equippedDoc.id.contains('_')
-                  ? equippedDoc.id.split('_').last
-                  : 'brown';
-            }
-            final assetPath =
-                _kSofaAssets[variantKey] ??
-                'assets/images/furniture/sofa_brown.png';
+            final col = surface == RoomSurface.floor
+                ? rawCol
+                : _clampFurnitureCol(equippedDoc.id, rawCol);
+            final row = surface == RoomSurface.floor
+                ? rawRow
+                : _clampFurnitureRow(equippedDoc.id, rawRow);
 
-            final point = perspective.pointFor(surface, col, row);
-            final itemSize = kBaseItemSize * point.scale;
+            final assetPath = meta.assetPath;
+            final squarePixels = _RoomCanvas.furnitureSquarePixels;
+            final itemWidth = squarePixels * meta.widthSquares;
+            final itemHeight = squarePixels * meta.lengthSquares;
+
             final isFloor = surface == RoomSurface.floor;
-            final left = point.anchor.dx - itemSize / 2;
+
+            late final _RoomPoint point;
+
+            if (isFloor) {
+              final gridX = _normalizedToGrid(col);
+              final gridY = _normalizedToGrid(row);
+
+              final footprint = perspective.floorFootprintBounds(
+                gridX: gridX,
+                gridY: gridY,
+                widthSquares: meta.widthSquares,
+                lengthSquares: meta.lengthSquares,
+              );
+
+              point = _RoomPoint(
+                Offset(footprint.center.dx, footprint.bottom),
+                1.0,
+              );
+            } else {
+              point = perspective.pointFor(surface, col, row);
+            }
+
+            final left = point.anchor.dx - itemWidth / 2;
             final top = isFloor
-                ? point.anchor.dy - itemSize
-                : point.anchor.dy - itemSize / 2;
+                ? point.anchor.dy - itemHeight
+                : point.anchor.dy - itemHeight / 2;
 
             return Stack(
               children: [
@@ -1174,57 +1333,55 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                     ),
                   ),
 
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 150),
+                Positioned(
                   left: left,
                   top: top,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      SizedBox(
-                        width: itemSize,
-                        height: itemSize,
-                        child: Image.asset(assetPath, fit: BoxFit.contain),
-                      ),
-
-                      if (widget.isEditing) ...[
-                        Positioned(
-                          top: -30,
-                          child: _GridArrowButton(
-                            icon: Icons.keyboard_arrow_up_rounded,
-                            onTap: () =>
-                                setState(() => _moveVertical(surface, 1)),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: -30,
-                          child: _GridArrowButton(
-                            icon: Icons.keyboard_arrow_down_rounded,
-                            onTap: () =>
-                                setState(() => _moveVertical(surface, -1)),
-                          ),
-                        ),
-                        Positioned(
-                          left: -30,
-                          child: _GridArrowButton(
-                            icon: Icons.keyboard_arrow_left_rounded,
-                            onTap: () =>
-                                setState(() => _moveHorizontal(surface, -1)),
-                          ),
-                        ),
-                        Positioned(
-                          right: -30,
-                          child: _GridArrowButton(
-                            icon: Icons.keyboard_arrow_right_rounded,
-                            onTap: () =>
-                                setState(() => _moveHorizontal(surface, 1)),
-                          ),
-                        ),
-                      ],
-                    ],
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: widget.isEditing
+                        ? (_) {
+                            _dragGridXAccumulator = 0.0;
+                            _dragGridYAccumulator = 0.0;
+                            _dragTargetGridX = _normalizedToGrid(
+                              _editingCol!,
+                            ).toDouble();
+                            _dragTargetGridY = _normalizedToGrid(
+                              _editingRow!,
+                            ).toDouble();
+                          }
+                        : null,
+                    onPanUpdate: widget.isEditing
+                        ? (details) {
+                            _handleFurnitureDrag(
+                              equippedDoc.id,
+                              details.delta,
+                              perspective,
+                            );
+                          }
+                        : null,
+                    onPanEnd: widget.isEditing
+                        ? (_) {
+                            _dragGridXAccumulator = 0.0;
+                            _dragGridYAccumulator = 0.0;
+                            _dragTargetGridX = null;
+                            _dragTargetGridY = null;
+                          }
+                        : null,
+                    child: SizedBox(
+                      width: itemWidth,
+                      height: itemHeight,
+                      child: Image.asset(assetPath, fit: BoxFit.contain),
+                    ),
                   ),
                 ),
+
+                if (widget.isEditing)
+                  Positioned(
+                    bottom: 24,
+                    left: 20,
+                    right: 20,
+                    child: _buildBottomEditBar(user, allDocs),
+                  ),
               ],
             );
           },
@@ -1233,19 +1390,369 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     );
   }
 
-  double _clamp01(double v) => v.clamp(0.0, 1.0);
+  Widget _buildBottomEditBar(User? user, List<QueryDocumentSnapshot> allDocs) {
+    final assetsMap = _getAssetsForCategory(_activeCategory);
+    final cs = widget.colorScheme;
 
-  void _moveHorizontal(RoomSurface surface, int dir) {
-    final sign = surface == RoomSurface.leftWall ? -dir : dir;
-    _editingCol = _clamp01(_editingCol! + sign * kStep);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: 24,
+        horizontal: 22,
+      ), // Extra large and spacious
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.98),
+        borderRadius: BorderRadius.circular(36), // Generous rounded corners
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 48, // Much larger category tabs
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: _editCategories.map((cat) {
+                final isSelected = cat == _activeCategory;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: ChoiceChip(
+                    label: Text(
+                      cat,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    selected: isSelected,
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() => _activeCategory = cat);
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 92, // Much larger item asset preview cards
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: assetsMap.entries.map((entry) {
+                final variantKey = entry.key;
+                final path = entry.value;
+                String prefix = '';
+                if (_activeCategory.toLowerCase() == 'sofas') prefix = 'sofa_';
+                if (_activeCategory.toLowerCase() == 'beds') prefix = 'bed_';
+                if (_activeCategory.toLowerCase() == 'desks') prefix = 'desk_';
+                if (_activeCategory.toLowerCase() == 'rugs') prefix = 'carpet_';
+
+                final docId = prefix.isNotEmpty
+                    ? '$prefix$variantKey'
+                    : variantKey;
+                final isCurrent = _editingDocId == docId;
+
+                return GestureDetector(
+                  onTap: () async {
+                    if (user != null) {
+                      setState(() {
+                        _editingDocId = docId;
+                        _editingCol = 0.5;
+                        _editingRow = 0.35;
+                      });
+                      await _equipItem(user, docId, _activeCategory);
+                    }
+                  },
+                  child: Container(
+                    width: 92,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? cs.primary.withValues(alpha: 0.2)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: isCurrent ? cs.primary : Colors.transparent,
+                        width: 4,
+                      ),
+                    ),
+                    child: Image.asset(path, fit: BoxFit.contain),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 60, // Much larger save button
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    onPressed: () {
+                      if (_editingCol != null &&
+                          _editingRow != null &&
+                          _editingDocId != null &&
+                          user != null) {
+                        _saveItemPosition(
+                          user,
+                          _editingDocId!,
+                          _editingCol!,
+                          _editingRow!,
+                        );
+                      }
+                      widget.onToggleEditing(false);
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 26),
+                    label: const Text(
+                      'Save Layout',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  void _moveVertical(RoomSurface surface, int dir) {
-    if (surface == RoomSurface.floor) {
-      _editingRow = _clamp01(_editingRow! - dir * kStep);
-    } else {
-      _editingRow = _clamp01(_editingRow! + dir * kStep);
+  Future<void> _equipItem(User user, String docId, String category) async {
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
+    final furnitureRef = firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('furniture');
+
+    final allItems = await furnitureRef.get();
+    for (var doc in allItems.docs) {
+      if (!kRoomThemes.containsKey(doc.id)) {
+        batch.update(doc.reference, {'isEquipped': false});
+      }
     }
+
+    final defaultLocation = {'col': 0.5, 'row': 0.35};
+
+    batch.set(furnitureRef.doc(docId), {
+      'isEquipped': true,
+      'category': category,
+      'location': defaultLocation,
+    }, SetOptions(merge: true));
+
+    final userDoc = await firestore.collection('users').doc(user.uid).get();
+    final userData = userDoc.data() ?? {};
+    final partnerEmail =
+        ((userData['partnerEmailLower'] as String?) ??
+                (userData['partnerEmail'] as String?) ??
+                '')
+            .trim()
+            .toLowerCase();
+
+    if (partnerEmail.isNotEmpty) {
+      final partnerQuery = await firestore
+          .collection('users')
+          .where('email', isEqualTo: partnerEmail)
+          .get();
+      for (var pDoc in partnerQuery.docs) {
+        final pFurnitureRef = pDoc.reference.collection('furniture');
+        final pItems = await pFurnitureRef.get();
+        for (var pItemDoc in pItems.docs) {
+          if (!kRoomThemes.containsKey(pItemDoc.id)) {
+            batch.update(pItemDoc.reference, {'isEquipped': false});
+          }
+        }
+        batch.set(pFurnitureRef.doc(docId), {
+          'isEquipped': true,
+          'category': category,
+          'location': defaultLocation,
+        }, SetOptions(merge: true));
+      }
+    }
+
+    await batch.commit();
+  }
+
+  double _clampFurnitureCol(String docId, double col) {
+    final meta = getFurnitureMeta(docId);
+    final maxGridX = (_RoomGeometry.floorColumns - meta.widthSquares).clamp(
+      0,
+      _RoomGeometry.floorColumns,
+    );
+
+    return _gridToNormalized(_normalizedToGrid(col).clamp(0, maxGridX));
+  }
+
+  double _clampFurnitureRow(String docId, double row) {
+    final meta = getFurnitureMeta(docId);
+    final maxGridY = (_RoomGeometry.floorColumns - meta.lengthSquares).clamp(
+      0,
+      _RoomGeometry.floorColumns,
+    );
+
+    return _gridToNormalized(_normalizedToGrid(row).clamp(0, maxGridY));
+  }
+
+  int _normalizedToGrid(double value) {
+    return (value * _RoomGeometry.floorColumns).round();
+  }
+
+  double _gridToNormalized(int value) {
+    return value / _RoomGeometry.floorColumns;
+  }
+
+  void _moveGridDirection(
+    String currentDocId,
+    int dCol,
+    int dRow,
+    List<QueryDocumentSnapshot> allDocs,
+  ) {
+    if (_editingCol == null || _editingRow == null) {
+      return;
+    }
+
+    final meta = getFurnitureMeta(currentDocId);
+    final currentGridX = _normalizedToGrid(_editingCol!);
+    final currentGridY = _normalizedToGrid(_editingRow!);
+
+    final maxGridX = (_RoomGeometry.floorColumns - meta.widthSquares).clamp(
+      0,
+      _RoomGeometry.floorColumns,
+    );
+    final maxGridY = (_RoomGeometry.floorColumns - meta.lengthSquares).clamp(
+      0,
+      _RoomGeometry.floorColumns,
+    );
+
+    final nextGridX = (currentGridX + dCol).clamp(0, maxGridX);
+    final nextGridY = (currentGridY + dRow).clamp(0, maxGridY);
+
+    if (nextGridX == currentGridX && nextGridY == currentGridY) {
+      return;
+    }
+
+    final nextCol = _gridToNormalized(nextGridX);
+    final nextRow = _gridToNormalized(nextGridY);
+
+    // This editor currently renders one furniture item at a time.
+    // Do NOT let other equipped-but-hidden Firestore items silently block
+    // movement. That made arrow taps appear completely dead.
+    setState(() {
+      _editingCol = nextCol;
+      _editingRow = nextRow;
+    });
+  }
+
+  void _handleFurnitureDrag(
+    String currentDocId,
+    Offset delta,
+    _RoomPerspective perspective,
+  ) {
+    if (_editingCol == null || _editingRow == null) return;
+
+    final meta = getFurnitureMeta(currentDocId);
+    final currentGridX = _normalizedToGrid(_editingCol!);
+    final currentGridY = _normalizedToGrid(_editingRow!);
+
+    _dragTargetGridX ??= currentGridX.toDouble();
+    _dragTargetGridY ??= currentGridY.toDouble();
+
+    // Resolve finger movement into the two diagonal perspective-grid axes.
+    // Using the local axes at the current cell keeps the drag direction
+    // visually aligned with the floor lines.
+    final p = perspective.floorGridIntersection(
+      currentGridX.toDouble(),
+      currentGridY.toDouble(),
+    );
+    final px = perspective.floorGridIntersection(
+      currentGridX + 1.0,
+      currentGridY.toDouble(),
+    );
+    final py = perspective.floorGridIntersection(
+      currentGridX.toDouble(),
+      currentGridY + 1.0,
+    );
+
+    final axisX = px - p;
+    final axisY = py - p;
+    final det = axisX.dx * axisY.dy - axisX.dy * axisY.dx;
+    if (det.abs() < 0.0001) return;
+
+    final gridDeltaX = (delta.dx * axisY.dy - delta.dy * axisY.dx) / det;
+    final gridDeltaY = (axisX.dx * delta.dy - axisX.dy * delta.dx) / det;
+
+    // Continuous target: don't throw away sub-cell movement. This makes
+    // slow drags precise instead of requiring repeated 40%-cell jumps.
+    _dragTargetGridX = _dragTargetGridX! + gridDeltaX;
+    _dragTargetGridY = _dragTargetGridY! + gridDeltaY;
+
+    // Search the perspective grid around the finger target and choose the
+    // closest cell whose ENTIRE furniture footprint still fits on the floor.
+    int? bestX;
+    int? bestY;
+    double bestDistance = double.infinity;
+
+    // The visible floor uses overflowing grid lines, so valid coordinates can
+    // extend well outside 0..floorColumns near the bottom of the screen.
+    const int overflow = 18;
+    final minGrid = -overflow;
+    final maxGrid = _RoomGeometry.floorColumns + overflow;
+
+    final targetX = _dragTargetGridX!;
+    final targetY = _dragTargetGridY!;
+
+    for (int gx = minGrid; gx <= maxGrid; gx++) {
+      for (int gy = minGrid; gy <= maxGrid; gy++) {
+        if (!perspective.floorFootprintFits(
+          gridX: gx,
+          gridY: gy,
+          widthSquares: meta.widthSquares,
+          lengthSquares: meta.lengthSquares,
+        )) {
+          continue;
+        }
+
+        final dx = gx - targetX;
+        final dy = gy - targetY;
+        final distance = dx * dx + dy * dy;
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestX = gx;
+          bestY = gy;
+        }
+      }
+    }
+
+    if (bestX == null || bestY == null) return;
+
+    if (bestX == currentGridX && bestY == currentGridY) return;
+
+    setState(() {
+      _editingCol = _gridToNormalized(bestX!);
+      _editingRow = _gridToNormalized(bestY!);
+    });
   }
 
   Future<void> _saveItemPosition(
@@ -1293,29 +1800,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       }
     }
     await batch.commit();
-  }
-}
-
-class _GridArrowButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _GridArrowButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black54,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(4.0),
-          child: Icon(icon, color: Colors.white, size: 18),
-        ),
-      ),
-    );
   }
 }
 
@@ -1491,10 +1975,10 @@ class _RoomGridPainter extends CustomPainter {
 
     for (
       int i = -floorOverflowLines;
-      i <= _RoomGeometry.wallColumns + floorOverflowLines;
+      i <= _RoomGeometry.floorColumns + floorOverflowLines;
       i++
     ) {
-      final t = i / _RoomGeometry.wallColumns;
+      final t = i / _RoomGeometry.floorColumns;
       final start = Offset.lerp(corner, leftEdge, t)!;
       final remainingY = room.bottom - start.dy;
       final dx = rightSeamSlope.abs() < 0.0001
@@ -1505,10 +1989,10 @@ class _RoomGridPainter extends CustomPainter {
 
     for (
       int i = -floorOverflowLines;
-      i <= _RoomGeometry.wallColumns + floorOverflowLines;
+      i <= _RoomGeometry.floorColumns + floorOverflowLines;
       i++
     ) {
-      final t = i / _RoomGeometry.wallColumns;
+      final t = i / _RoomGeometry.floorColumns;
       final start = Offset.lerp(corner, rightEdge, t)!;
       final remainingY = room.bottom - start.dy;
       final dx = leftSeamSlope.abs() < 0.0001
@@ -1567,7 +2051,7 @@ class _StatPill extends StatelessWidget {
 
 class _FurnitureInventorySheet extends StatefulWidget {
   final ColorScheme cs;
-  final ValueChanged<bool>? onEditModeChanged;
+  final VoidCallback? onEditModeRequested;
   final String selectedRoomTheme;
   final ValueChanged<String>? onRoomThemeChanged;
 
@@ -1575,7 +2059,7 @@ class _FurnitureInventorySheet extends StatefulWidget {
     required this.cs,
     required this.selectedRoomTheme,
     this.onRoomThemeChanged,
-    this.onEditModeChanged,
+    this.onEditModeRequested,
   });
 
   @override
@@ -1585,7 +2069,6 @@ class _FurnitureInventorySheet extends StatefulWidget {
 
 class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   String _selectedCategory = 'Rooms';
-  bool _isEditingLayout = false;
 
   final List<String> _categories = [
     'Rooms',
@@ -1632,15 +2115,15 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   Map<String, String> _getAssetsForCategory(String category) {
     switch (category.toLowerCase()) {
       case 'sofas':
-        return _kSofaAssets;
+        return kSofaAssets;
       case 'beds':
-        return _kBedAssets;
+        return kBedAssets;
       case 'desks':
-        return _kDeskAssets;
+        return kDeskAssets;
       case 'rugs':
-        return _kRugAssets;
+        return kRugAssets;
       case 'decor':
-        return _kDecorAssets;
+        return kDecorAssets;
       default:
         return {};
     }
@@ -1653,7 +2136,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
     final cardBackgroundColor = cs.surfaceContainerHighest;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.70,
+      height: MediaQuery.of(context).size.height * 0.75,
       padding: EdgeInsets.fromLTRB(
         12,
         16,
@@ -1700,20 +2183,11 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: Icon(
-                    _isEditingLayout ? Icons.check_rounded : Icons.edit_rounded,
-                    color: cs.primary,
-                  ),
-                  tooltip: _isEditingLayout
-                      ? 'Save layout'
-                      : 'Edit room layout',
+                  icon: Icon(Icons.edit_rounded, color: cs.primary, size: 22),
+                  tooltip: 'Edit Layout',
                   onPressed: () {
-                    setState(() {
-                      _isEditingLayout = !_isEditingLayout;
-                    });
-                    if (widget.onEditModeChanged != null) {
-                      widget.onEditModeChanged!(_isEditingLayout);
-                    }
+                    Navigator.pop(context);
+                    widget.onEditModeRequested?.call();
                   },
                 ),
               ],
@@ -1817,7 +2291,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                             _selectedCategory.toLowerCase() == 'rooms';
 
                         if (isRoomCategory) {
-                          final roomEntries = _kRoomThemes.entries.toList();
+                          final roomEntries = kRoomThemes.entries.toList();
 
                           return GridView.builder(
                             physics: const BouncingScrollPhysics(),
@@ -1967,7 +2441,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                 crossAxisCount: 2,
                                 mainAxisSpacing: 12,
                                 crossAxisSpacing: 12,
-                                childAspectRatio: 1.15,
+                                childAspectRatio: 1.0,
                               ),
                           itemCount: catalogItems.length,
                           itemBuilder: (context, index) {
@@ -1982,7 +2456,6 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                               _selectedCategory,
                               variantKey,
                             );
-
                             return GestureDetector(
                               onTap: () async {
                                 if (!isEquipped && user != null) {
@@ -1996,20 +2469,28 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                   final allItems = await furnitureRef.get();
                                   for (var doc in allItems.docs) {
                                     final dId = doc.id;
-                                    final belongsToCat = prefix.isNotEmpty
-                                        ? dId.startsWith(prefix)
-                                        : categoryAssets.containsKey(dId);
-                                    if (belongsToCat) {
-                                      batch.update(doc.reference, {
-                                        'isEquipped': false,
-                                      });
+                                    if (!kRoomThemes.containsKey(dId)) {
+                                      final belongsToCat = prefix.isNotEmpty
+                                          ? dId.startsWith(prefix)
+                                          : categoryAssets.containsKey(dId);
+                                      if (belongsToCat) {
+                                        batch.update(doc.reference, {
+                                          'isEquipped': false,
+                                        });
+                                      }
                                     }
                                   }
+
+                                  final defaultLocation = {
+                                    'col': 0.5,
+                                    'row': 0.35,
+                                  };
 
                                   if (targetDoc != null) {
                                     batch.set(targetDoc.reference, {
                                       'isEquipped': true,
                                       'category': _selectedCategory,
+                                      'location': defaultLocation,
                                     }, SetOptions(merge: true));
                                   } else {
                                     batch.set(
@@ -2017,6 +2498,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                       {
                                         'isEquipped': true,
                                         'category': _selectedCategory,
+                                        'location': defaultLocation,
                                       },
                                       SetOptions(merge: true),
                                     );
@@ -2047,13 +2529,15 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                       final pItems = await pFurnitureRef.get();
                                       for (var pItemDoc in pItems.docs) {
                                         final pId = pItemDoc.id;
-                                        final pBelongs = prefix.isNotEmpty
-                                            ? pId.startsWith(prefix)
-                                            : categoryAssets.containsKey(pId);
-                                        if (pBelongs) {
-                                          batch.update(pItemDoc.reference, {
-                                            'isEquipped': false,
-                                          });
+                                        if (!kRoomThemes.containsKey(pId)) {
+                                          final pBelongs = prefix.isNotEmpty
+                                              ? pId.startsWith(prefix)
+                                              : categoryAssets.containsKey(pId);
+                                          if (pBelongs) {
+                                            batch.update(pItemDoc.reference, {
+                                              'isEquipped': false,
+                                            });
+                                          }
                                         }
                                       }
                                       batch.set(
@@ -2061,6 +2545,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                         {
                                           'isEquipped': true,
                                           'category': _selectedCategory,
+                                          'location': defaultLocation,
                                         },
                                         SetOptions(merge: true),
                                       );
@@ -2083,6 +2568,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                   ),
                                 ),
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       child: ClipRRect(
@@ -2098,7 +2584,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                             Center(
                                               child: Padding(
                                                 padding: const EdgeInsets.all(
-                                                  8.0,
+                                                  6.0,
                                                 ),
                                                 child: Image.asset(
                                                   assetPath,
@@ -2110,7 +2596,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: 7),
+                                    const SizedBox(height: 6),
                                     Row(
                                       children: [
                                         Expanded(
@@ -2128,7 +2614,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                                         if (isEquipped)
                                           Icon(
                                             Icons.check_circle_rounded,
-                                            size: 17,
+                                            size: 16,
                                             color: cs.primary,
                                           ),
                                       ],
