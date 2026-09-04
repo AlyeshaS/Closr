@@ -951,7 +951,7 @@ class _RoomPerspective {
 
   Path floorPath() {
     final left = Offset(
-      roomRect.left + roomRect.width * _RoomGeometry.leftX,
+      roomRect.left + roomRect.width * _RoomGeometry.leftX - 1.0,
       roomRect.top + roomRect.height * _RoomGeometry.floorLeftEdgeY,
     );
     final corner = Offset(
@@ -959,7 +959,7 @@ class _RoomPerspective {
       roomRect.top + roomRect.height * _RoomGeometry.floorCornerY,
     );
     final right = Offset(
-      roomRect.left + roomRect.width * _RoomGeometry.rightX,
+      roomRect.left + roomRect.width * _RoomGeometry.rightX + 1.0,
       roomRect.top + roomRect.height * _RoomGeometry.floorRightEdgeY,
     );
 
@@ -977,25 +977,43 @@ class _RoomPerspective {
     required int gridY,
     required int widthSquares,
     required int lengthSquares,
+    double visualScale = 1.0,
   }) {
     final path = floorPath();
-    final points = floorFootprint(
-      gridX: gridX,
-      gridY: gridY,
-      widthSquares: widthSquares,
-      lengthSquares: lengthSquares,
-    );
 
-    // Keep the full furniture footprint on the floor. A tiny inset avoids
-    // rejecting cells that mathematically land exactly on the path edge.
+    // Movement should be constrained by what the user actually sees, not by
+    // the larger unscaled metadata box. This lets visually smaller furniture
+    // use the edge columns while still keeping the rendered PNG on the floor.
+    final scaledWidth = widthSquares * visualScale;
+    final scaledLength = lengthSquares * visualScale;
+
+    final centerGridX = gridX + widthSquares / 2.0;
+    final centerGridY = gridY + lengthSquares / 2.0;
+
+    final leftGrid = centerGridX - scaledWidth / 2.0;
+    final rightGrid = centerGridX + scaledWidth / 2.0;
+    final topGrid = centerGridY - scaledLength / 2.0;
+    final bottomGrid = centerGridY + scaledLength / 2.0;
+
+    final points = <Offset>[
+      floorGridIntersection(leftGrid, topGrid),
+      floorGridIntersection(rightGrid, topGrid),
+      floorGridIntersection(rightGrid, bottomGrid),
+      floorGridIntersection(leftGrid, bottomGrid),
+    ];
+
+    // Allow furniture to sit flush against the visible floor/wall edge.
+    // Path.contains() excludes some points that land mathematically on the
+    // boundary, so test a very slightly inward point instead of shrinking
+    // the whole usable floor by a noticeable amount.
     final center = Offset(
       points.map((p) => p.dx).reduce((a, b) => a + b) / points.length,
       points.map((p) => p.dy).reduce((a, b) => a + b) / points.length,
     );
 
     for (final point in points) {
-      final inset = Offset.lerp(point, center, 0.015)!;
-      if (!path.contains(inset)) return false;
+      final edgeSafePoint = Offset.lerp(point, center, 0.001)!;
+      if (!path.contains(edgeSafePoint)) return false;
     }
     return true;
   }
@@ -1109,6 +1127,69 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
   double _dragGridYAccumulator = 0.0;
   double? _dragTargetGridX;
   double? _dragTargetGridY;
+  double? _editingVisualScale;
+  double? _editingVisualRotation;
+
+  double _visualRotationForFurniture(String docId) {
+    // Keep aquarium and flat floor decor untouched.
+    if (docId == 'aquarium') return 0.0;
+
+    if (docId.startsWith('sofa_') || kSofaAssets.containsKey(docId)) {
+      return 0.055; // ~ +3.2 degrees
+    }
+
+    if (docId.startsWith('bed_') || kBedAssets.containsKey(docId)) {
+      return 0.038; // ~ +2.2 degrees
+    }
+
+    if (docId.startsWith('desk_') || kDeskAssets.containsKey(docId)) {
+      return 0.032; // ~ +1.8 degrees
+    }
+
+    return 0.0;
+  }
+
+  double _visualScaleForFurniture(String docId) {
+    // Aquarium is the visual benchmark (1.0).
+    // These scales only change how large the original PNG is shown.
+    // BoxFit.contain still preserves every item's original aspect ratio.
+    if (docId == 'aquarium') return 1.0;
+
+    if (docId.startsWith('sofa_') || kSofaAssets.containsKey(docId)) {
+      // Keep the full sofa PNG comfortably inside its assigned grid footprint.
+      return 0.68;
+    }
+
+    if (docId.startsWith('bed_') || kBedAssets.containsKey(docId)) {
+      return 0.58;
+    }
+
+    if (docId.startsWith('desk_') || kDeskAssets.containsKey(docId)) {
+      return 0.68;
+    }
+
+    if (docId.startsWith('carpet_') ||
+        docId.startsWith('rug_') ||
+        kRugAssets.containsKey(docId)) {
+      // Keep carpets compact inside their assigned floor squares.
+      return 0.52;
+    }
+
+    switch (docId) {
+      case 'bookcase':
+        return 1.18;
+      case 'candle':
+        return 0.82;
+      case 'dog':
+        return 0.95;
+      case 'television':
+        return 1.10;
+      case 'plant':
+        return 1.02;
+      default:
+        return 1.0;
+    }
+  }
 
   final List<String> _editCategories = [
     'Sofas',
@@ -1232,6 +1313,8 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
               _editingCol = null;
               _editingRow = null;
               _editingDocId = null;
+              _editingVisualScale = null;
+              _editingVisualRotation = null;
             }
             _wasEditing = widget.isEditing;
 
@@ -1268,17 +1351,32 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
             final savedRow =
                 (locationMap?['row'] as num?)?.toDouble() ?? defaultRow;
 
+            final savedVisualScale =
+                (data?['visualScale'] as num?)?.toDouble() ??
+                _visualScaleForFurniture(equippedDoc.id);
+            final savedVisualRotation =
+                (data?['visualRotation'] as num?)?.toDouble() ??
+                _visualRotationForFurniture(equippedDoc.id);
+
             if (_editingDocId != equippedDoc.id) {
               _editingDocId = equippedDoc.id;
               if (widget.isEditing) {
                 _editingCol = savedCol;
                 _editingRow = savedRow;
+                _editingVisualScale = savedVisualScale;
+                _editingVisualRotation = savedVisualRotation;
               }
             }
             if (widget.isEditing &&
                 (_editingCol == null || _editingRow == null)) {
               _editingCol = savedCol;
               _editingRow = savedRow;
+            }
+            if (widget.isEditing && _editingVisualScale == null) {
+              _editingVisualScale = savedVisualScale;
+            }
+            if (widget.isEditing && _editingVisualRotation == null) {
+              _editingVisualRotation = savedVisualRotation;
             }
 
             final rawCol = widget.isEditing ? _editingCol! : savedCol;
@@ -1293,8 +1391,15 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
 
             final assetPath = meta.assetPath;
             final squarePixels = _RoomCanvas.furnitureSquarePixels;
-            final itemWidth = squarePixels * meta.widthSquares;
-            final itemHeight = squarePixels * meta.lengthSquares;
+            final visualScale = widget.isEditing
+                ? (_editingVisualScale ?? savedVisualScale)
+                : savedVisualScale;
+            final visualRotation = widget.isEditing
+                ? (_editingVisualRotation ?? savedVisualRotation)
+                : savedVisualRotation;
+
+            final itemWidth = squarePixels * meta.widthSquares * visualScale;
+            final itemHeight = squarePixels * meta.lengthSquares * visualScale;
 
             final isFloor = surface == RoomSurface.floor;
 
@@ -1370,7 +1475,11 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                     child: SizedBox(
                       width: itemWidth,
                       height: itemHeight,
-                      child: Image.asset(assetPath, fit: BoxFit.contain),
+                      child: Transform.rotate(
+                        angle: visualRotation,
+                        alignment: Alignment.bottomCenter,
+                        child: Image.asset(assetPath, fit: BoxFit.contain),
+                      ),
                     ),
                   ),
                 ),
@@ -1467,6 +1576,10 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                         _editingDocId = docId;
                         _editingCol = 0.5;
                         _editingRow = 0.35;
+                        _editingVisualScale = _visualScaleForFurniture(docId);
+                        _editingVisualRotation = _visualRotationForFurniture(
+                          docId,
+                        );
                       });
                       await _equipItem(user, docId, _activeCategory);
                     }
@@ -1492,6 +1605,60 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
             ),
           ),
           const SizedBox(height: 20),
+          if (_editingDocId != null) ...[
+            Row(
+              children: [
+                const Icon(Icons.rotate_right_rounded, size: 22),
+                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 72,
+                  child: Text(
+                    'Rotation',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Expanded(
+                  child: Slider(
+                    min: -0.261799,
+                    max: 0.261799,
+                    divisions: 30,
+                    value: (_editingVisualRotation ?? 0.0).clamp(
+                      -0.261799,
+                      0.261799,
+                    ),
+                    onChanged: (value) {
+                      setState(() => _editingVisualRotation = value);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                const Icon(Icons.zoom_out_map_rounded, size: 22),
+                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 72,
+                  child: Text(
+                    'Size',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Expanded(
+                  child: Slider(
+                    min: 0.35,
+                    max: 1.50,
+                    divisions: 115,
+                    value: (_editingVisualScale ?? 1.0).clamp(0.35, 1.50),
+                    onChanged: (value) {
+                      setState(() => _editingVisualScale = value);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             children: [
               Expanded(
@@ -1516,6 +1683,8 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                           _editingDocId!,
                           _editingCol!,
                           _editingRow!,
+                          visualScale: _editingVisualScale,
+                          visualRotation: _editingVisualRotation,
                         );
                       }
                       widget.onToggleEditing(false);
@@ -1724,12 +1893,15 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
 
     for (int gx = minGrid; gx <= maxGrid; gx++) {
       for (int gy = minGrid; gy <= maxGrid; gy++) {
-        if (!perspective.floorFootprintFits(
-          gridX: gx,
-          gridY: gy,
-          widthSquares: meta.widthSquares,
-          lengthSquares: meta.lengthSquares,
-        )) {
+        // Allow the item to use every visible floor grid cell.
+        // We validate the furniture anchor point instead of rejecting a cell
+        // because one corner of the metadata footprint touches the angled wall.
+        final anchorPoint = perspective.floorGridIntersection(
+          gx + meta.widthSquares / 2.0,
+          gy + meta.lengthSquares.toDouble(),
+        );
+
+        if (!perspective.floorPath().contains(anchorPoint)) {
           continue;
         }
 
@@ -1759,8 +1931,10 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     User user,
     String docId,
     double col,
-    double row,
-  ) async {
+    double row, {
+    double? visualScale,
+    double? visualRotation,
+  }) async {
     final firestore = FirebaseFirestore.instance;
     final userDoc = await firestore.collection('users').doc(user.uid).get();
     final data = userDoc.data() ?? {};
@@ -1783,18 +1957,25 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
         : null;
 
     final location = {'col': col, 'row': row};
+    final updateData = <String, dynamic>{
+      'location': location,
+      if (visualScale != null) 'visualScale': visualScale,
+      if (visualRotation != null) 'visualRotation': visualRotation,
+    };
 
     final batch = firestore.batch();
     for (final doc in userQuery.docs) {
-      batch.set(doc.reference.collection('furniture').doc(docId), {
-        'location': location,
-      }, SetOptions(merge: true));
+      batch.set(
+        doc.reference.collection('furniture').doc(docId),
+        updateData,
+        SetOptions(merge: true),
+      );
     }
     if (partnerQuery != null) {
       for (final doc in partnerQuery.docs) {
         batch.set(
           doc.reference.collection('furniture').doc(docId),
-          {'location': location},
+          updateData,
           SetOptions(merge: true),
         );
       }
