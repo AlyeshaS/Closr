@@ -2011,6 +2011,11 @@ class _RoomGeometry {
   static const double ceilingLeftEdgeY = 166 / 1844;
   static const double ceilingRightEdgeY = 166 / 1844;
 
+  // Keep the visible wall grid and wall-mounted furniture below the very top
+  // edge of the room. The walls themselves still extend to the ceiling.
+  static const double wallGridTopCenterY = 0.075;
+  static const double wallGridTopEdgeY = 0.105;
+
   static const double floorCornerY = 1090 / 1844;
   static const double floorLeftEdgeY = 1223 / 1844;
   static const double floorRightEdgeY = 1221 / 1844;
@@ -2461,18 +2466,42 @@ class _RoomPerspective {
     final floorY = seamYAtCanvasX(x);
     final ceilingY = side == RoomSurface.leftWall
         ? lerpDouble(
-            roomRect.top + roomRect.height * _RoomGeometry.ceilingCenterY,
-            roomRect.top + roomRect.height * _RoomGeometry.ceilingLeftEdgeY,
+            roomRect.top + roomRect.height * _RoomGeometry.wallGridTopCenterY,
+            roomRect.top + roomRect.height * _RoomGeometry.wallGridTopEdgeY,
             dt,
           )!
         : lerpDouble(
-            roomRect.top + roomRect.height * _RoomGeometry.ceilingCenterY,
-            roomRect.top + roomRect.height * _RoomGeometry.ceilingRightEdgeY,
+            roomRect.top + roomRect.height * _RoomGeometry.wallGridTopCenterY,
+            roomRect.top + roomRect.height * _RoomGeometry.wallGridTopEdgeY,
             dt,
           )!;
     final y = lerpDouble(floorY, ceilingY, row.clamp(0.0, 1.0))!;
     final scale = lerpDouble(kMinDepthScale, 1.0, dt)!;
     return _RoomPoint(Offset(x, y), scale);
+  }
+
+  bool wallItemFits({
+    required RoomSurface surface,
+    required int gridX,
+    required int gridY,
+    required double itemWidth,
+    required double itemHeight,
+    required double rotation,
+  }) {
+    final col = gridX / _RoomGeometry.wallColumns;
+    final row = gridY / _RoomGeometry.wallRows;
+    final anchor = wallPoint(surface, col, row).anchor;
+
+    // Wall movement should be controlled by the wall grid itself. The old
+    // full-item bounds check rejected upper rows very early for taller PNGs,
+    // which made it feel like the item could only move two squares up.
+    // Keep the anchor inside the visible room; rendering separately clamps the
+    // sprite so the image itself never leaves the screen.
+    const edgeTolerance = 1.0;
+    return anchor.dx >= roomRect.left - edgeTolerance &&
+        anchor.dx <= roomRect.right + edgeTolerance &&
+        anchor.dy >= roomRect.top - edgeTolerance &&
+        anchor.dy <= roomRect.bottom + edgeTolerance;
   }
 
   _RoomPoint pointFor(RoomSurface surface, double col, double row) {
@@ -2541,6 +2570,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
   bool _editingFlipX = false;
   bool _editingFlipY = false;
   bool _editingLocked = false;
+  RoomSurface? _editingSurface;
 
   // Session-only undo history. It is cleared when Edit Room ends.
   final List<_FurnitureSessionSnapshot> _undoHistory = [];
@@ -2557,6 +2587,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
   bool _initialFlipX = false;
   bool _initialFlipY = false;
   bool _initialLocked = false;
+  RoomSurface? _initialSurface;
 
   void _notifySelectionChanged(bool hasSelection) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2570,6 +2601,25 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
   String _itemKeyForDoc(QueryDocumentSnapshot doc) {
     final data = _docData(doc);
     return (data['itemKey'] as String?) ?? doc.id;
+  }
+
+  RoomSurface _surfaceForData(Map<String, dynamic> data, RoomSurface fallback) {
+    switch (data['roomSurface'] as String?) {
+      case 'leftWall':
+        return RoomSurface.leftWall;
+      case 'rightWall':
+        return RoomSurface.rightWall;
+      case 'floor':
+        return RoomSurface.floor;
+      default:
+        return fallback;
+    }
+  }
+
+  String _surfaceName(RoomSurface surface) {
+    if (surface == RoomSurface.leftWall) return 'leftWall';
+    if (surface == RoomSurface.rightWall) return 'rightWall';
+    return 'floor';
   }
 
   double _visualRotationForFurniture(String itemKey) {
@@ -2628,6 +2678,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     _editingFlipX = false;
     _editingFlipY = false;
     _editingLocked = false;
+    _editingSurface = null;
     _initialCol = null;
     _initialRow = null;
     _initialVisualScale = null;
@@ -2635,6 +2686,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     _initialFlipX = false;
     _initialFlipY = false;
     _initialLocked = false;
+    _initialSurface = null;
     _notifySelectionChanged(false);
   }
 
@@ -2647,8 +2699,9 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     final data = _docData(doc);
     final itemKey = _itemKeyForDoc(doc);
     final meta = getFurnitureMeta(itemKey);
+    final selectedSurface = _surfaceForData(data, meta.surface);
     final location = data['location'] as Map<String, dynamic>?;
-    final defaultRow = meta.surface == RoomSurface.floor ? 0.35 : 0.5;
+    final defaultRow = selectedSurface == RoomSurface.floor ? 0.35 : 0.5;
 
     final col = (location?['col'] as num?)?.toDouble() ?? 0.5;
     final row = (location?['row'] as num?)?.toDouble() ?? defaultRow;
@@ -2674,6 +2727,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _editingFlipX = flipX;
       _editingFlipY = flipY;
       _editingLocked = false;
+      _editingSurface = selectedSurface;
 
       _initialCol = col;
       _initialRow = row;
@@ -2682,6 +2736,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _initialFlipX = flipX;
       _initialFlipY = flipY;
       _initialLocked = false;
+      _initialSurface = selectedSurface;
     });
     _notifySelectionChanged(true);
   }
@@ -2704,6 +2759,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
         _editingFlipX = _initialFlipX;
         _editingFlipY = _initialFlipY;
         _editingLocked = _initialLocked;
+        _editingSurface = _initialSurface;
       });
     }
     _clearSelection();
@@ -2755,6 +2811,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _editingFlipX = _initialFlipX;
       _editingFlipY = _initialFlipY;
       _editingLocked = _initialLocked;
+      _editingSurface = _initialSurface;
       _accumulatedDragX = 0.0;
       _accumulatedDragY = 0.0;
       _lastDragGlobalPosition = null;
@@ -2897,6 +2954,9 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       live['flipX'] = _editingFlipX;
       live['flipY'] = _editingFlipY;
       live['isLocked'] = _editingLocked;
+      if (_editingSurface != null) {
+        live['roomSurface'] = _surfaceName(_editingSurface!);
+      }
       docs[_editingDocId!] = live;
     }
 
@@ -3014,6 +3074,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       flipX: _editingFlipX,
       flipY: _editingFlipY,
       isLocked: _editingLocked,
+      surface: _editingSurface,
     );
   }
 
@@ -3041,6 +3102,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
         flipX: _editingFlipX,
         flipY: _editingFlipY,
         isLocked: nextLocked,
+        surface: _editingSurface,
       );
 
       if (!mounted) return;
@@ -3158,7 +3220,11 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                       .firstOrNull;
             final activeSurface = selectedDoc == null
                 ? RoomSurface.floor
-                : getFurnitureMeta(_itemKeyForDoc(selectedDoc)).surface;
+                : (_editingSurface ??
+                      _surfaceForData(
+                        _docData(selectedDoc),
+                        getFurnitureMeta(_itemKeyForDoc(selectedDoc)).surface,
+                      ));
 
             return Stack(
               children: [
@@ -3204,7 +3270,11 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     final data = _docData(doc);
     final itemKey = _itemKeyForDoc(doc);
     final meta = getFurnitureMeta(itemKey);
-    final surface = meta.surface;
+    final isSelected = widget.isEditing && _editingDocId == doc.id;
+    final savedSurface = _surfaceForData(data, meta.surface);
+    final surface = isSelected
+        ? (_editingSurface ?? savedSurface)
+        : savedSurface;
     final locationMap = data['location'] as Map<String, dynamic>?;
     final defaultRow = surface == RoomSurface.floor ? 0.35 : 0.5;
     final savedCol = (locationMap?['col'] as num?)?.toDouble() ?? 0.5;
@@ -3218,7 +3288,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     final savedFlipX = (data['flipX'] as bool?) ?? false;
     final savedFlipY = (data['flipY'] as bool?) ?? false;
     final isLocked = (data['isLocked'] as bool?) ?? false;
-    final isSelected = widget.isEditing && _editingDocId == doc.id;
 
     final rawCol = isSelected ? (_editingCol ?? savedCol) : savedCol;
     final rawRow = isSelected ? (_editingRow ?? savedRow) : savedRow;
@@ -3246,21 +3315,48 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     if (isFloor) {
       final gridX = _normalizedToGrid(col);
       final gridY = _normalizedToGrid(row);
-      final footprint = perspective.floorFootprintBounds(
-        gridX: gridX,
-        gridY: gridY,
-        widthSquares: meta.widthSquares,
-        lengthSquares: meta.lengthSquares,
+
+      // Use the same grid anchor for every floor item. Previously the render
+      // anchor came from the centre/bottom of each item's width/length
+      // footprint, which made wider furniture appear one cell farther from
+      // the side walls than narrower furniture at the same grid coordinate.
+      point = _RoomPoint(
+        perspective.floorGridIntersection(gridX.toDouble(), gridY.toDouble()),
+        1.0,
       );
-      point = _RoomPoint(Offset(footprint.center.dx, footprint.bottom), 1.0);
     } else {
       point = perspective.pointFor(surface, col, row);
     }
 
-    final left = point.anchor.dx - itemWidth / 2;
-    final top = isFloor
+    final rawLeft = point.anchor.dx - itemWidth / 2;
+    final rawTop = isFloor
         ? point.anchor.dy - itemHeight
         : point.anchor.dy - itemHeight / 2;
+
+    // Let wall items use the full wall grid, but keep the visible PNG inside
+    // the room/screen. This does not alter the grid geometry.
+    final left = isFloor
+        ? rawLeft
+        : rawLeft
+              .clamp(
+                perspective.roomRect.left,
+                math.max(
+                  perspective.roomRect.left,
+                  perspective.roomRect.right - itemWidth,
+                ),
+              )
+              .toDouble();
+    final top = isFloor
+        ? rawTop
+        : rawTop
+              .clamp(
+                perspective.roomRect.top,
+                math.max(
+                  perspective.roomRect.top,
+                  perspective.roomRect.bottom - itemHeight,
+                ),
+              )
+              .toDouble();
 
     return Positioned(
       key: ValueKey(doc.id),
@@ -3308,6 +3404,55 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              // Selection outline follows the PNG's visible alpha shape.
+              // A denser 4 px silhouette halo keeps the selected item obvious
+              // without falling back to a large rectangular selection box.
+              if (isSelected)
+                ...<Offset>[
+                  const Offset(-4, 0),
+                  const Offset(4, 0),
+                  const Offset(0, -4),
+                  const Offset(0, 4),
+                  const Offset(-3, -3),
+                  const Offset(3, -3),
+                  const Offset(-3, 3),
+                  const Offset(3, 3),
+                  const Offset(-4, -1.5),
+                  const Offset(-4, 1.5),
+                  const Offset(4, -1.5),
+                  const Offset(4, 1.5),
+                  const Offset(-1.5, -4),
+                  const Offset(1.5, -4),
+                  const Offset(-1.5, 4),
+                  const Offset(1.5, 4),
+                ].map(
+                  (outlineOffset) => Positioned.fill(
+                    child: IgnorePointer(
+                      child: Transform.translate(
+                        offset: outlineOffset,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..scale(flipX ? -1.0 : 1.0, flipY ? -1.0 : 1.0),
+                          child: Transform.rotate(
+                            angle: visualRotation,
+                            alignment: Alignment.bottomCenter,
+                            child: ColorFiltered(
+                              colorFilter: ColorFilter.mode(
+                                widget.colorScheme.primary,
+                                BlendMode.srcIn,
+                              ),
+                              child: Image.asset(
+                                meta.assetPath,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               Positioned.fill(
                 child: Transform(
                   alignment: Alignment.center,
@@ -3320,57 +3465,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                   ),
                 ),
               ),
-              if (isSelected)
-                Positioned(
-                  top: -14,
-                  left: 0,
-                  right: 0,
-                  child: IgnorePointer(
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: widget.colorScheme.surface,
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.14),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: widget.colorScheme.onPrimary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Selected',
-                              style: TextStyle(
-                                color: widget.colorScheme.onPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                height: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               if (widget.isEditing && isLocked)
                 Positioned.fill(
                   child: IgnorePointer(
@@ -3437,6 +3531,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       'itemKey': itemKey,
       'isEquipped': true,
       'category': category,
+      'roomSurface': _surfaceName(meta.surface),
       'location': defaultLocation,
       'visualScale': _visualScaleForFurniture(itemKey),
       'visualRotation': _visualRotationForFurniture(itemKey),
@@ -3478,6 +3573,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _editingVisualRotation = rotation;
       _editingFlipX = false;
       _editingFlipY = false;
+      _editingSurface = meta.surface;
 
       _initialCol = col;
       _initialRow = row;
@@ -3485,6 +3581,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _initialVisualRotation = rotation;
       _initialFlipX = false;
       _initialFlipY = false;
+      _initialSurface = meta.surface;
     });
     _notifySelectionChanged(true);
   }
@@ -3552,20 +3649,26 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
 
   double _clampFurnitureCol(String itemKey, double col) {
     final meta = getFurnitureMeta(itemKey);
-    final maxGridX = (_RoomGeometry.floorColumns - meta.widthSquares).clamp(
-      0,
-      _RoomGeometry.floorColumns,
-    );
-    return _gridToNormalized(_normalizedToGrid(col).clamp(0, maxGridX));
+    final isFloor = meta.surface == RoomSurface.floor;
+    final gridLimit = isFloor
+        ? _RoomGeometry.floorGridDepth
+        : _RoomGeometry.wallColumns;
+    final maxGridX = gridLimit;
+    final grid = _surfaceColToGrid(meta.surface, col).clamp(0, maxGridX);
+    return _surfaceColToNormalized(meta.surface, grid);
   }
 
   double _clampFurnitureRow(String itemKey, double row) {
     final meta = getFurnitureMeta(itemKey);
-    final maxGridY = (_RoomGeometry.floorColumns - meta.lengthSquares).clamp(
-      0,
-      _RoomGeometry.floorColumns,
-    );
-    return _gridToNormalized(_normalizedToGrid(row).clamp(0, maxGridY));
+    final isFloor = meta.surface == RoomSurface.floor;
+    final gridLimit = isFloor
+        ? _RoomGeometry.floorGridDepth
+        : _RoomGeometry.wallRows;
+    // Wall items can use the full vertical wall grid. Screen bounds are
+    // enforced during movement instead of reserving rows based on item size.
+    final maxGridY = gridLimit;
+    final grid = _surfaceRowToGrid(meta.surface, row).clamp(0, maxGridY);
+    return _surfaceRowToNormalized(meta.surface, grid);
   }
 
   int _normalizedToGrid(double value) {
@@ -3576,6 +3679,34 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     return value / _RoomGeometry.floorColumns;
   }
 
+  int _surfaceColToGrid(RoomSurface surface, double value) {
+    final columns = surface == RoomSurface.floor
+        ? _RoomGeometry.floorColumns
+        : _RoomGeometry.wallColumns;
+    return (value * columns).round();
+  }
+
+  int _surfaceRowToGrid(RoomSurface surface, double value) {
+    final rows = surface == RoomSurface.floor
+        ? _RoomGeometry.floorColumns
+        : _RoomGeometry.wallRows;
+    return (value * rows).round();
+  }
+
+  double _surfaceColToNormalized(RoomSurface surface, int value) {
+    final columns = surface == RoomSurface.floor
+        ? _RoomGeometry.floorColumns
+        : _RoomGeometry.wallColumns;
+    return value / columns;
+  }
+
+  double _surfaceRowToNormalized(RoomSurface surface, int value) {
+    final rows = surface == RoomSurface.floor
+        ? _RoomGeometry.floorColumns
+        : _RoomGeometry.wallRows;
+    return value / rows;
+  }
+
   void _handleFurnitureDrag(
     String itemKey,
     Offset delta,
@@ -3584,30 +3715,94 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     if (_editingCol == null || _editingRow == null) return;
 
     final meta = getFurnitureMeta(itemKey);
-    final currentGridX = _normalizedToGrid(_editingCol!);
-    final currentGridY = _normalizedToGrid(_editingRow!);
+    final surface = _editingSurface ?? meta.surface;
+    final isFloor = surface == RoomSurface.floor;
+    final currentGridX = _surfaceColToGrid(surface, _editingCol!);
+    final currentGridY = _surfaceRowToGrid(surface, _editingRow!);
 
-    // Evaluate screen-space span of a full grid step across perspective space
-    final p0 = perspective.floorGridIntersection(
-      currentGridX.toDouble(),
-      currentGridY.toDouble(),
-    );
-    final px = perspective.floorGridIntersection(
-      (currentGridX + 1.0).toDouble(),
-      currentGridY.toDouble(),
-    );
-    final py = perspective.floorGridIntersection(
-      currentGridX.toDouble(),
-      (currentGridY + 1.0).toDouble(),
-    );
+    final canvasDelta = delta / widget.canvasScale;
 
-    final stepX = (px - p0);
-    final stepY = (py - p0);
+    // Join the floor grid to the wall grids at their shared seams.
+    // Floor (x, 0) maps directly to the left wall's x column and
+    // floor (0, y) maps directly to the right wall's y column.
+    if (isFloor && canvasDelta.dy < 0) {
+      RoomSurface? wallSurface;
+      int wallColumn = 0;
 
+      if (currentGridY == 0 && currentGridX > 0) {
+        wallSurface = RoomSurface.leftWall;
+        wallColumn = currentGridX.clamp(0, _RoomGeometry.wallColumns).toInt();
+      } else if (currentGridX == 0 && currentGridY > 0) {
+        wallSurface = RoomSurface.rightWall;
+        wallColumn = currentGridY.clamp(0, _RoomGeometry.wallColumns).toInt();
+      } else if (currentGridX == 0 && currentGridY == 0) {
+        wallSurface = canvasDelta.dx < 0
+            ? RoomSurface.leftWall
+            : RoomSurface.rightWall;
+        wallColumn = 0;
+      }
+
+      if (wallSurface != null) {
+        setState(() {
+          _editingSurface = wallSurface;
+          _editingCol = _surfaceColToNormalized(wallSurface!, wallColumn);
+          _editingRow = 0.0;
+          _accumulatedDragX = 0.0;
+          _accumulatedDragY = 0.0;
+        });
+        return;
+      }
+    }
+
+    // Dragging down from the bottom wall row returns the item to the exact
+    // corresponding floor seam cell.
+    if (!isFloor && currentGridY == 0 && canvasDelta.dy > 0) {
+      final floorGridX = surface == RoomSurface.leftWall ? currentGridX : 0;
+      final floorGridY = surface == RoomSurface.rightWall ? currentGridX : 0;
+      setState(() {
+        _editingSurface = RoomSurface.floor;
+        _editingCol = _surfaceColToNormalized(RoomSurface.floor, floorGridX);
+        _editingRow = _surfaceRowToNormalized(RoomSurface.floor, floorGridY);
+        _accumulatedDragX = 0.0;
+        _accumulatedDragY = 0.0;
+      });
+      return;
+    }
+
+    late final Offset p0;
+    late final Offset px;
+    late final Offset py;
+
+    if (isFloor) {
+      p0 = perspective.floorGridIntersection(
+        currentGridX.toDouble(),
+        currentGridY.toDouble(),
+      );
+      px = perspective.floorGridIntersection(
+        (currentGridX + 1.0).toDouble(),
+        currentGridY.toDouble(),
+      );
+      py = perspective.floorGridIntersection(
+        currentGridX.toDouble(),
+        (currentGridY + 1.0).toDouble(),
+      );
+    } else {
+      // Wall movement follows the original 8-column × 14-row grid.
+      // The visual grid stays unchanged; upper rows remain fully reachable.
+      final col0 = currentGridX / _RoomGeometry.wallColumns;
+      final row0 = currentGridY / _RoomGeometry.wallRows;
+      final col1 = (currentGridX + 1.0) / _RoomGeometry.wallColumns;
+      final row1 = (currentGridY + 1.0) / _RoomGeometry.wallRows;
+      p0 = perspective.wallPoint(surface, col0, row0).anchor;
+      px = perspective.wallPoint(surface, col1, row0).anchor;
+      py = perspective.wallPoint(surface, col0, row1).anchor;
+    }
+
+    final stepX = px - p0;
+    final stepY = py - p0;
     final det = stepX.dx * stepY.dy - stepX.dy * stepY.dx;
     if (det.abs() < 0.0001) return;
 
-    final canvasDelta = delta / widget.canvasScale;
     _accumulatedDragX += canvasDelta.dx;
     _accumulatedDragY += canvasDelta.dy;
 
@@ -3617,21 +3812,18 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
         (stepX.dx * _accumulatedDragY - stepX.dy * _accumulatedDragX) / det;
 
     if (dGridX.abs() >= 0.5 || dGridY.abs() >= 0.5) {
-      final stepMoveX = dGridX.sign * dGridX.abs().floor();
-      final stepMoveY = dGridY.sign * dGridY.abs().floor();
+      // round() makes the first half-cell crossing feel responsive and avoids
+      // the old 0.5-to-0.99 dead zone caused by floor().
+      final stepMoveX = dGridX.abs() >= 0.5 ? dGridX.round() : 0;
+      final stepMoveY = dGridY.abs() >= 0.5 ? dGridY.round() : 0;
 
       if (stepMoveX != 0 || stepMoveY != 0) {
-        final isFloor = meta.surface == RoomSurface.floor;
-        final gridLimit = isFloor
-            ? _RoomGeometry.floorGridDepth
-            : _RoomGeometry.floorColumns;
-
         final maxGridX = isFloor
-            ? gridLimit
-            : (gridLimit - meta.widthSquares).clamp(0, gridLimit);
+            ? _RoomGeometry.floorGridDepth
+            : _RoomGeometry.wallColumns;
         final maxGridY = isFloor
-            ? gridLimit
-            : (gridLimit - meta.lengthSquares).clamp(0, gridLimit);
+            ? _RoomGeometry.floorGridDepth
+            : _RoomGeometry.wallRows;
 
         final targetGridX = (currentGridX + stepMoveX)
             .clamp(0, maxGridX)
@@ -3640,21 +3832,36 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
             .clamp(0, maxGridY)
             .toInt();
 
-        final targetFits =
-            !isFloor ||
-            perspective.floorFootprintFits(
-              gridX: targetGridX,
-              gridY: targetGridY,
-              widthSquares: meta.widthSquares,
-              lengthSquares: meta.lengthSquares,
-              visualScale: _editingVisualScale ?? 1.0,
-            );
+        final currentVisualScale = _editingVisualScale ?? 1.0;
+        final targetFits = isFloor
+            ? perspective.floorFootprintFits(
+                gridX: targetGridX,
+                gridY: targetGridY,
+                widthSquares: meta.widthSquares,
+                lengthSquares: meta.lengthSquares,
+                visualScale: currentVisualScale,
+              )
+            : perspective.wallItemFits(
+                surface: surface,
+                gridX: targetGridX,
+                gridY: targetGridY,
+                itemWidth:
+                    _RoomCanvas.furnitureSquarePixels *
+                    meta.widthSquares *
+                    currentVisualScale,
+                itemHeight:
+                    _RoomCanvas.furnitureSquarePixels *
+                    meta.lengthSquares *
+                    currentVisualScale,
+                rotation: _editingVisualRotation ?? 0.0,
+              );
 
         if (targetFits &&
             (targetGridX != currentGridX || targetGridY != currentGridY)) {
           setState(() {
-            _editingCol = _gridToNormalized(targetGridX);
-            _editingRow = _gridToNormalized(targetGridY);
+            _editingCol = _surfaceColToNormalized(surface, targetGridX);
+            _editingRow = _surfaceRowToNormalized(surface, targetGridY);
+            _editingSurface = surface;
             _accumulatedDragX = 0.0;
             _accumulatedDragY = 0.0;
           });
@@ -3673,6 +3880,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     bool? flipX,
     bool? flipY,
     bool? isLocked,
+    RoomSurface? surface,
   }) async {
     final firestore = FirebaseFirestore.instance;
     final userRef = firestore.collection('users').doc(user.uid);
@@ -3687,6 +3895,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
 
     final updateData = <String, dynamic>{
       'location': {'col': col, 'row': row},
+      if (surface != null) 'roomSurface': _surfaceName(surface),
       if (visualScale != null) 'visualScale': visualScale,
       if (visualRotation != null) 'visualRotation': visualRotation,
       if (flipX != null) 'flipX': flipX,
@@ -3799,8 +4008,8 @@ class _RoomGridPainter extends CustomPainter {
     for (int i = 1; i < _RoomGeometry.wallColumns; i++) {
       final t = i / _RoomGeometry.wallColumns;
       final top = Offset.lerp(
-        _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
-        _p(size, _RoomGeometry.leftX, _RoomGeometry.ceilingLeftEdgeY),
+        _p(size, _RoomGeometry.centerX, _RoomGeometry.wallGridTopCenterY),
+        _p(size, _RoomGeometry.leftX, _RoomGeometry.wallGridTopEdgeY),
         t,
       )!;
       final bottom = Offset.lerp(
@@ -3814,12 +4023,12 @@ class _RoomGridPainter extends CustomPainter {
     for (int j = 1; j < _RoomGeometry.wallRows; j++) {
       final t = j / _RoomGeometry.wallRows;
       final inner = Offset.lerp(
-        _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
+        _p(size, _RoomGeometry.centerX, _RoomGeometry.wallGridTopCenterY),
         _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY),
         t,
       )!;
       final outer = Offset.lerp(
-        _p(size, _RoomGeometry.leftX, _RoomGeometry.ceilingLeftEdgeY),
+        _p(size, _RoomGeometry.leftX, _RoomGeometry.wallGridTopEdgeY),
         _p(size, _RoomGeometry.leftX, _RoomGeometry.floorLeftEdgeY),
         t,
       )!;
@@ -3836,8 +4045,8 @@ class _RoomGridPainter extends CustomPainter {
     for (int i = 1; i < _RoomGeometry.wallColumns; i++) {
       final t = i / _RoomGeometry.wallColumns;
       final top = Offset.lerp(
-        _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
-        _p(size, _RoomGeometry.rightX, _RoomGeometry.ceilingRightEdgeY),
+        _p(size, _RoomGeometry.centerX, _RoomGeometry.wallGridTopCenterY),
+        _p(size, _RoomGeometry.rightX, _RoomGeometry.wallGridTopEdgeY),
         t,
       )!;
       final bottom = Offset.lerp(
@@ -3851,12 +4060,12 @@ class _RoomGridPainter extends CustomPainter {
     for (int j = 1; j < _RoomGeometry.wallRows; j++) {
       final t = j / _RoomGeometry.wallRows;
       final inner = Offset.lerp(
-        _p(size, _RoomGeometry.centerX, _RoomGeometry.ceilingCenterY),
+        _p(size, _RoomGeometry.centerX, _RoomGeometry.wallGridTopCenterY),
         _p(size, _RoomGeometry.centerX, _RoomGeometry.floorCornerY),
         t,
       )!;
       final outer = Offset.lerp(
-        _p(size, _RoomGeometry.rightX, _RoomGeometry.ceilingRightEdgeY),
+        _p(size, _RoomGeometry.rightX, _RoomGeometry.wallGridTopEdgeY),
         _p(size, _RoomGeometry.rightX, _RoomGeometry.floorRightEdgeY),
         t,
       )!;
