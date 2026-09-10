@@ -844,7 +844,7 @@ class _HomePageState extends State<HomePage>
                 child: Material(
                   color: Colors.transparent,
                   child: Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
                     decoration: BoxDecoration(
                       color: cs.surface,
                       borderRadius: BorderRadius.circular(22),
@@ -865,31 +865,33 @@ class _HomePageState extends State<HomePage>
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            IconButton(
-                              tooltip: _isEditPanelCollapsed
-                                  ? 'Expand controls'
-                                  : 'Collapse controls',
-                              onPressed: () => setState(
-                                () => _isEditPanelCollapsed =
-                                    !_isEditPanelCollapsed,
-                              ),
-                              icon: AnimatedRotation(
-                                turns: _isEditPanelCollapsed ? 0.5 : 0.0,
-                                duration: const Duration(milliseconds: 180),
-                                child: Icon(
-                                  Icons.keyboard_arrow_up_rounded,
-                                  color: cs.onSurface,
-                                  size: 24,
+                            SizedBox(
+                              width: 18,
+                              height: 34,
+                              child: IconButton(
+                                tooltip: _isEditPanelCollapsed
+                                    ? 'Expand controls'
+                                    : 'Collapse controls',
+                                onPressed: () => setState(
+                                  () => _isEditPanelCollapsed =
+                                      !_isEditPanelCollapsed,
                                 ),
-                              ),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 34,
-                                minHeight: 34,
+                                icon: AnimatedRotation(
+                                  turns: _isEditPanelCollapsed ? 0.5 : 0.0,
+                                  duration: const Duration(milliseconds: 180),
+                                  child: Icon(
+                                    Icons.keyboard_arrow_up_rounded,
+                                    color: cs.onSurface,
+                                    size: 24,
+                                  ),
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                alignment: Alignment.centerLeft,
+                                constraints: const BoxConstraints(),
                               ),
                             ),
-                            const SizedBox(width: 2),
+                            const SizedBox(width: 6),
                             Text(
                               'Edit Room',
                               style: Theme.of(context).textTheme.titleMedium
@@ -899,15 +901,15 @@ class _HomePageState extends State<HomePage>
                                     color: cs.onSurface,
                                   ),
                             ),
-                            const SizedBox(width: 2),
+                            const SizedBox(width: 5),
                             Transform.translate(
-                              offset: const Offset(-3, 0),
+                              offset: const Offset(-6, 0),
                               child: IconButton(
                                 tooltip: 'How room editing works',
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
-                                  minWidth: 34,
+                                  minWidth: 26,
                                   minHeight: 34,
                                 ),
                                 onPressed: () {
@@ -1399,17 +1401,20 @@ class _HomePageState extends State<HomePage>
                             ),
                           ],
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 38, top: 2),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Tap an item, then drag across grid',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                    fontSize: 11,
-                                  ),
+                        Transform.translate(
+                          offset: const Offset(0, -6),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 24, top: 0),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Tap an item, then drag across grid',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                      fontSize: 11,
+                                    ),
+                              ),
                             ),
                           ),
                         ),
@@ -1434,10 +1439,10 @@ class _HomePageState extends State<HomePage>
                                         boxShadow: [
                                           BoxShadow(
                                             color: cs.shadow.withValues(
-                                              alpha: 0.12,
+                                              alpha: 0.10,
                                             ),
-                                            blurRadius: 18,
-                                            offset: const Offset(0, 6),
+                                            blurRadius: 7,
+                                            offset: const Offset(0, 2),
                                           ),
                                         ],
                                       ),
@@ -1448,18 +1453,18 @@ class _HomePageState extends State<HomePage>
                                         icon: Icon(
                                           Icons.flip_rounded,
                                           size: 16,
-                                          color: roomBrown,
+                                          color: cs.onSurface,
                                         ),
                                         label: Text(
                                           'Flip',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: roomBrown,
+                                            color: cs.onSurface,
                                           ),
                                         ),
                                         style: FilledButton.styleFrom(
                                           backgroundColor: cs.surface,
-                                          foregroundColor: roomBrown,
+                                          foregroundColor: cs.onSurface,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
                                             vertical: 8,
@@ -1488,10 +1493,10 @@ class _HomePageState extends State<HomePage>
                                         boxShadow: [
                                           BoxShadow(
                                             color: cs.shadow.withValues(
-                                              alpha: 0.12,
+                                              alpha: 0.10,
                                             ),
-                                            blurRadius: 18,
-                                            offset: const Offset(0, 6),
+                                            blurRadius: 7,
+                                            offset: const Offset(0, 2),
                                           ),
                                         ],
                                       ),
@@ -1507,18 +1512,18 @@ class _HomePageState extends State<HomePage>
                                         icon: Icon(
                                           Icons.restart_alt_rounded,
                                           size: 16,
-                                          color: roomBrown,
+                                          color: cs.onSurface,
                                         ),
                                         label: Text(
                                           'Restart',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: roomBrown,
+                                            color: cs.onSurface,
                                           ),
                                         ),
                                         style: FilledButton.styleFrom(
                                           backgroundColor: cs.surface,
-                                          foregroundColor: roomBrown,
+                                          foregroundColor: cs.onSurface,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
                                             vertical: 8,
@@ -1547,10 +1552,10 @@ class _HomePageState extends State<HomePage>
                                         boxShadow: [
                                           BoxShadow(
                                             color: cs.shadow.withValues(
-                                              alpha: 0.12,
+                                              alpha: 0.10,
                                             ),
-                                            blurRadius: 18,
-                                            offset: const Offset(0, 6),
+                                            blurRadius: 7,
+                                            offset: const Offset(0, 2),
                                           ),
                                         ],
                                       ),
