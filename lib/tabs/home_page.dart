@@ -126,6 +126,7 @@ class _HomePageState extends State<HomePage>
   bool _isLoadingRoom = true;
   bool _hasFurnitureSelection = false;
   bool _isFurnitureTrayOpen = false;
+  bool _isEditPanelCollapsed = false;
   final GlobalKey<_RoomFurnitureState> _roomFurnitureKey =
       GlobalKey<_RoomFurnitureState>();
 
@@ -493,6 +494,7 @@ class _HomePageState extends State<HomePage>
           setState(() {
             _isEditingLayout = true;
             _isFurnitureTrayOpen = false;
+            _isEditPanelCollapsed = false;
           });
         },
       ),
@@ -593,6 +595,9 @@ class _HomePageState extends State<HomePage>
     final user = FirebaseAuth.instance.currentUser;
     final cs = Theme.of(context).colorScheme;
     final firstName = user?.displayName?.split(' ').first ?? 'there';
+    final roomTheme =
+        kRoomThemes[_selectedRoomTheme] ?? kRoomThemes['room_pink']!;
+    final roomBrown = roomTheme.baseboardDark;
 
     return Stack(
       fit: StackFit.expand,
@@ -669,15 +674,9 @@ class _HomePageState extends State<HomePage>
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: cs.shadow.withValues(alpha: 0.07),
-                            blurRadius: 22,
-                            offset: const Offset(0, 10),
-                          ),
-                          BoxShadow(
-                            color: cs.primary.withValues(alpha: 0.1),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                            spreadRadius: -4,
+                            color: cs.shadow.withValues(alpha: 0.12),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
@@ -688,18 +687,11 @@ class _HomePageState extends State<HomePage>
                           child: Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  cs.primaryContainer.withValues(alpha: 0.85),
-                                  cs.secondaryContainer.withValues(alpha: 0.55),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: cs.surface,
                               borderRadius: BorderRadius.circular(22),
                               border: Border.all(
-                                color: cs.primary.withValues(alpha: 0.35),
-                                width: 1,
+                                color: cs.outline.withValues(alpha: 0.3),
+                                width: 0.5,
                               ),
                             ),
                             child: Column(
@@ -737,56 +729,32 @@ class _HomePageState extends State<HomePage>
                                         size: 20,
                                       ),
                                       style: IconButton.styleFrom(
-                                        backgroundColor: cs.primary.withValues(
-                                          alpha: 0.15,
+                                        backgroundColor: cs.surface,
+                                        foregroundColor: roomBrown,
+                                        side: BorderSide(
+                                          color: roomBrown.withValues(
+                                            alpha: 0.28,
+                                          ),
                                         ),
-                                        foregroundColor: cs.primary,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 4),
                                 Material(
-                                  color: cs.surface.withValues(alpha: 0.7),
-                                  borderRadius: BorderRadius.circular(14),
+                                  color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () => _showTipSheet(context, cs),
                                     borderRadius: BorderRadius.circular(14),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.auto_awesome_rounded,
-                                            size: 16,
-                                            color: cs.primary,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Daily inspiration',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w600,
-                                                  color: cs.onSurface,
-                                                ),
-                                          ),
-                                          const Spacer(),
-                                          Icon(
-                                            Icons.chevron_right_rounded,
-                                            size: 16,
-                                            color: cs.onSurfaceVariant,
-                                          ),
-                                        ],
-                                      ),
+                                    child: _StatPill(
+                                      cs: cs,
+                                      icon: Icons.auto_awesome_rounded,
+                                      tint: cs.primary,
+                                      label: 'Daily inspiration',
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 4),
                                 Row(
                                   children: [
                                     Expanded(
@@ -878,23 +846,16 @@ class _HomePageState extends State<HomePage>
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          cs.primaryContainer.withValues(alpha: 0.92),
-                          cs.secondaryContainer.withValues(alpha: 0.72),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: cs.surface,
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(
-                        color: cs.primary.withValues(alpha: 0.35),
+                        color: cs.primary.withValues(alpha: 0.24),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: cs.shadow.withValues(alpha: 0.08),
-                          blurRadius: 22,
-                          offset: const Offset(0, 10),
+                          color: cs.shadow.withValues(alpha: 0.12),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
@@ -902,521 +863,480 @@ class _HomePageState extends State<HomePage>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Edit room',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.normal,
-                                              fontSize: 19,
-                                              color: cs.onSurface,
-                                            ),
-                                      ),
-                                      const SizedBox(width: 0),
-                                      Transform.translate(
-                                        offset: const Offset(-3, 0),
-                                        child: IconButton(
-                                          tooltip: 'How room editing works',
-                                          visualDensity: VisualDensity.compact,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(
-                                            minWidth: 34,
-                                            minHeight: 34,
-                                          ),
-                                          onPressed: () {
-                                            showModalBottomSheet<void>(
-                                              context: context,
-                                              isScrollControlled: true,
-                                              backgroundColor:
-                                                  Colors.transparent,
-                                              builder: (sheetContext) {
-                                                final sheetTheme = Theme.of(
-                                                  sheetContext,
-                                                );
-                                                final sheetCs =
-                                                    sheetTheme.colorScheme;
-                                                final steps =
-                                                    <
-                                                      ({
-                                                        IconData icon,
-                                                        String title,
-                                                        String body,
-                                                      })
-                                                    >[
-                                                      (
-                                                        icon: Icons
-                                                            .touch_app_rounded,
-                                                        title: 'Select',
-                                                        body:
-                                                            'Tap any unlocked furniture item to select it.',
-                                                      ),
-                                                      (
-                                                        icon: Icons
-                                                            .open_with_rounded,
-                                                        title: 'Move',
-                                                        body:
-                                                            'Drag the selected item across the room grid to place it exactly where you want.',
-                                                      ),
-                                                      (
-                                                        icon: Icons
-                                                            .rotate_right_rounded,
-                                                        title:
-                                                            'Rotate & resize',
-                                                        body:
-                                                            'Use the Rotate and Size sliders for precise adjustments.',
-                                                      ),
-                                                      (
-                                                        icon:
-                                                            Icons.flip_rounded,
-                                                        title: 'Flip',
-                                                        body:
-                                                            'Mirror the selected furniture with one tap.',
-                                                      ),
-                                                      (
-                                                        icon:
-                                                            Icons.lock_rounded,
-                                                        title: 'Lock',
-                                                        body:
-                                                            'Double-tap an item to lock or unlock it. Locked furniture stays in place.',
-                                                      ),
-                                                      (
-                                                        icon: Icons
-                                                            .restart_alt_rounded,
-                                                        title: 'Restart',
-                                                        body:
-                                                            'Return the selected item to the position, size, rotation and flip state it had when you selected it.',
-                                                      ),
-                                                      (
-                                                        icon: Icons
-                                                            .delete_outline_rounded,
-                                                        title: 'Delete',
-                                                        body:
-                                                            'Delete the selected item. With nothing selected, Delete lets you remove all furniture after confirmation.',
-                                                      ),
-                                                      (
-                                                        icon: Icons
-                                                            .deselect_rounded,
-                                                        title: 'Deselect',
-                                                        body:
-                                                            'Tap an empty part of the room to clear your selection.',
-                                                      ),
-                                                      (
-                                                        icon:
-                                                            Icons.check_rounded,
-                                                        title: 'Finish',
-                                                        body:
-                                                            'Tap the checkmark when your room looks right.',
-                                                      ),
-                                                    ];
+                            IconButton(
+                              tooltip: _isEditPanelCollapsed
+                                  ? 'Expand controls'
+                                  : 'Collapse controls',
+                              onPressed: () => setState(
+                                () => _isEditPanelCollapsed =
+                                    !_isEditPanelCollapsed,
+                              ),
+                              icon: AnimatedRotation(
+                                turns: _isEditPanelCollapsed ? 0.5 : 0.0,
+                                duration: const Duration(milliseconds: 180),
+                                child: Icon(
+                                  Icons.keyboard_arrow_up_rounded,
+                                  color: cs.onSurface,
+                                  size: 24,
+                                ),
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 34,
+                                minHeight: 34,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Edit Room',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 19,
+                                    color: cs.onSurface,
+                                  ),
+                            ),
+                            const SizedBox(width: 2),
+                            Transform.translate(
+                              offset: const Offset(-3, 0),
+                              child: IconButton(
+                                tooltip: 'How room editing works',
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 34,
+                                  minHeight: 34,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet<void>(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (sheetContext) {
+                                      final sheetTheme = Theme.of(sheetContext);
+                                      final sheetCs = sheetTheme.colorScheme;
+                                      final steps = <({IconData icon, String title, String body})>[
+                                        (
+                                          icon: Icons.touch_app_rounded,
+                                          title: 'Select',
+                                          body:
+                                              'Tap any unlocked furniture item to select it.',
+                                        ),
+                                        (
+                                          icon: Icons.open_with_rounded,
+                                          title: 'Move',
+                                          body:
+                                              'Drag the selected item across the room grid to place it exactly where you want.',
+                                        ),
+                                        (
+                                          icon: Icons.rotate_right_rounded,
+                                          title: 'Rotate & resize',
+                                          body:
+                                              'Use the Rotate and Size sliders for precise adjustments.',
+                                        ),
+                                        (
+                                          icon: Icons.flip_rounded,
+                                          title: 'Flip',
+                                          body:
+                                              'Mirror the selected furniture with one tap.',
+                                        ),
+                                        (
+                                          icon: Icons.lock_rounded,
+                                          title: 'Lock',
+                                          body:
+                                              'Double-tap an item to lock or unlock it. Locked furniture stays in place.',
+                                        ),
+                                        (
+                                          icon: Icons.restart_alt_rounded,
+                                          title: 'Restart',
+                                          body:
+                                              'Return the selected item to the position, size, rotation and flip state it had when you selected it.',
+                                        ),
+                                        (
+                                          icon: Icons.delete_outline_rounded,
+                                          title: 'Delete',
+                                          body:
+                                              'Delete the selected item. With nothing selected, Delete lets you remove all furniture after confirmation.',
+                                        ),
+                                        (
+                                          icon: Icons.deselect_rounded,
+                                          title: 'Deselect',
+                                          body:
+                                              'Tap an empty part of the room to clear your selection.',
+                                        ),
+                                        (
+                                          icon: Icons.check_rounded,
+                                          title: 'Finish',
+                                          body:
+                                              'Tap the checkmark when your room looks right.',
+                                        ),
+                                      ];
 
-                                                return DraggableScrollableSheet(
-                                                  initialChildSize: 0.72,
-                                                  minChildSize: 0.48,
-                                                  maxChildSize: 0.92,
-                                                  expand: false,
-                                                  builder: (context, scrollController) {
-                                                    return Container(
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(
-                                                          0xFFF3E8D7,
+                                      return DraggableScrollableSheet(
+                                        initialChildSize: 0.72,
+                                        minChildSize: 0.48,
+                                        maxChildSize: 0.92,
+                                        expand: false,
+                                        builder: (context, scrollController) {
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: sheetCs.surface,
+                                              borderRadius:
+                                                  const BorderRadius.vertical(
+                                                    top: Radius.circular(32),
+                                                  ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: sheetCs.shadow
+                                                      .withValues(alpha: 0.16),
+                                                  blurRadius: 30,
+                                                  offset: const Offset(0, -8),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                const SizedBox(height: 10),
+                                                Container(
+                                                  width: 44,
+                                                  height: 5,
+                                                  decoration: BoxDecoration(
+                                                    color: sheetCs.primary
+                                                        .withValues(
+                                                          alpha: 0.32,
                                                         ),
-                                                        borderRadius:
-                                                            const BorderRadius.vertical(
-                                                              top:
-                                                                  Radius.circular(
-                                                                    32,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          99,
+                                                        ),
+                                                  ),
+                                                ),
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.fromLTRB(
+                                                        22,
+                                                        18,
+                                                        14,
+                                                        12,
+                                                      ),
+                                                  child: Row(
+                                                    children: [
+                                                      Container(
+                                                        width: 44,
+                                                        height: 44,
+                                                        decoration: BoxDecoration(
+                                                          color: sheetCs.primary
+                                                              .withValues(
+                                                                alpha: 0.13,
+                                                              ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                14,
+                                                              ),
+                                                          border: Border.all(
+                                                            color: sheetCs
+                                                                .primary
+                                                                .withValues(
+                                                                  alpha: 0.18,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons
+                                                              .chair_alt_rounded,
+                                                          color:
+                                                              sheetCs.primary,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              'How to edit your room',
+                                                              style: sheetTheme
+                                                                  .textTheme
+                                                                  .titleLarge
+                                                                  ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                    color: sheetCs
+                                                                        .onSurface,
                                                                   ),
                                                             ),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: sheetCs
-                                                                .shadow
-                                                                .withValues(
-                                                                  alpha: 0.16,
-                                                                ),
-                                                            blurRadius: 30,
-                                                            offset:
-                                                                const Offset(
-                                                                  0,
-                                                                  -8,
-                                                                ),
-                                                          ),
-                                                        ],
+                                                            const SizedBox(
+                                                              height: 2,
+                                                            ),
+                                                            Text(
+                                                              'Scroll through the controls below',
+                                                              style: sheetTheme
+                                                                  .textTheme
+                                                                  .bodySmall
+                                                                  ?.copyWith(
+                                                                    color: sheetCs
+                                                                        .onSurfaceVariant,
+                                                                  ),
+                                                            ),
+                                                          ],
+                                                        ),
                                                       ),
-                                                      child: Column(
-                                                        children: [
-                                                          const SizedBox(
-                                                            height: 10,
-                                                          ),
-                                                          Container(
-                                                            width: 44,
-                                                            height: 5,
+                                                      IconButton(
+                                                        tooltip: 'Close',
+                                                        onPressed: () =>
+                                                            Navigator.of(
+                                                              sheetContext,
+                                                            ).pop(),
+                                                        icon: const Icon(
+                                                          Icons.close_rounded,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Divider(
+                                                  height: 1,
+                                                  color: sheetCs.primary
+                                                      .withValues(alpha: 0.12),
+                                                ),
+                                                Expanded(
+                                                  child: ListView.separated(
+                                                    controller:
+                                                        scrollController,
+                                                    padding:
+                                                        const EdgeInsets.fromLTRB(
+                                                          18,
+                                                          18,
+                                                          18,
+                                                          30,
+                                                        ),
+                                                    itemCount: steps.length + 1,
+                                                    separatorBuilder: (_, __) =>
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                    itemBuilder: (context, index) {
+                                                      if (index ==
+                                                          steps.length) {
+                                                        return Padding(
+                                                          padding:
+                                                              const EdgeInsets.only(
+                                                                top: 6,
+                                                              ),
+                                                          child: Container(
+                                                            padding:
+                                                                const EdgeInsets.all(
+                                                                  16,
+                                                                ),
                                                             decoration: BoxDecoration(
                                                               color: sheetCs
                                                                   .primary
                                                                   .withValues(
-                                                                    alpha: 0.32,
+                                                                    alpha: 0.10,
                                                                   ),
                                                               borderRadius:
                                                                   BorderRadius.circular(
-                                                                    99,
+                                                                    20,
                                                                   ),
+                                                              border: Border.all(
+                                                                color: sheetCs
+                                                                    .primary
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.14,
+                                                                    ),
+                                                              ),
                                                             ),
-                                                          ),
-                                                          Padding(
-                                                            padding:
-                                                                const EdgeInsets.fromLTRB(
-                                                                  22,
-                                                                  18,
-                                                                  14,
-                                                                  12,
-                                                                ),
                                                             child: Row(
                                                               children: [
-                                                                Container(
-                                                                  width: 44,
-                                                                  height: 44,
-                                                                  decoration: BoxDecoration(
-                                                                    color: sheetCs
-                                                                        .primary
-                                                                        .withValues(
-                                                                          alpha:
-                                                                              0.13,
-                                                                        ),
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          14,
-                                                                        ),
-                                                                    border: Border.all(
-                                                                      color: sheetCs
-                                                                          .primary
-                                                                          .withValues(
-                                                                            alpha:
-                                                                                0.18,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                  child: Icon(
-                                                                    Icons
-                                                                        .chair_alt_rounded,
-                                                                    color: sheetCs
-                                                                        .primary,
-                                                                  ),
+                                                                Icon(
+                                                                  Icons
+                                                                      .swipe_up_rounded,
+                                                                  color: sheetCs
+                                                                      .primary,
                                                                 ),
                                                                 const SizedBox(
                                                                   width: 12,
                                                                 ),
                                                                 Expanded(
-                                                                  child: Column(
-                                                                    crossAxisAlignment:
-                                                                        CrossAxisAlignment
-                                                                            .start,
-                                                                    children: [
-                                                                      Text(
-                                                                        'How to edit your room',
-                                                                        style: sheetTheme.textTheme.titleLarge?.copyWith(
+                                                                  child: Text(
+                                                                    'Tip: drag this panel up for more room, or swipe it down when you are done.',
+                                                                    style: sheetTheme
+                                                                        .textTheme
+                                                                        .bodyMedium
+                                                                        ?.copyWith(
                                                                           fontWeight:
-                                                                              FontWeight.w700,
-                                                                          color: const Color(
-                                                                            0xFF3E342C,
-                                                                          ),
+                                                                              FontWeight.w600,
                                                                         ),
-                                                                      ),
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            2,
-                                                                      ),
-                                                                      Text(
-                                                                        'Scroll through the controls below',
-                                                                        style: sheetTheme
-                                                                            .textTheme
-                                                                            .bodySmall
-                                                                            ?.copyWith(
-                                                                              color: const Color(
-                                                                                0xFF786B60,
-                                                                              ),
-                                                                            ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                                IconButton(
-                                                                  tooltip:
-                                                                      'Close',
-                                                                  onPressed: () =>
-                                                                      Navigator.of(
-                                                                        sheetContext,
-                                                                      ).pop(),
-                                                                  icon: const Icon(
-                                                                    Icons
-                                                                        .close_rounded,
                                                                   ),
                                                                 ),
                                                               ],
                                                             ),
                                                           ),
-                                                          Divider(
-                                                            height: 1,
-                                                            color: sheetCs
-                                                                .primary
-                                                                .withValues(
-                                                                  alpha: 0.12,
-                                                                ),
-                                                          ),
-                                                          Expanded(
-                                                            child: ListView.separated(
-                                                              controller:
-                                                                  scrollController,
-                                                              padding:
-                                                                  const EdgeInsets.fromLTRB(
-                                                                    18,
-                                                                    18,
-                                                                    18,
-                                                                    30,
-                                                                  ),
-                                                              itemCount:
-                                                                  steps.length +
-                                                                  1,
-                                                              separatorBuilder:
-                                                                  (_, __) =>
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            10,
-                                                                      ),
-                                                              itemBuilder: (context, index) {
-                                                                if (index ==
-                                                                    steps
-                                                                        .length) {
-                                                                  return Padding(
-                                                                    padding:
-                                                                        const EdgeInsets.only(
-                                                                          top:
-                                                                              6,
-                                                                        ),
-                                                                    child: Container(
-                                                                      padding:
-                                                                          const EdgeInsets.all(
-                                                                            16,
-                                                                          ),
-                                                                      decoration: BoxDecoration(
-                                                                        color: sheetCs
-                                                                            .primary
-                                                                            .withValues(
-                                                                              alpha: 0.10,
-                                                                            ),
-                                                                        borderRadius:
-                                                                            BorderRadius.circular(
-                                                                              20,
-                                                                            ),
-                                                                        border: Border.all(
-                                                                          color: sheetCs.primary.withValues(
-                                                                            alpha:
-                                                                                0.14,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                      child: Row(
-                                                                        children: [
-                                                                          Icon(
-                                                                            Icons.swipe_up_rounded,
-                                                                            color:
-                                                                                sheetCs.primary,
-                                                                          ),
-                                                                          const SizedBox(
-                                                                            width:
-                                                                                12,
-                                                                          ),
-                                                                          Expanded(
-                                                                            child: Text(
-                                                                              'Tip: drag this panel up for more room, or swipe it down when you are done.',
-                                                                              style: sheetTheme.textTheme.bodyMedium?.copyWith(
-                                                                                fontWeight: FontWeight.w600,
-                                                                              ),
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                  );
-                                                                }
-                                                                final step =
-                                                                    steps[index];
-                                                                return TweenAnimationBuilder<
-                                                                  double
-                                                                >(
-                                                                  duration: Duration(
-                                                                    milliseconds:
-                                                                        240 +
-                                                                        (index *
-                                                                            35),
-                                                                  ),
-                                                                  curve: Curves
-                                                                      .easeOutCubic,
-                                                                  tween: Tween(
-                                                                    begin: 0,
-                                                                    end: 1,
-                                                                  ),
-                                                                  builder:
-                                                                      (
-                                                                        context,
-                                                                        value,
-                                                                        child,
-                                                                      ) => Transform.translate(
-                                                                        offset: Offset(
-                                                                          0,
-                                                                          14 *
-                                                                              (1 -
-                                                                                  value),
-                                                                        ),
-                                                                        child: Opacity(
-                                                                          opacity:
-                                                                              value,
-                                                                          child:
-                                                                              child,
-                                                                        ),
-                                                                      ),
-                                                                  child: Container(
-                                                                    padding:
-                                                                        const EdgeInsets.all(
-                                                                          14,
-                                                                        ),
-                                                                    decoration: BoxDecoration(
-                                                                      color: const Color(
-                                                                        0xFFFFFBF5,
-                                                                      ),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                            20,
-                                                                          ),
-                                                                      border: Border.all(
-                                                                        color: sheetCs
-                                                                            .primary
-                                                                            .withValues(
-                                                                              alpha: 0.12,
-                                                                            ),
-                                                                      ),
-                                                                      boxShadow: [
-                                                                        BoxShadow(
-                                                                          color:
-                                                                              const Color(
-                                                                                0xFF5B4636,
-                                                                              ).withValues(
-                                                                                alpha: 0.06,
-                                                                              ),
-                                                                          blurRadius:
-                                                                              12,
-                                                                          offset: const Offset(
-                                                                            0,
-                                                                            4,
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                    child: Row(
-                                                                      crossAxisAlignment:
-                                                                          CrossAxisAlignment
-                                                                              .start,
-                                                                      children: [
-                                                                        Container(
-                                                                          width:
-                                                                              42,
-                                                                          height:
-                                                                              42,
-                                                                          decoration: BoxDecoration(
-                                                                            color: sheetCs.primary.withValues(
-                                                                              alpha: 0.12,
-                                                                            ),
-                                                                            borderRadius: BorderRadius.circular(
-                                                                              13,
-                                                                            ),
-                                                                          ),
-                                                                          child: Icon(
-                                                                            step.icon,
-                                                                            size:
-                                                                                21,
-                                                                            color:
-                                                                                sheetCs.primary,
-                                                                          ),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          width:
-                                                                              12,
-                                                                        ),
-                                                                        Expanded(
-                                                                          child: Column(
-                                                                            crossAxisAlignment:
-                                                                                CrossAxisAlignment.start,
-                                                                            children: [
-                                                                              Text(
-                                                                                step.title,
-                                                                                style: sheetTheme.textTheme.titleSmall?.copyWith(
-                                                                                  fontWeight: FontWeight.w700,
-                                                                                  color: const Color(
-                                                                                    0xFF3E342C,
-                                                                                  ),
-                                                                                ),
-                                                                              ),
-                                                                              const SizedBox(
-                                                                                height: 3,
-                                                                              ),
-                                                                              Text(
-                                                                                step.body,
-                                                                                style: sheetTheme.textTheme.bodySmall?.copyWith(
-                                                                                  color: const Color(
-                                                                                    0xFF786B60,
-                                                                                  ),
-                                                                                  height: 1.35,
-                                                                                ),
-                                                                              ),
-                                                                            ],
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                );
-                                                              },
+                                                        );
+                                                      }
+                                                      final step = steps[index];
+                                                      return TweenAnimationBuilder<
+                                                        double
+                                                      >(
+                                                        duration: Duration(
+                                                          milliseconds:
+                                                              240 +
+                                                              (index * 35),
+                                                        ),
+                                                        curve:
+                                                            Curves.easeOutCubic,
+                                                        tween: Tween(
+                                                          begin: 0,
+                                                          end: 1,
+                                                        ),
+                                                        builder:
+                                                            (
+                                                              context,
+                                                              value,
+                                                              child,
+                                                            ) => Transform.translate(
+                                                              offset: Offset(
+                                                                0,
+                                                                14 *
+                                                                    (1 - value),
+                                                              ),
+                                                              child: Opacity(
+                                                                opacity: value,
+                                                                child: child,
+                                                              ),
                                                             ),
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                14,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color:
+                                                                sheetCs.surface,
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  20,
+                                                                ),
+                                                            border: Border.all(
+                                                              color: sheetCs
+                                                                  .primary
+                                                                  .withValues(
+                                                                    alpha: 0.12,
+                                                                  ),
+                                                            ),
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: sheetCs
+                                                                    .shadow
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.07,
+                                                                    ),
+                                                                blurRadius: 12,
+                                                                offset:
+                                                                    const Offset(
+                                                                      0,
+                                                                      4,
+                                                                    ),
+                                                              ),
+                                                            ],
                                                           ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  },
-                                                );
-                                              },
-                                            );
-                                          },
-                                          icon: Icon(
-                                            Icons.info_outline_rounded,
-                                            size: 25,
-                                            color: cs.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    'Tap an item, then drag across grid',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: cs.onSurfaceVariant,
-                                          fontSize: 11,
-                                        ),
-                                  ),
-                                ],
+                                                          child: Row(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Container(
+                                                                width: 42,
+                                                                height: 42,
+                                                                decoration: BoxDecoration(
+                                                                  color: sheetCs
+                                                                      .primary
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.12,
+                                                                      ),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        13,
+                                                                      ),
+                                                                ),
+                                                                child: Icon(
+                                                                  step.icon,
+                                                                  size: 21,
+                                                                  color: sheetCs
+                                                                      .primary,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 12,
+                                                              ),
+                                                              Expanded(
+                                                                child: Column(
+                                                                  crossAxisAlignment:
+                                                                      CrossAxisAlignment
+                                                                          .start,
+                                                                  children: [
+                                                                    Text(
+                                                                      step.title,
+                                                                      style: sheetTheme
+                                                                          .textTheme
+                                                                          .titleSmall
+                                                                          ?.copyWith(
+                                                                            fontWeight:
+                                                                                FontWeight.w700,
+                                                                            color:
+                                                                                sheetCs.onSurface,
+                                                                          ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                      height: 3,
+                                                                    ),
+                                                                    Text(
+                                                                      step.body,
+                                                                      style: sheetTheme
+                                                                          .textTheme
+                                                                          .bodySmall
+                                                                          ?.copyWith(
+                                                                            color:
+                                                                                sheetCs.onSurfaceVariant,
+                                                                            height:
+                                                                                1.35,
+                                                                          ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 25,
+                                  color: cs.primary,
+                                ),
                               ),
                             ),
-                            // Cancel Button (disregards changes)
+                            const Spacer(),
                             Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
@@ -1441,7 +1361,7 @@ class _HomePageState extends State<HomePage>
                                 icon: Icon(
                                   Icons.close_rounded,
                                   size: 19,
-                                  color: cs.onSurfaceVariant,
+                                  color: cs.onSurface,
                                 ),
                                 style: IconButton.styleFrom(
                                   padding: const EdgeInsets.all(7),
@@ -1450,15 +1370,14 @@ class _HomePageState extends State<HomePage>
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // Done Button
                             Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: cs.primary.withValues(alpha: 0.28),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+                                    color: cs.shadow.withValues(alpha: 0.12),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 6),
                                   ),
                                 ],
                               ),
@@ -1480,215 +1399,335 @@ class _HomePageState extends State<HomePage>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        // Dedicated row for Flip, Restart, Delete
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: () => _roomFurnitureKey.currentState
-                                    ?.toggleFlipSelected(),
-                                icon: const Icon(Icons.flip_rounded, size: 16),
-                                label: const Text(
-                                  'Flip',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
+                        Padding(
+                          padding: const EdgeInsets.only(left: 38, top: 2),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Tap an item, then drag across grid',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontSize: 11,
                                   ),
-                                  minimumSize: const Size(0, 36),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: () {
-                                  _roomFurnitureKey.currentState
-                                      ?.restartSelected();
-                                  // Restart updates the furniture state internally.
-                                  // Rebuild this parent too so the Rotate and Size
-                                  // sliders immediately jump back to the restored values.
-                                  setState(() {});
-                                },
-                                icon: const Icon(
-                                  Icons.restart_alt_rounded,
-                                  size: 16,
-                                ),
-                                label: const Text(
-                                  'Restart',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
-                                  ),
-                                  minimumSize: const Size(0, 36),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                onPressed: () async {
-                                  final roomState =
-                                      _roomFurnitureKey.currentState;
-                                  if (roomState == null) return;
-
-                                  if (roomState.hasSelection) {
-                                    await roomState.deleteSelected();
-                                    return;
-                                  }
-
-                                  final confirmed = await showDialog<bool>(
-                                    context: context,
-                                    builder: (dialogContext) => AlertDialog(
-                                      title: const Text(
-                                        'Delete all furniture?',
-                                      ),
-                                      content: const Text(
-                                        'No item is selected. This will remove all furniture currently placed in the room.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(
-                                            dialogContext,
-                                          ).pop(false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () => Navigator.of(
-                                            dialogContext,
-                                          ).pop(true),
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: cs.error,
-                                            foregroundColor: cs.onError,
+                          ),
+                        ),
+                        AnimatedCrossFade(
+                          duration: const Duration(milliseconds: 220),
+                          firstCurve: Curves.easeOutCubic,
+                          secondCurve: Curves.easeInCubic,
+                          crossFadeState: _isEditPanelCollapsed
+                              ? CrossFadeState.showSecond
+                              : CrossFadeState.showFirst,
+                          firstChild: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(height: 12),
+                              // Dedicated row for Flip, Restart, Delete
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: cs.shadow.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            blurRadius: 18,
+                                            offset: const Offset(0, 6),
                                           ),
-                                          child: const Text('Delete all'),
+                                        ],
+                                      ),
+                                      child: FilledButton.tonalIcon(
+                                        onPressed: () => _roomFurnitureKey
+                                            .currentState
+                                            ?.toggleFlipSelected(),
+                                        icon: Icon(
+                                          Icons.flip_rounded,
+                                          size: 16,
+                                          color: roomBrown,
                                         ),
-                                      ],
+                                        label: Text(
+                                          'Flip',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: roomBrown,
+                                          ),
+                                        ),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: cs.surface,
+                                          foregroundColor: roomBrown,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                          minimumSize: const Size(0, 36),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            side: BorderSide(
+                                              color: cs.primary.withValues(
+                                                alpha: 0.65,
+                                              ),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  );
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: cs.shadow.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            blurRadius: 18,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                      ),
+                                      child: FilledButton.tonalIcon(
+                                        onPressed: () {
+                                          _roomFurnitureKey.currentState
+                                              ?.restartSelected();
+                                          // Restart updates the furniture state internally.
+                                          // Rebuild this parent too so the Rotate and Size
+                                          // sliders immediately jump back to the restored values.
+                                          setState(() {});
+                                        },
+                                        icon: Icon(
+                                          Icons.restart_alt_rounded,
+                                          size: 16,
+                                          color: roomBrown,
+                                        ),
+                                        label: Text(
+                                          'Restart',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: roomBrown,
+                                          ),
+                                        ),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: cs.surface,
+                                          foregroundColor: roomBrown,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                          minimumSize: const Size(0, 36),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            side: BorderSide(
+                                              color: cs.primary.withValues(
+                                                alpha: 0.65,
+                                              ),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: cs.shadow.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            blurRadius: 18,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                      ),
+                                      child: FilledButton.tonalIcon(
+                                        onPressed: () async {
+                                          final roomState =
+                                              _roomFurnitureKey.currentState;
+                                          if (roomState == null) return;
 
-                                  if (confirmed == true) {
-                                    await roomState.deleteAllFurniture();
-                                  }
-                                },
-                                icon: Icon(
-                                  Icons.delete_outline_rounded,
-                                  size: 16,
-                                  color: cs.error,
-                                ),
-                                label: Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                    color: cs.error,
-                                    fontSize: 12,
+                                          if (roomState.hasSelection) {
+                                            await roomState.deleteSelected();
+                                            return;
+                                          }
+
+                                          final confirmed = await showDialog<bool>(
+                                            context: context,
+                                            builder: (dialogContext) => AlertDialog(
+                                              title: const Text(
+                                                'Delete all furniture?',
+                                              ),
+                                              content: const Text(
+                                                'No item is selected. This will remove all furniture currently placed in the room.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(
+                                                    dialogContext,
+                                                  ).pop(false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                FilledButton(
+                                                  onPressed: () => Navigator.of(
+                                                    dialogContext,
+                                                  ).pop(true),
+                                                  style: FilledButton.styleFrom(
+                                                    backgroundColor: cs.error,
+                                                    foregroundColor: cs.onError,
+                                                  ),
+                                                  child: const Text(
+                                                    'Delete all',
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+
+                                          if (confirmed == true) {
+                                            await roomState
+                                                .deleteAllFurniture();
+                                          }
+                                        },
+                                        icon: Icon(
+                                          Icons.delete_outline_rounded,
+                                          size: 16,
+                                          color: cs.error,
+                                        ),
+                                        label: Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: cs.error,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: cs.surface,
+                                          foregroundColor: cs.error,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                          minimumSize: const Size(0, 36),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            side: BorderSide(
+                                              color: cs.primary.withValues(
+                                                alpha: 0.65,
+                                              ),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              // Rotate slider
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 48,
+                                    child: Text(
+                                      'Rotate',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ),
-                                  minimumSize: const Size(0, 36),
-                                  backgroundColor: cs.errorContainer.withValues(
-                                    alpha: 0.3,
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 26,
+                                      child: Slider(
+                                        value:
+                                            _roomFurnitureKey
+                                                .currentState
+                                                ?._editingVisualRotation ??
+                                            0.0,
+                                        min: -math.pi,
+                                        max: math.pi,
+                                        activeColor: cs.primary,
+                                        inactiveColor: cs.onSurfaceVariant
+                                            .withValues(alpha: 0.32),
+                                        onChanged: _hasFurnitureSelection
+                                            ? (val) {
+                                                setState(() {
+                                                  _roomFurnitureKey.currentState
+                                                      ?.setRotationSelected(
+                                                        val,
+                                                      );
+                                                });
+                                              }
+                                            : null,
+                                      ),
+                                    ),
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              // Size slider
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 48,
+                                    child: Text(
+                                      'Size',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 26,
+                                      child: Slider(
+                                        value:
+                                            _roomFurnitureKey
+                                                .currentState
+                                                ?._editingVisualScale ??
+                                            1.0,
+                                        min: 0.3,
+                                        max: 2.0,
+                                        activeColor: cs.primary,
+                                        inactiveColor: cs.onSurfaceVariant
+                                            .withValues(alpha: 0.32),
+                                        onChanged: _hasFurnitureSelection
+                                            ? (val) {
+                                                setState(() {
+                                                  _roomFurnitureKey.currentState
+                                                      ?.setScaleSelected(val);
+                                                });
+                                              }
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        // Rotate slider
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 48,
-                              child: Text(
-                                'Rotate',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: SizedBox(
-                                height: 26,
-                                child: Slider(
-                                  value:
-                                      _roomFurnitureKey
-                                          .currentState
-                                          ?._editingVisualRotation ??
-                                      0.0,
-                                  min: -math.pi,
-                                  max: math.pi,
-                                  onChanged: _hasFurnitureSelection
-                                      ? (val) {
-                                          setState(() {
-                                            _roomFurnitureKey.currentState
-                                                ?.setRotationSelected(val);
-                                          });
-                                        }
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        // Size slider
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 48,
-                              child: Text(
-                                'Size',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: SizedBox(
-                                height: 26,
-                                child: Slider(
-                                  value:
-                                      _roomFurnitureKey
-                                          .currentState
-                                          ?._editingVisualScale ??
-                                      1.0,
-                                  min: 0.3,
-                                  max: 2.0,
-                                  onChanged: _hasFurnitureSelection
-                                      ? (val) {
-                                          setState(() {
-                                            _roomFurnitureKey.currentState
-                                                ?.setScaleSelected(val);
-                                          });
-                                        }
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          secondChild: const SizedBox.shrink(),
                         ),
                       ],
                     ),
@@ -1901,9 +1940,14 @@ class _HomePageState extends State<HomePage>
             bottom: kPetFloorOffset + 20,
             child: Material(
               key: const ValueKey('furniture-tray-closed-plus'),
-              color: cs.surface.withValues(alpha: 0.9),
-              shape: const CircleBorder(),
-              elevation: 6,
+              color: cs.surface,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: roomBrown.withValues(alpha: 0.22),
+                  width: 1,
+                ),
+              ),
+              elevation: 8,
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: () => setState(() => _isFurnitureTrayOpen = true),
@@ -1969,9 +2013,14 @@ class _HomePageState extends State<HomePage>
               child: _Reveal(
                 animation: _seg(0.3, 0.8),
                 child: Material(
-                  color: cs.surface.withValues(alpha: 0.9),
-                  shape: const CircleBorder(),
-                  elevation: 6,
+                  color: cs.surface,
+                  shape: CircleBorder(
+                    side: BorderSide(
+                      color: roomBrown.withValues(alpha: 0.22),
+                      width: 1,
+                    ),
+                  ),
+                  elevation: 8,
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: () => _showFurnitureInventory(context, cs),
@@ -4154,7 +4203,14 @@ class _StatPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surface.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.38), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.14),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
