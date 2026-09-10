@@ -922,436 +922,485 @@ class _HomePageState extends State<HomePage>
                                               color: cs.onSurface,
                                             ),
                                       ),
-                                      const SizedBox(width: 4),
-                                      IconButton(
-                                        tooltip: 'How room editing works',
-                                        visualDensity: VisualDensity.compact,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 38,
-                                          minHeight: 38,
-                                        ),
-                                        onPressed: () {
-                                          showModalBottomSheet<void>(
-                                            context: context,
-                                            isScrollControlled: true,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (sheetContext) {
-                                              final sheetTheme = Theme.of(
-                                                sheetContext,
-                                              );
-                                              final sheetCs =
-                                                  sheetTheme.colorScheme;
-                                              final steps =
-                                                  <
-                                                    ({
-                                                      IconData icon,
-                                                      String title,
-                                                      String body,
-                                                    })
-                                                  >[
-                                                    (
-                                                      icon: Icons
-                                                          .touch_app_rounded,
-                                                      title: 'Select',
-                                                      body:
-                                                          'Tap any unlocked furniture item to select it.',
-                                                    ),
-                                                    (
-                                                      icon: Icons
-                                                          .open_with_rounded,
-                                                      title: 'Move',
-                                                      body:
-                                                          'Drag the selected item across the room grid to place it exactly where you want.',
-                                                    ),
-                                                    (
-                                                      icon: Icons
-                                                          .rotate_right_rounded,
-                                                      title: 'Rotate & resize',
-                                                      body:
-                                                          'Use the Rotate and Size sliders for precise adjustments.',
-                                                    ),
-                                                    (
-                                                      icon: Icons.flip_rounded,
-                                                      title: 'Flip',
-                                                      body:
-                                                          'Mirror the selected furniture with one tap.',
-                                                    ),
-                                                    (
-                                                      icon: Icons.lock_rounded,
-                                                      title: 'Lock',
-                                                      body:
-                                                          'Double-tap an item to lock or unlock it. Locked furniture stays in place.',
-                                                    ),
-                                                    (
-                                                      icon: Icons
-                                                          .restart_alt_rounded,
-                                                      title: 'Restart',
-                                                      body:
-                                                          'Return the selected item to the position, size, rotation and flip state it had when you selected it.',
-                                                    ),
-                                                    (
-                                                      icon: Icons
-                                                          .delete_outline_rounded,
-                                                      title: 'Delete',
-                                                      body:
-                                                          'Delete the selected item. With nothing selected, Delete lets you remove all furniture after confirmation.',
-                                                    ),
-                                                    (
-                                                      icon: Icons
-                                                          .deselect_rounded,
-                                                      title: 'Deselect',
-                                                      body:
-                                                          'Tap an empty part of the room to clear your selection.',
-                                                    ),
-                                                    (
-                                                      icon: Icons.check_rounded,
-                                                      title: 'Finish',
-                                                      body:
-                                                          'Tap the checkmark when your room looks right.',
-                                                    ),
-                                                  ];
+                                      const SizedBox(width: 0),
+                                      Transform.translate(
+                                        offset: const Offset(-3, 0),
+                                        child: IconButton(
+                                          tooltip: 'How room editing works',
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 34,
+                                            minHeight: 34,
+                                          ),
+                                          onPressed: () {
+                                            showModalBottomSheet<void>(
+                                              context: context,
+                                              isScrollControlled: true,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              builder: (sheetContext) {
+                                                final sheetTheme = Theme.of(
+                                                  sheetContext,
+                                                );
+                                                final sheetCs =
+                                                    sheetTheme.colorScheme;
+                                                final steps =
+                                                    <
+                                                      ({
+                                                        IconData icon,
+                                                        String title,
+                                                        String body,
+                                                      })
+                                                    >[
+                                                      (
+                                                        icon: Icons
+                                                            .touch_app_rounded,
+                                                        title: 'Select',
+                                                        body:
+                                                            'Tap any unlocked furniture item to select it.',
+                                                      ),
+                                                      (
+                                                        icon: Icons
+                                                            .open_with_rounded,
+                                                        title: 'Move',
+                                                        body:
+                                                            'Drag the selected item across the room grid to place it exactly where you want.',
+                                                      ),
+                                                      (
+                                                        icon: Icons
+                                                            .rotate_right_rounded,
+                                                        title:
+                                                            'Rotate & resize',
+                                                        body:
+                                                            'Use the Rotate and Size sliders for precise adjustments.',
+                                                      ),
+                                                      (
+                                                        icon:
+                                                            Icons.flip_rounded,
+                                                        title: 'Flip',
+                                                        body:
+                                                            'Mirror the selected furniture with one tap.',
+                                                      ),
+                                                      (
+                                                        icon:
+                                                            Icons.lock_rounded,
+                                                        title: 'Lock',
+                                                        body:
+                                                            'Double-tap an item to lock or unlock it. Locked furniture stays in place.',
+                                                      ),
+                                                      (
+                                                        icon: Icons
+                                                            .restart_alt_rounded,
+                                                        title: 'Restart',
+                                                        body:
+                                                            'Return the selected item to the position, size, rotation and flip state it had when you selected it.',
+                                                      ),
+                                                      (
+                                                        icon: Icons
+                                                            .delete_outline_rounded,
+                                                        title: 'Delete',
+                                                        body:
+                                                            'Delete the selected item. With nothing selected, Delete lets you remove all furniture after confirmation.',
+                                                      ),
+                                                      (
+                                                        icon: Icons
+                                                            .deselect_rounded,
+                                                        title: 'Deselect',
+                                                        body:
+                                                            'Tap an empty part of the room to clear your selection.',
+                                                      ),
+                                                      (
+                                                        icon:
+                                                            Icons.check_rounded,
+                                                        title: 'Finish',
+                                                        body:
+                                                            'Tap the checkmark when your room looks right.',
+                                                      ),
+                                                    ];
 
-                                              return DraggableScrollableSheet(
-                                                initialChildSize: 0.72,
-                                                minChildSize: 0.48,
-                                                maxChildSize: 0.92,
-                                                expand: false,
-                                                builder: (context, scrollController) {
-                                                  return Container(
-                                                    decoration: BoxDecoration(
-                                                      color: sheetCs.surface,
-                                                      borderRadius:
-                                                          const BorderRadius.vertical(
-                                                            top:
-                                                                Radius.circular(
-                                                                  30,
-                                                                ),
-                                                          ),
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: sheetCs.shadow
-                                                              .withValues(
-                                                                alpha: 0.16,
-                                                              ),
-                                                          blurRadius: 30,
-                                                          offset: const Offset(
-                                                            0,
-                                                            -8,
-                                                          ),
+                                                return DraggableScrollableSheet(
+                                                  initialChildSize: 0.72,
+                                                  minChildSize: 0.48,
+                                                  maxChildSize: 0.92,
+                                                  expand: false,
+                                                  builder: (context, scrollController) {
+                                                    return Container(
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                          0xFFF3E8D7,
                                                         ),
-                                                      ],
-                                                    ),
-                                                    child: Column(
-                                                      children: [
-                                                        const SizedBox(
-                                                          height: 10,
-                                                        ),
-                                                        Container(
-                                                          width: 44,
-                                                          height: 5,
-                                                          decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            const BorderRadius.vertical(
+                                                              top:
+                                                                  Radius.circular(
+                                                                    32,
+                                                                  ),
+                                                            ),
+                                                        boxShadow: [
+                                                          BoxShadow(
                                                             color: sheetCs
-                                                                .onSurfaceVariant
+                                                                .shadow
                                                                 .withValues(
-                                                                  alpha: 0.25,
+                                                                  alpha: 0.16,
                                                                 ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  99,
+                                                            blurRadius: 30,
+                                                            offset:
+                                                                const Offset(
+                                                                  0,
+                                                                  -8,
                                                                 ),
                                                           ),
-                                                        ),
-                                                        Padding(
-                                                          padding:
-                                                              const EdgeInsets.fromLTRB(
-                                                                22,
-                                                                18,
-                                                                14,
-                                                                12,
-                                                              ),
-                                                          child: Row(
-                                                            children: [
-                                                              Container(
-                                                                width: 44,
-                                                                height: 44,
-                                                                decoration: BoxDecoration(
-                                                                  color: sheetCs
-                                                                      .primaryContainer,
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        14,
-                                                                      ),
-                                                                ),
-                                                                child: Icon(
-                                                                  Icons
-                                                                      .chair_alt_rounded,
-                                                                  color: sheetCs
-                                                                      .onPrimaryContainer,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(
-                                                                width: 12,
-                                                              ),
-                                                              Expanded(
-                                                                child: Column(
-                                                                  crossAxisAlignment:
-                                                                      CrossAxisAlignment
-                                                                          .start,
-                                                                  children: [
-                                                                    Text(
-                                                                      'How to edit your room',
-                                                                      style: sheetTheme
-                                                                          .textTheme
-                                                                          .titleLarge
-                                                                          ?.copyWith(
-                                                                            fontWeight:
-                                                                                FontWeight.w900,
-                                                                          ),
-                                                                    ),
-                                                                    const SizedBox(
-                                                                      height: 2,
-                                                                    ),
-                                                                    Text(
-                                                                      'Scroll through the controls below',
-                                                                      style: sheetTheme
-                                                                          .textTheme
-                                                                          .bodySmall
-                                                                          ?.copyWith(
-                                                                            color:
-                                                                                sheetCs.onSurfaceVariant,
-                                                                          ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                              IconButton(
-                                                                tooltip:
-                                                                    'Close',
-                                                                onPressed: () =>
-                                                                    Navigator.of(
-                                                                      sheetContext,
-                                                                    ).pop(),
-                                                                icon: const Icon(
-                                                                  Icons
-                                                                      .close_rounded,
-                                                                ),
-                                                              ),
-                                                            ],
+                                                        ],
+                                                      ),
+                                                      child: Column(
+                                                        children: [
+                                                          const SizedBox(
+                                                            height: 10,
                                                           ),
-                                                        ),
-                                                        Divider(
-                                                          height: 1,
-                                                          color: sheetCs
-                                                              .outlineVariant
-                                                              .withValues(
-                                                                alpha: 0.6,
-                                                              ),
-                                                        ),
-                                                        Expanded(
-                                                          child: ListView.separated(
-                                                            controller:
-                                                                scrollController,
+                                                          Container(
+                                                            width: 44,
+                                                            height: 5,
+                                                            decoration: BoxDecoration(
+                                                              color: sheetCs
+                                                                  .primary
+                                                                  .withValues(
+                                                                    alpha: 0.32,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    99,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                          Padding(
                                                             padding:
                                                                 const EdgeInsets.fromLTRB(
+                                                                  22,
                                                                   18,
-                                                                  18,
-                                                                  18,
-                                                                  30,
+                                                                  14,
+                                                                  12,
                                                                 ),
-                                                            itemCount:
-                                                                steps.length +
-                                                                1,
-                                                            separatorBuilder:
-                                                                (_, __) =>
-                                                                    const SizedBox(
-                                                                      height:
-                                                                          10,
+                                                            child: Row(
+                                                              children: [
+                                                                Container(
+                                                                  width: 44,
+                                                                  height: 44,
+                                                                  decoration: BoxDecoration(
+                                                                    color: sheetCs
+                                                                        .primary
+                                                                        .withValues(
+                                                                          alpha:
+                                                                              0.13,
+                                                                        ),
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          14,
+                                                                        ),
+                                                                    border: Border.all(
+                                                                      color: sheetCs
+                                                                          .primary
+                                                                          .withValues(
+                                                                            alpha:
+                                                                                0.18,
+                                                                          ),
                                                                     ),
-                                                            itemBuilder: (context, index) {
-                                                              if (index ==
-                                                                  steps
-                                                                      .length) {
-                                                                return Padding(
-                                                                  padding:
-                                                                      const EdgeInsets.only(
-                                                                        top: 6,
+                                                                  ),
+                                                                  child: Icon(
+                                                                    Icons
+                                                                        .chair_alt_rounded,
+                                                                    color: sheetCs
+                                                                        .primary,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                  width: 12,
+                                                                ),
+                                                                Expanded(
+                                                                  child: Column(
+                                                                    crossAxisAlignment:
+                                                                        CrossAxisAlignment
+                                                                            .start,
+                                                                    children: [
+                                                                      Text(
+                                                                        'How to edit your room',
+                                                                        style: sheetTheme.textTheme.titleLarge?.copyWith(
+                                                                          fontWeight:
+                                                                              FontWeight.w700,
+                                                                          color: const Color(
+                                                                            0xFF3E342C,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        height:
+                                                                            2,
+                                                                      ),
+                                                                      Text(
+                                                                        'Scroll through the controls below',
+                                                                        style: sheetTheme
+                                                                            .textTheme
+                                                                            .bodySmall
+                                                                            ?.copyWith(
+                                                                              color: const Color(
+                                                                                0xFF786B60,
+                                                                              ),
+                                                                            ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                                IconButton(
+                                                                  tooltip:
+                                                                      'Close',
+                                                                  onPressed: () =>
+                                                                      Navigator.of(
+                                                                        sheetContext,
+                                                                      ).pop(),
+                                                                  icon: const Icon(
+                                                                    Icons
+                                                                        .close_rounded,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          Divider(
+                                                            height: 1,
+                                                            color: sheetCs
+                                                                .primary
+                                                                .withValues(
+                                                                  alpha: 0.12,
+                                                                ),
+                                                          ),
+                                                          Expanded(
+                                                            child: ListView.separated(
+                                                              controller:
+                                                                  scrollController,
+                                                              padding:
+                                                                  const EdgeInsets.fromLTRB(
+                                                                    18,
+                                                                    18,
+                                                                    18,
+                                                                    30,
+                                                                  ),
+                                                              itemCount:
+                                                                  steps.length +
+                                                                  1,
+                                                              separatorBuilder:
+                                                                  (_, __) =>
+                                                                      const SizedBox(
+                                                                        height:
+                                                                            10,
+                                                                      ),
+                                                              itemBuilder: (context, index) {
+                                                                if (index ==
+                                                                    steps
+                                                                        .length) {
+                                                                  return Padding(
+                                                                    padding:
+                                                                        const EdgeInsets.only(
+                                                                          top:
+                                                                              6,
+                                                                        ),
+                                                                    child: Container(
+                                                                      padding:
+                                                                          const EdgeInsets.all(
+                                                                            16,
+                                                                          ),
+                                                                      decoration: BoxDecoration(
+                                                                        color: sheetCs
+                                                                            .primary
+                                                                            .withValues(
+                                                                              alpha: 0.10,
+                                                                            ),
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(
+                                                                              20,
+                                                                            ),
+                                                                        border: Border.all(
+                                                                          color: sheetCs.primary.withValues(
+                                                                            alpha:
+                                                                                0.14,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      child: Row(
+                                                                        children: [
+                                                                          Icon(
+                                                                            Icons.swipe_up_rounded,
+                                                                            color:
+                                                                                sheetCs.primary,
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            width:
+                                                                                12,
+                                                                          ),
+                                                                          Expanded(
+                                                                            child: Text(
+                                                                              'Tip: drag this panel up for more room, or swipe it down when you are done.',
+                                                                              style: sheetTheme.textTheme.bodyMedium?.copyWith(
+                                                                                fontWeight: FontWeight.w600,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                  );
+                                                                }
+                                                                final step =
+                                                                    steps[index];
+                                                                return TweenAnimationBuilder<
+                                                                  double
+                                                                >(
+                                                                  duration: Duration(
+                                                                    milliseconds:
+                                                                        240 +
+                                                                        (index *
+                                                                            35),
+                                                                  ),
+                                                                  curve: Curves
+                                                                      .easeOutCubic,
+                                                                  tween: Tween(
+                                                                    begin: 0,
+                                                                    end: 1,
+                                                                  ),
+                                                                  builder:
+                                                                      (
+                                                                        context,
+                                                                        value,
+                                                                        child,
+                                                                      ) => Transform.translate(
+                                                                        offset: Offset(
+                                                                          0,
+                                                                          14 *
+                                                                              (1 -
+                                                                                  value),
+                                                                        ),
+                                                                        child: Opacity(
+                                                                          opacity:
+                                                                              value,
+                                                                          child:
+                                                                              child,
+                                                                        ),
                                                                       ),
                                                                   child: Container(
                                                                     padding:
                                                                         const EdgeInsets.all(
-                                                                          16,
+                                                                          14,
                                                                         ),
                                                                     decoration: BoxDecoration(
-                                                                      color: sheetCs
-                                                                          .primaryContainer
-                                                                          .withValues(
-                                                                            alpha:
-                                                                                0.55,
-                                                                          ),
+                                                                      color: const Color(
+                                                                        0xFFFFFBF5,
+                                                                      ),
                                                                       borderRadius:
                                                                           BorderRadius.circular(
-                                                                            18,
+                                                                            20,
                                                                           ),
+                                                                      border: Border.all(
+                                                                        color: sheetCs
+                                                                            .primary
+                                                                            .withValues(
+                                                                              alpha: 0.12,
+                                                                            ),
+                                                                      ),
+                                                                      boxShadow: [
+                                                                        BoxShadow(
+                                                                          color:
+                                                                              const Color(
+                                                                                0xFF5B4636,
+                                                                              ).withValues(
+                                                                                alpha: 0.06,
+                                                                              ),
+                                                                          blurRadius:
+                                                                              12,
+                                                                          offset: const Offset(
+                                                                            0,
+                                                                            4,
+                                                                          ),
+                                                                        ),
+                                                                      ],
                                                                     ),
                                                                     child: Row(
+                                                                      crossAxisAlignment:
+                                                                          CrossAxisAlignment
+                                                                              .start,
                                                                       children: [
-                                                                        Icon(
-                                                                          Icons
-                                                                              .swipe_up_rounded,
-                                                                          color:
-                                                                              sheetCs.primary,
+                                                                        Container(
+                                                                          width:
+                                                                              42,
+                                                                          height:
+                                                                              42,
+                                                                          decoration: BoxDecoration(
+                                                                            color: sheetCs.primary.withValues(
+                                                                              alpha: 0.12,
+                                                                            ),
+                                                                            borderRadius: BorderRadius.circular(
+                                                                              13,
+                                                                            ),
+                                                                          ),
+                                                                          child: Icon(
+                                                                            step.icon,
+                                                                            size:
+                                                                                21,
+                                                                            color:
+                                                                                sheetCs.primary,
+                                                                          ),
                                                                         ),
                                                                         const SizedBox(
                                                                           width:
                                                                               12,
                                                                         ),
                                                                         Expanded(
-                                                                          child: Text(
-                                                                            'Tip: drag this panel up for more room, or swipe it down when you are done.',
-                                                                            style: sheetTheme.textTheme.bodyMedium?.copyWith(
-                                                                              fontWeight: FontWeight.w600,
-                                                                            ),
+                                                                          child: Column(
+                                                                            crossAxisAlignment:
+                                                                                CrossAxisAlignment.start,
+                                                                            children: [
+                                                                              Text(
+                                                                                step.title,
+                                                                                style: sheetTheme.textTheme.titleSmall?.copyWith(
+                                                                                  fontWeight: FontWeight.w700,
+                                                                                  color: const Color(
+                                                                                    0xFF3E342C,
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                              const SizedBox(
+                                                                                height: 3,
+                                                                              ),
+                                                                              Text(
+                                                                                step.body,
+                                                                                style: sheetTheme.textTheme.bodySmall?.copyWith(
+                                                                                  color: const Color(
+                                                                                    0xFF786B60,
+                                                                                  ),
+                                                                                  height: 1.35,
+                                                                                ),
+                                                                              ),
+                                                                            ],
                                                                           ),
                                                                         ),
                                                                       ],
                                                                     ),
                                                                   ),
                                                                 );
-                                                              }
-                                                              final step =
-                                                                  steps[index];
-                                                              return TweenAnimationBuilder<
-                                                                double
-                                                              >(
-                                                                duration: Duration(
-                                                                  milliseconds:
-                                                                      240 +
-                                                                      (index *
-                                                                          35),
-                                                                ),
-                                                                curve: Curves
-                                                                    .easeOutCubic,
-                                                                tween: Tween(
-                                                                  begin: 0,
-                                                                  end: 1,
-                                                                ),
-                                                                builder:
-                                                                    (
-                                                                      context,
-                                                                      value,
-                                                                      child,
-                                                                    ) => Transform.translate(
-                                                                      offset: Offset(
-                                                                        0,
-                                                                        14 *
-                                                                            (1 -
-                                                                                value),
-                                                                      ),
-                                                                      child: Opacity(
-                                                                        opacity:
-                                                                            value,
-                                                                        child:
-                                                                            child,
-                                                                      ),
-                                                                    ),
-                                                                child: Container(
-                                                                  padding:
-                                                                      const EdgeInsets.all(
-                                                                        14,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    color: sheetCs
-                                                                        .surfaceContainerHighest
-                                                                        .withValues(
-                                                                          alpha:
-                                                                              0.55,
-                                                                        ),
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          18,
-                                                                        ),
-                                                                    border: Border.all(
-                                                                      color: sheetCs
-                                                                          .outlineVariant
-                                                                          .withValues(
-                                                                            alpha:
-                                                                                0.55,
-                                                                          ),
-                                                                    ),
-                                                                  ),
-                                                                  child: Row(
-                                                                    crossAxisAlignment:
-                                                                        CrossAxisAlignment
-                                                                            .start,
-                                                                    children: [
-                                                                      Container(
-                                                                        width:
-                                                                            42,
-                                                                        height:
-                                                                            42,
-                                                                        decoration: BoxDecoration(
-                                                                          color:
-                                                                              sheetCs.primaryContainer,
-                                                                          borderRadius: BorderRadius.circular(
-                                                                            13,
-                                                                          ),
-                                                                        ),
-                                                                        child: Icon(
-                                                                          step.icon,
-                                                                          size:
-                                                                              21,
-                                                                          color:
-                                                                              sheetCs.onPrimaryContainer,
-                                                                        ),
-                                                                      ),
-                                                                      const SizedBox(
-                                                                        width:
-                                                                            12,
-                                                                      ),
-                                                                      Expanded(
-                                                                        child: Column(
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Text(
-                                                                              step.title,
-                                                                              style: sheetTheme.textTheme.titleSmall?.copyWith(
-                                                                                fontWeight: FontWeight.w800,
-                                                                              ),
-                                                                            ),
-                                                                            const SizedBox(
-                                                                              height: 3,
-                                                                            ),
-                                                                            Text(
-                                                                              step.body,
-                                                                              style: sheetTheme.textTheme.bodySmall?.copyWith(
-                                                                                color: sheetCs.onSurfaceVariant,
-                                                                                height: 1.35,
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                              );
-                                                            },
+                                                              },
+                                                            ),
                                                           ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          );
-                                        },
-                                        icon: Icon(
-                                          Icons.info_outline_rounded,
-                                          size: 23,
-                                          color: cs.primary,
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                            );
+                                          },
+                                          icon: Icon(
+                                            Icons.info_outline_rounded,
+                                            size: 25,
+                                            color: cs.primary,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -2328,34 +2377,26 @@ class _RoomPerspective {
   }) {
     final path = floorPath();
 
-    final scaledWidth = widthSquares * visualScale;
-    final scaledLength = lengthSquares * visualScale;
-
-    final centerGridX = gridX + widthSquares / 2.0;
-    final centerGridY = gridY + lengthSquares / 2.0;
-
-    final leftGrid = centerGridX - scaledWidth / 2.0;
-    final rightGrid = centerGridX + scaledWidth / 2.0;
-    final topGrid = centerGridY - scaledLength / 2.0;
-    final bottomGrid = centerGridY + scaledLength / 2.0;
-
-    final points = <Offset>[
-      floorGridIntersection(leftGrid, topGrid),
-      floorGridIntersection(rightGrid, topGrid),
-      floorGridIntersection(rightGrid, bottomGrid),
-      floorGridIntersection(leftGrid, bottomGrid),
-    ];
-
-    final center = Offset(
-      points.map((p) => p.dx).reduce((a, b) => a + b) / points.length,
-      points.map((p) => p.dy).reduce((a, b) => a + b) / points.length,
+    // Validate the grid anchor itself instead of the centre of the furniture.
+    // Using width/length to offset this point was still pushing wide items
+    // outside the floor polygon near the right wall, leaving the last visible
+    // grid strip unreachable. Every visible floor grid anchor should remain
+    // usable regardless of the furniture PNG dimensions.
+    final placementAnchor = floorGridIntersection(
+      gridX.toDouble(),
+      gridY.toDouble(),
     );
 
-    for (final point in points) {
-      final edgeSafePoint = Offset.lerp(point, center, 0.001)!;
-      if (!path.contains(edgeSafePoint)) return false;
-    }
-    return true;
+    if (path.contains(placementAnchor)) return true;
+
+    // Let the visual item reach the wall-side cells. The furniture is drawn
+    // around a multi-square footprint, so validating only the exact anchor
+    // makes the sprite appear one strip too far inward near the walls. Allow
+    // roughly one grid-cell of horizontal edge tolerance while still requiring
+    // the placement to remain adjacent to the floor polygon.
+    final edgeTolerance = (size.width / _RoomGeometry.floorColumns) * 0.72;
+    return path.contains(placementAnchor + Offset(-edgeTolerance, 0)) ||
+        path.contains(placementAnchor + Offset(edgeTolerance, 0));
   }
 
   List<Offset> floorFootprint({
@@ -3280,24 +3321,49 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
                 ),
               ),
               if (isSelected)
-                Positioned.fill(
+                Positioned(
+                  top: -14,
+                  left: 0,
+                  right: 0,
                   child: IgnorePointer(
-                    child: Transform.scale(
-                      scaleX: 0.64,
-                      scaleY: 0.64,
-                      child: DecoratedBox(
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
+                          color: widget.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: widget.colorScheme.primary,
+                            color: widget.colorScheme.surface,
                             width: 2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: widget.colorScheme.primary.withValues(
-                                alpha: 0.10,
+                              color: Colors.black.withValues(alpha: 0.14),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_rounded,
+                              size: 14,
+                              color: widget.colorScheme.onPrimary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Selected',
+                              style: TextStyle(
+                                color: widget.colorScheme.onPrimary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                height: 1,
                               ),
-                              blurRadius: 6,
                             ),
                           ],
                         ),
@@ -3560,8 +3626,12 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
             ? _RoomGeometry.floorGridDepth
             : _RoomGeometry.floorColumns;
 
-        final maxGridX = (gridLimit - meta.widthSquares).clamp(0, gridLimit);
-        final maxGridY = (gridLimit - meta.lengthSquares).clamp(0, gridLimit);
+        final maxGridX = isFloor
+            ? gridLimit
+            : (gridLimit - meta.widthSquares).clamp(0, gridLimit);
+        final maxGridY = isFloor
+            ? gridLimit
+            : (gridLimit - meta.lengthSquares).clamp(0, gridLimit);
 
         final targetGridX = (currentGridX + stepMoveX)
             .clamp(0, maxGridX)
