@@ -632,13 +632,13 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
   double _visualRotationForFurniture(String itemKey) {
     if (itemKey == 'aquarium') return 0.0;
     if (itemKey.startsWith('sofa_') || kSofaAssets.containsKey(itemKey)) {
-      return 0.055;
+      return 0.0;
     }
     if (itemKey.startsWith('bed_') || kBedAssets.containsKey(itemKey)) {
-      return 0.038;
+      return 0.0;
     }
     if (itemKey.startsWith('desk_') || kDeskAssets.containsKey(itemKey)) {
-      return 0.032;
+      return 0.0;
     }
     return 0.0;
   }
@@ -2140,4 +2140,3 @@ class _RoomGridPainter extends CustomPainter {
     return oldDelegate.activeSurface != activeSurface;
   }
 }
-
