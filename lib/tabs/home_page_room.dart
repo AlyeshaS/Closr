@@ -664,8 +664,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
         return 1.18;
       case 'candle':
         return 0.82;
-      case 'dog':
-        return 0.95;
       case 'television':
         return 1.10;
       case 'plant':
@@ -722,8 +720,6 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
     final flipY = (data['flipY'] as bool?) ?? false;
     final isLocked = (data['isLocked'] as bool?) ?? false;
 
-    if (isLocked) return;
-
     setState(() {
       _editingDocId = doc.id;
       _editingItemKey = itemKey;
@@ -733,7 +729,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _editingVisualRotation = rotation;
       _editingFlipX = flipX;
       _editingFlipY = flipY;
-      _editingLocked = false;
+      _editingLocked = isLocked;
       _editingSurface = selectedSurface;
 
       _initialCol = col;
@@ -742,13 +738,33 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       _initialVisualRotation = rotation;
       _initialFlipX = flipX;
       _initialFlipY = flipY;
-      _initialLocked = false;
+      _initialLocked = isLocked;
       _initialSurface = selectedSurface;
     });
     _notifySelectionChanged(true);
   }
 
   bool get hasSelection => _editingDocId != null;
+
+  bool get isSelectedLocked => _editingDocId != null && _editingLocked;
+
+  Future<void> toggleSelectedLock() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final selectedId = _editingDocId;
+    if (user == null || selectedId == null) return;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('furniture')
+        .get();
+    for (final doc in snapshot.docs) {
+      if (doc.id == selectedId) {
+        await _toggleItemLock(doc, user);
+        return;
+      }
+    }
+  }
 
   Future<void> saveSelected() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -1113,11 +1129,8 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       );
 
       if (!mounted) return;
-      if (nextLocked) {
-        setState(_clearSelection);
-      } else {
-        setState(() => _editingLocked = false);
-      }
+      setState(() => _editingLocked = nextLocked);
+      _notifySelectionChanged(true);
       return;
     }
 
@@ -1371,9 +1384,7 @@ class _RoomFurnitureState extends State<_RoomFurniture> {
       top: top,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: widget.isEditing && !isLocked
-            ? () => _selectItem(doc, user)
-            : null,
+        onTap: widget.isEditing ? () => _selectItem(doc, user) : null,
         onDoubleTap: widget.isEditing ? () => _toggleItemLock(doc, user) : null,
         onPanStart: widget.isEditing && !isLocked
             ? (details) {

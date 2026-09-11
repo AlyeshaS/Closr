@@ -34,6 +34,7 @@ class _HomePageState extends State<HomePage>
   String _selectedRoomTheme = 'room_pink';
   bool _isLoadingRoom = true;
   bool _hasFurnitureSelection = false;
+  bool _isSelectedFurnitureLocked = false;
   bool _isFurnitureTrayOpen = false;
   bool _isEditPanelCollapsed = false;
   final GlobalKey<_RoomFurnitureState> _roomFurnitureKey =
@@ -508,6 +509,8 @@ class _HomePageState extends State<HomePage>
         kRoomThemes[_selectedRoomTheme] ?? kRoomThemes['room_pink']!;
     final roomBrown = roomTheme.baseboardDark;
 
+    final canInteract = _hasFurnitureSelection && !_isSelectedFurnitureLocked;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -518,8 +521,15 @@ class _HomePageState extends State<HomePage>
             roomThemeKey: _selectedRoomTheme,
             furnitureKey: _roomFurnitureKey,
             onSelectionChanged: (hasSelection) {
-              if (_hasFurnitureSelection != hasSelection && mounted) {
-                setState(() => _hasFurnitureSelection = hasSelection);
+              final isLocked =
+                  _roomFurnitureKey.currentState?.isSelectedLocked ?? false;
+              if ((_hasFurnitureSelection != hasSelection ||
+                      _isSelectedFurnitureLocked != isLocked) &&
+                  mounted) {
+                setState(() {
+                  _hasFurnitureSelection = hasSelection;
+                  _isSelectedFurnitureLocked = isLocked;
+                });
               }
             },
           ),
@@ -834,7 +844,7 @@ class _HomePageState extends State<HomePage>
                                           icon: Icons.touch_app_rounded,
                                           title: 'Select',
                                           body:
-                                              'Tap any unlocked furniture item to select it.',
+                                              'Tap any furniture item to select it. Locked items can still be selected to unlock them.',
                                         ),
                                         (
                                           icon: Icons.open_with_rounded,
@@ -858,7 +868,7 @@ class _HomePageState extends State<HomePage>
                                           icon: Icons.lock_rounded,
                                           title: 'Lock',
                                           body:
-                                              'Double-tap an item to lock or unlock it. Locked furniture stays in place.',
+                                              'Use the lock button or double-tap an item to lock or unlock it. Locked furniture stays in place.',
                                         ),
                                         (
                                           icon: Icons.restart_alt_rounded,
@@ -1247,6 +1257,32 @@ class _HomePageState extends State<HomePage>
                                 ),
                               ),
                             ),
+                            IconButton(
+                              tooltip: _isSelectedFurnitureLocked
+                                  ? 'Unlock selected item'
+                                  : 'Lock selected item',
+                              onPressed: _hasFurnitureSelection
+                                  ? () async {
+                                      await _roomFurnitureKey.currentState
+                                          ?.toggleSelectedLock();
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _isSelectedFurnitureLocked =
+                                            _roomFurnitureKey
+                                                .currentState
+                                                ?.isSelectedLocked ??
+                                            false;
+                                      });
+                                    }
+                                  : null,
+                              icon: Icon(
+                                _isSelectedFurnitureLocked
+                                    ? Icons.lock_rounded
+                                    : Icons.lock_open_rounded,
+                                size: 21,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
                             const Spacer(),
                             Container(
                               decoration: BoxDecoration(
@@ -1356,24 +1392,41 @@ class _HomePageState extends State<HomePage>
                                         ],
                                       ),
                                       child: FilledButton.tonalIcon(
-                                        onPressed: () => _roomFurnitureKey
-                                            .currentState
-                                            ?.toggleFlipSelected(),
+                                        onPressed: canInteract
+                                            ? () => _roomFurnitureKey
+                                                  .currentState
+                                                  ?.toggleFlipSelected()
+                                            : null,
                                         icon: Icon(
                                           Icons.flip_rounded,
                                           size: 16,
-                                          color: cs.onSurface,
+                                          color: canInteract
+                                              ? cs.onSurface
+                                              : cs.onSurface.withValues(
+                                                  alpha: 0.38,
+                                                ),
                                         ),
                                         label: Text(
                                           'Flip',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: cs.onSurface,
+                                            color: canInteract
+                                                ? cs.onSurface
+                                                : cs.onSurface.withValues(
+                                                    alpha: 0.38,
+                                                  ),
                                           ),
                                         ),
                                         style: FilledButton.styleFrom(
-                                          backgroundColor: cs.surface,
-                                          foregroundColor: cs.onSurface,
+                                          backgroundColor: canInteract
+                                              ? cs.surface
+                                              : cs.surfaceContainerHighest
+                                                    .withValues(alpha: 0.4),
+                                          foregroundColor: canInteract
+                                              ? cs.onSurface
+                                              : cs.onSurface.withValues(
+                                                  alpha: 0.38,
+                                                ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
                                             vertical: 8,
@@ -1384,10 +1437,13 @@ class _HomePageState extends State<HomePage>
                                               10,
                                             ),
                                             side: BorderSide(
-                                              color: cs.primary.withValues(
-                                                alpha: 0.65,
-                                              ),
-                                              width: 1.2,
+                                              color: canInteract
+                                                  ? cs.primary.withValues(
+                                                      alpha: 0.65,
+                                                    )
+                                                  : cs.outlineVariant
+                                                        .withValues(alpha: 0.3),
+                                              width: canInteract ? 1.2 : 1.0,
                                             ),
                                           ),
                                         ),
@@ -1410,29 +1466,43 @@ class _HomePageState extends State<HomePage>
                                         ],
                                       ),
                                       child: FilledButton.tonalIcon(
-                                        onPressed: () {
-                                          _roomFurnitureKey.currentState
-                                              ?.restartSelected();
-                                          // Restart updates the furniture state internally.
-                                          // Rebuild this parent too so the Rotate and Size
-                                          // sliders immediately jump back to the restored values.
-                                          setState(() {});
-                                        },
+                                        onPressed: canInteract
+                                            ? () {
+                                                _roomFurnitureKey.currentState
+                                                    ?.restartSelected();
+                                                setState(() {});
+                                              }
+                                            : null,
                                         icon: Icon(
                                           Icons.restart_alt_rounded,
                                           size: 16,
-                                          color: cs.onSurface,
+                                          color: canInteract
+                                              ? cs.onSurface
+                                              : cs.onSurface.withValues(
+                                                  alpha: 0.38,
+                                                ),
                                         ),
                                         label: Text(
                                           'Restart',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: cs.onSurface,
+                                            color: canInteract
+                                                ? cs.onSurface
+                                                : cs.onSurface.withValues(
+                                                    alpha: 0.38,
+                                                  ),
                                           ),
                                         ),
                                         style: FilledButton.styleFrom(
-                                          backgroundColor: cs.surface,
-                                          foregroundColor: cs.onSurface,
+                                          backgroundColor: canInteract
+                                              ? cs.surface
+                                              : cs.surfaceContainerHighest
+                                                    .withValues(alpha: 0.4),
+                                          foregroundColor: canInteract
+                                              ? cs.onSurface
+                                              : cs.onSurface.withValues(
+                                                  alpha: 0.38,
+                                                ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
                                             vertical: 8,
@@ -1443,10 +1513,13 @@ class _HomePageState extends State<HomePage>
                                               10,
                                             ),
                                             side: BorderSide(
-                                              color: cs.primary.withValues(
-                                                alpha: 0.65,
-                                              ),
-                                              width: 1.2,
+                                              color: canInteract
+                                                  ? cs.primary.withValues(
+                                                      alpha: 0.65,
+                                                    )
+                                                  : cs.outlineVariant
+                                                        .withValues(alpha: 0.3),
+                                              width: canInteract ? 1.2 : 1.0,
                                             ),
                                           ),
                                         ),
@@ -1469,68 +1542,96 @@ class _HomePageState extends State<HomePage>
                                         ],
                                       ),
                                       child: FilledButton.tonalIcon(
-                                        onPressed: () async {
-                                          final roomState =
-                                              _roomFurnitureKey.currentState;
-                                          if (roomState == null) return;
+                                        onPressed: _isSelectedFurnitureLocked
+                                            ? null
+                                            : () async {
+                                                final roomState =
+                                                    _roomFurnitureKey
+                                                        .currentState;
+                                                if (roomState == null) return;
 
-                                          if (roomState.hasSelection) {
-                                            await roomState.deleteSelected();
-                                            return;
-                                          }
+                                                if (roomState.hasSelection) {
+                                                  await roomState
+                                                      .deleteSelected();
+                                                  return;
+                                                }
 
-                                          final confirmed = await showDialog<bool>(
-                                            context: context,
-                                            builder: (dialogContext) => AlertDialog(
-                                              title: const Text(
-                                                'Delete all furniture?',
-                                              ),
-                                              content: const Text(
-                                                'No item is selected. This will remove all furniture currently placed in the room.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.of(
-                                                    dialogContext,
-                                                  ).pop(false),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                FilledButton(
-                                                  onPressed: () => Navigator.of(
-                                                    dialogContext,
-                                                  ).pop(true),
-                                                  style: FilledButton.styleFrom(
-                                                    backgroundColor: cs.error,
-                                                    foregroundColor: cs.onError,
+                                                final confirmed = await showDialog<bool>(
+                                                  context: context,
+                                                  builder: (dialogContext) => AlertDialog(
+                                                    title: const Text(
+                                                      'Delete all furniture?',
+                                                    ),
+                                                    content: const Text(
+                                                      'No item is selected. This will remove all furniture currently placed in the room.',
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.of(
+                                                              dialogContext,
+                                                            ).pop(false),
+                                                        child: const Text(
+                                                          'Cancel',
+                                                        ),
+                                                      ),
+                                                      FilledButton(
+                                                        onPressed: () =>
+                                                            Navigator.of(
+                                                              dialogContext,
+                                                            ).pop(true),
+                                                        style:
+                                                            FilledButton.styleFrom(
+                                                              backgroundColor:
+                                                                  cs.error,
+                                                              foregroundColor:
+                                                                  cs.onError,
+                                                            ),
+                                                        child: const Text(
+                                                          'Delete all',
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  child: const Text(
-                                                    'Delete all',
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
+                                                );
 
-                                          if (confirmed == true) {
-                                            await roomState
-                                                .deleteAllFurniture();
-                                          }
-                                        },
+                                                if (confirmed == true) {
+                                                  await roomState
+                                                      .deleteAllFurniture();
+                                                }
+                                              },
                                         icon: Icon(
                                           Icons.delete_outline_rounded,
                                           size: 16,
-                                          color: cs.error,
+                                          color: !_isSelectedFurnitureLocked
+                                              ? cs.error
+                                              : cs.error.withValues(
+                                                  alpha: 0.38,
+                                                ),
                                         ),
                                         label: Text(
                                           'Delete',
                                           style: TextStyle(
-                                            color: cs.error,
+                                            color: !_isSelectedFurnitureLocked
+                                                ? cs.error
+                                                : cs.error.withValues(
+                                                    alpha: 0.38,
+                                                  ),
                                             fontSize: 12,
                                           ),
                                         ),
                                         style: FilledButton.styleFrom(
-                                          backgroundColor: cs.surface,
-                                          foregroundColor: cs.error,
+                                          backgroundColor:
+                                              !_isSelectedFurnitureLocked
+                                              ? cs.surface
+                                              : cs.surfaceContainerHighest
+                                                    .withValues(alpha: 0.4),
+                                          foregroundColor:
+                                              !_isSelectedFurnitureLocked
+                                              ? cs.error
+                                              : cs.error.withValues(
+                                                  alpha: 0.38,
+                                                ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
                                             vertical: 8,
@@ -1541,10 +1642,15 @@ class _HomePageState extends State<HomePage>
                                               10,
                                             ),
                                             side: BorderSide(
-                                              color: cs.primary.withValues(
-                                                alpha: 0.65,
-                                              ),
-                                              width: 1.2,
+                                              color: !_isSelectedFurnitureLocked
+                                                  ? cs.primary.withValues(
+                                                      alpha: 0.65,
+                                                    )
+                                                  : cs.outlineVariant
+                                                        .withValues(alpha: 0.3),
+                                              width: !_isSelectedFurnitureLocked
+                                                  ? 1.2
+                                                  : 1.0,
                                             ),
                                           ),
                                         ),
@@ -1582,7 +1688,7 @@ class _HomePageState extends State<HomePage>
                                         activeColor: cs.primary,
                                         inactiveColor: cs.onSurfaceVariant
                                             .withValues(alpha: 0.32),
-                                        onChanged: _hasFurnitureSelection
+                                        onChanged: canInteract
                                             ? (val) {
                                                 setState(() {
                                                   _roomFurnitureKey.currentState
@@ -1626,7 +1732,7 @@ class _HomePageState extends State<HomePage>
                                         activeColor: cs.primary,
                                         inactiveColor: cs.onSurfaceVariant
                                             .withValues(alpha: 0.32),
-                                        onChanged: _hasFurnitureSelection
+                                        onChanged: canInteract
                                             ? (val) {
                                                 setState(() {
                                                   _roomFurnitureKey.currentState
@@ -1896,7 +2002,7 @@ class _HomePageState extends State<HomePage>
                           snapshot.data?.data() as Map<String, dynamic>?;
 
                       final companionEmoji =
-                          (data?['companionEmoji'] as String?) ?? 'ðŸ±';
+                          (data?['companionEmoji'] as String?) ?? 'ðŸ ±';
                       final companionSource =
                           (data?['companionAsset'] as String?) ??
                           (data?['companionLottie'] as String?) ??
@@ -2196,7 +2302,7 @@ class _CharacterSprite extends StatelessWidget {
   const _CharacterSprite({
     super.key,
     required this.source,
-    this.fallbackEmoji = 'ðŸ±',
+    this.fallbackEmoji = 'ðŸ ±',
     this.equippedAccessories = const [],
   });
 
@@ -2251,7 +2357,7 @@ class _CharacterSprite extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Text('â˜ï¸', style: TextStyle(fontSize: 12)),
+                child: const Text('â˜ ï¸ ', style: TextStyle(fontSize: 12)),
               ),
             ),
           if (equippedAccessories.contains('moon_halo'))

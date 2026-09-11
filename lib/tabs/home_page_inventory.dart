@@ -24,10 +24,20 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
   final List<String> _categories = [
     'Rooms',
     'Sofas',
+    'Chairs',
     'Beds',
     'Desks',
     'Rugs',
-    'Decor',
+    'Storage',
+    'Tables',
+    'Lighting',
+    'Plants',
+    'Wall',
+    'Tabletop',
+    'Tech',
+    'Books',
+    'Toys',
+    'Aquarium',
   ];
 
   String _getItemTitle(String category, String variantKey) {
@@ -73,10 +83,72 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
         return kDeskAssets;
       case 'rugs':
         return kRugAssets;
-      case 'decor':
-        return kDecorAssets;
+      case 'chairs':
+        return _decorAssetsWhere((key) => key.startsWith('chair_'));
+      case 'storage':
+        return _decorAssetsWhere(
+          (key) => key == 'bookcase' || key.startsWith('drawers_'),
+        );
+      case 'tables':
+        return _decorAssetsWhere(
+          (key) => key.startsWith('table_') || key.startsWith('littletable_'),
+        );
+      case 'lighting':
+        return _decorAssetsWhere(
+          (key) =>
+              key.startsWith('lamp_') ||
+              key == 'decorative_lamp' ||
+              key == 'decorative_light',
+        );
+      case 'plants':
+        return _decorAssetsWhere(
+          (key) => key == 'plant' || key.startsWith('plant_'),
+        );
+      case 'wall':
+        return _decorAssetsWhere(
+          (key) =>
+              key.startsWith('littleframes_') ||
+              key.startsWith('littlewallpainting_') ||
+              key.startsWith('wallpainting_') ||
+              key.startsWith('window_'),
+        );
+      case 'tabletop':
+        return _decorAssetsWhere(
+          (key) => key == 'candle' || key.startsWith('coffeecup_'),
+        );
+      case 'tech':
+        return _decorAssetsWhere(
+          (key) => key.startsWith('laptop_') || key == 'television',
+        );
+      case 'books':
+        return _decorAssetsWhere((key) => key.startsWith('book_'));
+      case 'toys':
+        return _decorAssetsWhere((key) => key.startsWith('teddybear_'));
+      case 'aquarium':
+        return _decorAssetsWhere((key) => key == 'aquarium');
       default:
         return {};
+    }
+  }
+
+  Map<String, String> _decorAssetsWhere(bool Function(String key) test) {
+    return Map.fromEntries(
+      kDecorAssets.entries.where((entry) => test(entry.key)),
+    );
+  }
+
+  String _categoryPrefix(String category) {
+    switch (category.toLowerCase()) {
+      case 'sofas':
+        return 'sofa_';
+      case 'beds':
+        return 'bed_';
+      case 'desks':
+        return 'desk_';
+      case 'rugs':
+        return 'carpet_';
+      default:
+        return '';
     }
   }
 
@@ -104,12 +176,18 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
       'itemKey': itemKey,
       'isEquipped': true,
       'category': category,
+      'roomSurface': meta.surface == RoomSurface.floor
+          ? 'floor'
+          : (meta.surface == RoomSurface.leftWall ? 'leftWall' : 'rightWall'),
       'location': {
         'col': 0.5,
         'row': meta.surface == RoomSurface.floor ? 0.35 : 0.5,
       },
+      'visualScale': 1.0,
+      'visualRotation': 0.0,
       'flipX': false,
       'flipY': false,
+      'isLocked': false,
     };
 
     final batch = firestore.batch();
@@ -196,79 +274,70 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
             ),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(2),
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               decoration: BoxDecoration(
                 color: cs.onSurface.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(100),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: cs.onSurface.withValues(alpha: 0.05)),
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final activeIndex = _categories.indexOf(_selectedCategory);
-                  final tabWidth =
-                      (constraints.maxWidth - 4) / _categories.length;
-
-                  return Stack(
-                    children: [
-                      AnimatedAlign(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.fastOutSlowIn,
-                        alignment: Alignment(
-                          -1.0 + (2.0 / (_categories.length - 1)) * activeIndex,
-                          0,
-                        ),
-                        child: Container(
-                          width: tabWidth,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: cs.surface,
-                            borderRadius: BorderRadius.circular(100),
-                            boxShadow: [
-                              BoxShadow(
-                                color: cs.primary.withValues(alpha: 0.15),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: _categories.map((category) {
+                    final active = category == _selectedCategory;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: active ? cs.surface : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: active
+                                ? cs.primary.withValues(alpha: 0.45)
+                                : Colors.transparent,
                           ),
-                        ),
-                      ),
-                      Row(
-                        children: _categories.map((category) {
-                          final active = category == _selectedCategory;
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedCategory = category),
-                              behavior: HitTestBehavior.opaque,
-                              child: SizedBox(
-                                height: 38,
-                                child: Center(
-                                  child: Text(
-                                    category,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: active
-                                          ? FontWeight.w500
-                                          : FontWeight.w300,
-                                      color: active
-                                          ? cs.onSurface
-                                          : cs.onSurfaceVariant.withValues(
-                                              alpha: 0.8,
-                                            ),
-                                      letterSpacing: 0.1,
-                                    ),
+                          boxShadow: active
+                              ? [
+                                  BoxShadow(
+                                    color: cs.primary.withValues(alpha: 0.12),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
+                                ]
+                              : null,
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () =>
+                              setState(() => _selectedCategory = category),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Center(
+                              child: Text(
+                                category,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: active
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: active
+                                      ? cs.onSurface
+                                      : cs.onSurfaceVariant.withValues(
+                                          alpha: 0.85,
+                                        ),
                                 ),
                               ),
                             ),
-                          );
-                        }).toList(),
+                          ),
+                        ),
                       ),
-                    ],
-                  );
-                },
+                    );
+                  }).toList(),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -384,17 +453,7 @@ class _FurnitureInventorySheetState extends State<_FurnitureInventorySheet> {
                         final categoryAssets = _getAssetsForCategory(
                           _selectedCategory,
                         );
-                        final prefix =
-                            _selectedCategory.toLowerCase() == 'sofas'
-                            ? 'sofa_'
-                            : (_selectedCategory.toLowerCase() == 'beds'
-                                  ? 'bed_'
-                                  : (_selectedCategory.toLowerCase() == 'desks'
-                                        ? 'desk_'
-                                        : (_selectedCategory.toLowerCase() ==
-                                                  'rugs'
-                                              ? 'carpet_'
-                                              : '')));
+                        final prefix = _categoryPrefix(_selectedCategory);
 
                         List<Map<String, dynamic>> catalogItems = [];
 
