@@ -1466,12 +1466,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         name,
                         style: Theme.of(context).textTheme.titleMedium,
-                        textAlign: TextAlign.center,
+                        textAlign: TextAlign.left,
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -1479,7 +1479,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
-                        textAlign: TextAlign.center,
+                        textAlign: TextAlign.left,
                       ),
                     ],
                   ),
