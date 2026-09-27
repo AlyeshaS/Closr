@@ -71,15 +71,9 @@ class LoginScreen extends StatelessWidget {
                   onPressed: () async {
                     final user = await _authService.signInWithGoogle();
                     if (user != null) {
-                      // Check if this is a new user (no partnerEmail field exists)
-                      final userDoc = await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(user.uid)
-                          .get();
-                      final data = userDoc.data();
-                      if (data == null ||
-                          data['partnerEmail'] == null ||
-                          data['partnerEmail'] == '') {
+                      // Only new Firebase profiles need onboarding details.
+                      final profileExisted = _authService.lastProfileExisted;
+                      if (!profileExisted) {
                         String? partnerEmail;
                         await showDialog(
                           context: context,
@@ -120,7 +114,10 @@ class LoginScreen extends StatelessWidget {
                               }, SetOptions(merge: true));
                         }
                       }
-                      Navigator.pushReplacementNamed(context, '/preferences');
+                      Navigator.pushReplacementNamed(
+                        context,
+                        profileExisted ? '/main' : '/preferences',
+                      );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Sign in failed')),

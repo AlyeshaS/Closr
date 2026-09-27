@@ -237,7 +237,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                           if (context.mounted) {
                             if (user != null) {
-                              Navigator.pushReplacementNamed(context, '/main');
+                              Navigator.pushReplacementNamed(
+                                context,
+                                authService.lastProfileExisted
+                                    ? '/main'
+                                    : '/preferences',
+                              );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Sign in failed')),

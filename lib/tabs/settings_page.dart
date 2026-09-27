@@ -81,7 +81,6 @@ const _kCompanions = [
   ),
 ];
 
-// Sofa Shop Items mapping the 4 individual image files
 class _SofaShopItem {
   final String id;
   final String title;
@@ -135,8 +134,6 @@ const _kSofaShopItems = [
   ),
 ];
 
-// ── Interests Data ─────────────────────────────────────────────────────────────
-
 const _kInterestOptions = {
   'food': [
     'Coffee',
@@ -186,8 +183,6 @@ const _kInterestOptions = {
   ],
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -196,7 +191,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // Companion state
   String _companionEmoji = '🐱';
   String _companionName = 'Mochi';
   String _companionAsset = 'assets/images/cat.png';
@@ -209,7 +203,6 @@ class _SettingsPageState extends State<SettingsPage> {
       CompanionRewardsService();
   final BadgeService _badgeService = BadgeService();
 
-  // Partner state
   String _partnerEmail = '';
   DateTime? _anniversaryDate;
 
@@ -235,7 +228,6 @@ class _SettingsPageState extends State<SettingsPage> {
         .collection('users')
         .doc(user.uid)
         .get();
-
     final furnitureSnapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -244,11 +236,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final data = doc.data() ?? {};
     final ownedIds = furnitureSnapshot.docs.map((d) => d.id).toSet();
-    if (ownedIds.isEmpty) {
-      ownedIds.add('sofa_brown');
-    }
+    if (ownedIds.isEmpty) ownedIds.add('sofa_brown');
 
-    // Check which item is currently equipped via isEquipped boolean
     String equippedVariant = 'brown';
     for (var fDoc in furnitureSnapshot.docs) {
       final fData = fDoc.data();
@@ -287,7 +276,6 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  // ── Sync Helper to update both users via email connection ────────────────
   Future<void> _syncToPartnerAndSelf({
     required String userEmail,
     required String partnerEmail,
@@ -768,12 +756,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                               item.id,
                                               item.variantKey,
                                             );
-                                            setSheet(() {
-                                              equippedKey = item.variantKey;
-                                            });
-                                            setState(() {
-                                              _equippedSofa = item.variantKey;
-                                            });
+                                            setSheet(
+                                              () =>
+                                                  equippedKey = item.variantKey,
+                                            );
+                                            setState(
+                                              () => _equippedSofa =
+                                                  item.variantKey,
+                                            );
                                           })
                                   : (!canBuy
                                         ? null
@@ -919,6 +909,66 @@ class _SettingsPageState extends State<SettingsPage> {
           const SnackBar(content: Text('Feedback note copied to clipboard')),
         );
       },
+    );
+  }
+
+  // ── Account Deletion Confirmation Dialog ──────────────────────────────────
+  Future<void> _showDeleteAccountDialog() async {
+    final cs = Theme.of(context).colorScheme;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'Your account and all your data will be deleted. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  // 1. Delete the user's Firestore document completely
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .delete();
+
+                  // 2. Delete the Firebase Auth account
+                  await user.delete();
+                }
+                // 3. Sign out locally to clear Google Sign-In cache
+                await AuthService().signOut();
+
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/welcome');
+                }
+              } catch (_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Failed to delete account. Please sign out and back in before trying again.',
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: cs.error,
+              foregroundColor: cs.onError,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1175,7 +1225,6 @@ class _SettingsPageState extends State<SettingsPage> {
                             partnerEmail: _partnerEmail,
                             dataToUpdate: updateData,
                           );
-
                           await _companionRewardsService.syncCompanionProfile(
                             userId: user.uid,
                             emoji: chosen.emoji,
@@ -1187,14 +1236,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           _companionName = newName;
                           _companionAsset = chosen.assetPath;
                         });
-                        if (mounted) {
-                          await _loadCompanion();
-                        }
-
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                        }
-
+                        if (mounted) await _loadCompanion();
+                        if (ctx.mounted) Navigator.pop(ctx);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -1377,7 +1420,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Text('You', style: Theme.of(context).textTheme.displayMedium),
           const SizedBox(height: 20),
 
-          // ── Profile card ──────────────────────────────────────────────
+          // ── Profile card (with delete account icon button replacing the pencil) ──
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -1441,7 +1484,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
-                Icon(Icons.edit_outlined, size: 18, color: cs.onSurfaceVariant),
+                IconButton(
+                  onPressed: _showDeleteAccountDialog,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 20,
+                    color: cs.error,
+                  ),
+                  tooltip: 'Delete Account',
+                ),
               ],
             ),
           ),

@@ -39,6 +39,6 @@ class PreferencesService {
         .doc(currentUser.uid)
         .collection('preferences')
         .doc('main')
-        .update({categoryKey: values});
+        .set({categoryKey: values}, SetOptions(merge: true));
   }
 }

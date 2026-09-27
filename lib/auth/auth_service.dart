@@ -7,6 +7,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _lastProfileExisted = false;
+
+  bool get lastProfileExisted => _lastProfileExisted;
 
   GoogleSignIn get _googleSignIn {
     final webClientId = _envValue('GOOGLE_WEB_CLIENT_ID');
@@ -43,6 +46,12 @@ class AuthService {
     final user = userCredential.user;
 
     if (user != null) {
+      final profileRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      final existingProfile = await profileRef.get();
+      _lastProfileExisted = existingProfile.exists;
+
       final normalizedPartnerEmail = partnerEmail?.trim().toLowerCase() ?? '';
       String foundPartnerUid = '';
 
@@ -75,10 +84,7 @@ class AuthService {
         }
       }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set(payload, SetOptions(merge: true));
+      await profileRef.set(payload, SetOptions(merge: true));
 
       // Mutual sync linking
       if (foundPartnerUid.isNotEmpty) {

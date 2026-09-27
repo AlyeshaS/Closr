@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -16,13 +17,26 @@ class AuthGate extends StatelessWidget {
         }
         final user = snapshot.data;
         if (user != null) {
-          // User is signed in, go to main
-          Future.microtask(() => Navigator.pushReplacementNamed(context, '/main'));
+          Future.microtask(() async {
+            final doc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+            if (context.mounted) {
+              if (doc.exists) {
+                Navigator.pushReplacementNamed(context, '/main');
+              } else {
+                Navigator.pushReplacementNamed(context, '/preferences');
+              }
+            }
+          });
         } else {
-          // User not signed in, go to welcome
-          Future.microtask(() => Navigator.pushReplacementNamed(context, '/welcome'));
+          Future.microtask(
+            () => Navigator.pushReplacementNamed(context, '/welcome'),
+          );
         }
-        // Show a blank screen while redirecting
+
         return const Scaffold(body: SizedBox.shrink());
       },
     );

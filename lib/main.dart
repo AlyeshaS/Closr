@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'tabs/suggestions/suggestions_screen.dart';
+import 'tabs/preferences/preferences_screen.dart';
 import 'welcome_screen.dart';
 import 'main_page.dart';
 import 'auth/auth_gate.dart';
@@ -372,6 +373,7 @@ class MyApp extends StatelessWidget {
           home: const AuthGate(),
           routes: {
             '/welcome': (context) => const WelcomeScreen(),
+            '/preferences': (context) => const PreferencesScreen(),
             '/main': (context) => const MainPage(),
             '/suggestions': (context) => SuggestionsScreen(),
           },
