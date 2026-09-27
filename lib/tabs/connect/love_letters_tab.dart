@@ -70,25 +70,27 @@ class _LoveLettersTabState extends State<LoveLettersTab>
 
     return Stack(
       children: [
-        // 1. Drifting background hearts
+        // 1. Drifting background hearts (Optimized with RepaintBoundary)
         Positioned.fill(
           child: IgnorePointer(
-            child: Container(
-              color: cs.surface,
-              child: Stack(
-                children: [
-                  for (int i = 0; i < 40; i++)
-                    _buildBackgroundHeart(i, cs, _bgAnimationController),
-                ],
+            child: RepaintBoundary(
+              child: Container(
+                color: cs.surface,
+                child: Stack(
+                  children: [
+                    for (int i = 0; i < 40; i++)
+                      _buildBackgroundHeart(i, cs, _bgAnimationController),
+                  ],
+                ),
               ),
             ),
           ),
         ),
 
-        // 2. Main interactive layer
+        // 2. Main interactive layer (Toggle position kept high right under tabs)
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: StreamBuilder<List<LoveLetter>>(
               initialData: const <LoveLetter>[],
               stream: LoveLetterService().streamForCurrentUser(),

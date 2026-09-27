@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../../../models/love_letter.dart';
-import '../../../services/love_letter_service.dart';
+import '../models/love_letter.dart';
+import '../services/love_letter_service.dart';
 
 class ComposeLoveLetterPage extends StatefulWidget {
   final LoveLetter? editingLetter;
@@ -424,25 +424,37 @@ class _ComposeLoveLetterPageState extends State<ComposeLoveLetterPage>
           ),
 
           if (_showSendAnimation)
-            IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _sendAnimController,
-                builder: (context, child) {
-                  return Align(
-                    alignment: Alignment(0.0, _heartYAnimation.value),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Align(
+                  alignment: const Alignment(0.0, 0.1),
+                  child: AnimatedBuilder(
+                    animation: _heartYAnimation,
+                    builder: (context, child) {
+                      final screenHeight = MediaQuery.sizeOf(context).height;
+                      return Transform.translate(
+                        offset: Offset(
+                          0,
+                          (_heartYAnimation.value - 0.1) * screenHeight / 2,
+                        ),
+                        child: child,
+                      );
+                    },
                     child: FadeTransition(
                       opacity: _heartFadeAnimation,
-                      child: Transform.scale(
-                        scale: _heartScaleAnimation.value,
-                        child: Icon(
-                          Icons.favorite_rounded,
-                          color: cs.primary,
-                          size: 120,
+                      child: ScaleTransition(
+                        scale: _heartScaleAnimation,
+                        child: RepaintBoundary(
+                          child: Icon(
+                            Icons.favorite_rounded,
+                            color: cs.primary,
+                            size: 120,
+                          ),
                         ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
         ],

@@ -15,7 +15,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  late Animation<double> _floatAnimation;
+  late Animation<Offset> _floatAnimation;
 
   @override
   void initState() {
@@ -43,9 +43,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       duration: const Duration(milliseconds: 3000),
     )..repeat(reverse: true);
 
-    _floatAnimation = Tween<double>(begin: -6.0, end: 6.0).animate(
-      CurvedAnimation(parent: _floatController, curve: Curves.easeInOutSine),
-    );
+    _floatAnimation =
+        Tween<Offset>(
+          begin: const Offset(0, -0.012),
+          end: const Offset(0, 0.012),
+        ).animate(
+          CurvedAnimation(
+            parent: _floatController,
+            curve: Curves.easeInOutSine,
+          ),
+        );
 
     _fadeController.forward();
   }
@@ -68,65 +75,62 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       body: SafeArea(
         child: Stack(
           children: [
-            // Floating background symbols (Hearts, letters, games, notes, etc.)
             Positioned.fill(
               child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _floatAnimation,
-                  builder: (context, child) {
-                    return Stack(
-                      children: [
-                        _BackgroundSymbol(
-                          icon: Icons.favorite_rounded,
-                          size: 28,
-                          top: 70 + _floatAnimation.value,
-                          left: 36,
-                          color: cs.primary,
-                          rotation: -0.15,
-                        ),
-                        _BackgroundSymbol(
-                          icon: Icons.mail_outline_rounded,
-                          size: 26,
-                          top: 140 - _floatAnimation.value,
-                          right: 42,
-                          color: cs.secondary,
-                          rotation: 0.18,
-                        ),
-                        _BackgroundSymbol(
-                          icon: Icons.sports_esports_rounded,
-                          size: 28,
-                          top: 280 + (_floatAnimation.value * 0.8),
-                          left: 28,
-                          color: cs.secondary,
-                          rotation: -0.1,
-                        ),
-                        _BackgroundSymbol(
-                          icon: Icons.auto_awesome_rounded,
-                          size: 22,
-                          top: 360 - (_floatAnimation.value * 0.9),
-                          right: 32,
-                          color: cs.primary,
-                          rotation: 0.2,
-                        ),
-                        _BackgroundSymbol(
-                          icon: Icons.note_alt_outlined,
-                          size: 26,
-                          bottom: 220 - _floatAnimation.value,
-                          left: 48,
-                          color: cs.primary,
-                          rotation: 0.12,
-                        ),
-                        _BackgroundSymbol(
-                          icon: Icons.favorite_border_rounded,
-                          size: 24,
-                          bottom: 140 + _floatAnimation.value,
-                          right: 50,
-                          color: cs.secondary,
-                          rotation: -0.2,
-                        ),
-                      ],
-                    );
-                  },
+                child: SlideTransition(
+                  position: _floatAnimation,
+                  child: Stack(
+                    children: [
+                      _BackgroundSymbol(
+                        icon: Icons.favorite_rounded,
+                        size: 28,
+                        top: 70,
+                        left: 36,
+                        color: cs.primary,
+                        rotation: -0.15,
+                      ),
+                      _BackgroundSymbol(
+                        icon: Icons.mail_outline_rounded,
+                        size: 26,
+                        top: 140,
+                        right: 42,
+                        color: cs.secondary,
+                        rotation: 0.18,
+                      ),
+                      _BackgroundSymbol(
+                        icon: Icons.sports_esports_rounded,
+                        size: 28,
+                        top: 280,
+                        left: 28,
+                        color: cs.secondary,
+                        rotation: -0.1,
+                      ),
+                      _BackgroundSymbol(
+                        icon: Icons.auto_awesome_rounded,
+                        size: 22,
+                        top: 360,
+                        right: 32,
+                        color: cs.primary,
+                        rotation: 0.2,
+                      ),
+                      _BackgroundSymbol(
+                        icon: Icons.note_alt_outlined,
+                        size: 26,
+                        bottom: 220,
+                        left: 48,
+                        color: cs.primary,
+                        rotation: 0.12,
+                      ),
+                      _BackgroundSymbol(
+                        icon: Icons.favorite_border_rounded,
+                        size: 24,
+                        bottom: 140,
+                        right: 50,
+                        color: cs.secondary,
+                        rotation: -0.2,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

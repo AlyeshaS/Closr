@@ -545,6 +545,8 @@ class _ResolveBackdrop extends StatefulWidget {
 class _ResolveBackdropState extends State<_ResolveBackdrop>
     with SingleTickerProviderStateMixin {
   late final AnimationController _movementController;
+  late final Animation<Offset> _topBlobAnimation;
+  late final Animation<Offset> _bottomBlobAnimation;
 
   @override
   void initState() {
@@ -553,6 +555,14 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
       vsync: this,
       duration: const Duration(seconds: 8),
     )..repeat(reverse: true);
+    _topBlobAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(15 / 180, 0),
+    ).animate(_movementController);
+    _bottomBlobAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(18 / 210, 0),
+    ).animate(_movementController);
   }
 
   @override
@@ -570,39 +580,37 @@ class _ResolveBackdropState extends State<_ResolveBackdrop>
       color: cs.surface,
       child: Stack(
         children: [
-          AnimatedBuilder(
-            animation: _movementController,
-            builder: (context, child) {
-              return Positioned(
-                top: -40 + (_movementController.value * 15),
-                right: -30 - (_movementController.value * 12),
-                child: child!,
-              );
-            },
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                color: cs.primary.withOpacity(isDark ? 0.12 : 0.07),
-                shape: BoxShape.circle,
+          Positioned(
+            top: -40,
+            right: -30,
+            child: RepaintBoundary(
+              child: SlideTransition(
+                position: _topBlobAnimation,
+                child: Container(
+                  width: 180,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(isDark ? 0.12 : 0.07),
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ),
             ),
           ),
-          AnimatedBuilder(
-            animation: _movementController,
-            builder: (context, child) {
-              return Positioned(
-                bottom: -60 - (_movementController.value * 12),
-                left: -40 + (_movementController.value * 18),
-                child: child!,
-              );
-            },
-            child: Container(
-              width: 210,
-              height: 210,
-              decoration: BoxDecoration(
-                color: cs.secondary.withOpacity(isDark ? 0.10 : 0.06),
-                shape: BoxShape.circle,
+          Positioned(
+            bottom: -60,
+            left: -40,
+            child: RepaintBoundary(
+              child: SlideTransition(
+                position: _bottomBlobAnimation,
+                child: Container(
+                  width: 210,
+                  height: 210,
+                  decoration: BoxDecoration(
+                    color: cs.secondary.withOpacity(isDark ? 0.10 : 0.06),
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ),
             ),
           ),
