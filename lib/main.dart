@@ -6,11 +6,11 @@ import 'tabs/suggestions/suggestions_screen.dart';
 import 'tabs/preferences/preferences_screen.dart';
 import 'welcome_screen.dart';
 import 'main_page.dart';
-import 'auth/auth_gate.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme_provider.dart';
 import 'services/notifications_service.dart';
 import 'theme/closr_colors.dart'; // Ensure you import your custom colors file!
+import 'splash_loading_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -370,9 +370,10 @@ class MyApp extends StatelessWidget {
           theme: _lightTheme(),
           darkTheme: _darkTheme(),
           themeMode: themeProvider.themeMode,
-          home: const AuthGate(),
+          home: const SplashLoadingScreen(),
           routes: {
             '/welcome': (context) => const WelcomeScreen(),
+            '/splash': (context) => const SplashLoadingScreen(),
             '/preferences': (context) => const PreferencesScreen(),
             '/main': (context) => const MainPage(),
             '/suggestions': (context) => SuggestionsScreen(),

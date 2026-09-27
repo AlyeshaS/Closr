@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../tabs/preferences/preferences_service.dart';
+import '../welcome_transition_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -66,7 +67,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
 
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/main');
+      final rawName = user?.displayName?.trim() ?? '';
+      final name = rawName.isEmpty
+          ? 'there'
+          : rawName.split(RegExp(r'\s+')).first;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => WelcomeTransitionScreen(name: name)),
+      );
     }
   }
 

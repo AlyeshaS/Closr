@@ -18,7 +18,9 @@ part 'home_page_inventory.dart';
 const double kPetFloorOffset = 16.0;
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final VoidCallback? onReady;
+
+  const HomePage({super.key, this.onReady});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -32,7 +34,6 @@ class _HomePageState extends State<HomePage>
   final GeminiService _geminiService = GeminiService();
   bool _isEditingLayout = false;
   String _selectedRoomTheme = 'room_pink';
-  bool _isLoadingRoom = true;
   bool _hasFurnitureSelection = false;
   bool _isSelectedFurnitureLocked = false;
   bool _isFurnitureTrayOpen = false;
@@ -68,9 +69,9 @@ class _HomePageState extends State<HomePage>
     if (user == null) {
       if (mounted) {
         setState(() {
-          _isLoadingRoom = false;
           _entrance.forward();
         });
+        widget.onReady?.call();
       }
       return;
     }
@@ -92,16 +93,16 @@ class _HomePageState extends State<HomePage>
           if (equippedRoom != null) {
             _selectedRoomTheme = equippedRoom;
           }
-          _isLoadingRoom = false;
           _entrance.forward();
         });
+        widget.onReady?.call();
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _isLoadingRoom = false;
           _entrance.forward();
         });
+        widget.onReady?.call();
       }
     }
   }
@@ -532,49 +533,6 @@ class _HomePageState extends State<HomePage>
                 });
               }
             },
-          ),
-        ),
-
-        IgnorePointer(
-          ignoring: !_isLoadingRoom,
-          child: AnimatedOpacity(
-            opacity: _isLoadingRoom ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.easeInOut,
-            child: ColoredBox(
-              color: cs.surfaceContainerHighest,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.8, end: 1.1),
-                      duration: const Duration(milliseconds: 900),
-                      curve: Curves.easeInOut,
-                      builder: (context, scale, child) {
-                        return Transform.scale(
-                          scale: scale,
-                          child: Icon(
-                            Icons.chair_alt_rounded,
-                            size: 48,
-                            color: cs.primary,
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ),
         ),
 

@@ -195,8 +195,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       const SizedBox(height: 36),
 
                       // Centered Headline
-                      Text(
-                        'A little closer,\nevery day.',
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(text: 'A little '),
+                            TextSpan(
+                              text: 'CLOSR',
+                              style: TextStyle(color: cs.primary),
+                            ),
+                            const TextSpan(text: ',\nevery day.'),
+                          ],
+                        ),
                         textAlign: TextAlign.center,
                         style: textTheme.displayMedium?.copyWith(
                           fontSize: 36,
